@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartBarangay | Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="{% if official_mode %}official-mode{% endif %}" data-dashboard-role="{{ dashboard_role }}" data-dashboard-department="{{ dashboard_department or '' }}">
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <div class="brand">
+                <div class="brand-mark"><i data-lucide="shield"></i></div>
+                <div>
+                    <strong>SmartBarangay</strong>
+                    <span>Barangay Don Felipe Larrazabal</span>
+                </div>
+            </div>
+            <nav class="main-nav" aria-label="Main navigation">
+                <a class="nav-item active" href="#" data-section="Dashboard"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></a>
+                <a class="nav-item" href="#" data-section="Manage Officials"><i data-lucide="user-round-cog"></i><span>Manage Officials</span></a>
+                <a class="nav-item" href="#" data-section="Residents"><i data-lucide="users-round"></i><span>Manage Residents</span></a>
+                <a class="nav-item" href="#" data-section="Documents"><i data-lucide="file-text"></i><span>Documents</span></a>
+                <a class="nav-item" href="#" data-section="Concerns"><i data-lucide="message-square"></i><span>Concerns</span><b class="nav-count">6</b></a>
+                <a class="nav-item" href="#" data-section="Announcements"><i data-lucide="send"></i><span>Announcements</span></a>
+                <a class="nav-item" href="#" data-section="Weather & Alerts"><i data-lucide="cloud-lightning"></i><span>Weather &amp; Alerts</span><b class="alert-dot"></b></a>
+                <a class="nav-item" href="#" data-section="Reports"><i data-lucide="bar-chart-3"></i><span>Reports</span></a>
+            </nav>
+            <div class="sidebar-footer">
+                <a class="nav-item" href="#" data-section="Settings"><i data-lucide="settings"></i><span>Settings</span></a>
+                <a class="nav-item" href="#" data-action="logout"><i data-lucide="log-out"></i><span>Logout</span></a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="topbar">
+                <button class="menu-toggle" type="button" aria-label="Toggle navigation" aria-controls="sidebar" aria-expanded="true"><i data-lucide="menu"></i></button>
+                <div class="search"><i data-lucide="search"></i><input aria-label="Search" placeholder="Search residents, documents..." /></div>
+                <div class="top-actions">
+                    <button class="signal" type="button" data-action="signal"><i data-lucide="triangle-alert"></i><span class="signal-label">Weather loading...</span></button>
+                    <div class="notification-wrap"><button class="icon-button notification" type="button" aria-label="Announcements" aria-expanded="false"><i data-lucide="bell"></i><span>0</span></button><div class="announcement-popover" id="announcement-popover" hidden><div class="popover-heading"><strong>Announcements</strong><button type="button" class="popover-close" aria-label="Close announcements"><i data-lucide="x"></i></button></div><div id="notification-list"><div class="empty-state">Loading announcements...</div></div></div></div>
+                    <button class="profile" type="button" aria-expanded="false"><div class="avatar">KR</div><div><strong>Kap. Ramirez</strong><small>Barangay Captain</small></div><i data-lucide="chevron-down"></i></button>
+                    <div class="profile-menu"><button type="button">View profile</button><button type="button">Account settings</button></div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <div class="breadcrumb"><span>SmartBarangay</span><i data-lucide="chevron-right"></i><b>Dashboard</b></div>
+                <div id="dashboard-view"{% if official_mode %} hidden{% endif %}>
+                <section class="page-heading"><div><h1 id="dashboard-title">Resident Analytics Dashboard</h1><p id="dashboard-subtitle">Barangay Don Felipe Larrazabal · Ormoc City, Leyte</p></div><div class="sync"><i data-lucide="activity"></i> Live sync: <time id="dashboard-sync-time"></time></div></section>
+
+                <section class="metric-grid">
+                    <article class="metric-card"><div class="metric-label">TOTAL RESIDENTS <i data-lucide="users-round"></i></div><strong id="dashboard-total-residents">0</strong><span class="trend positive">From Supabase</span></article>
+                    <article class="metric-card"><div class="metric-label">HOUSEHOLDS <i data-lucide="house"></i></div><strong id="dashboard-households">0</strong><span class="trend positive">From Supabase</span></article>
+                    <article class="metric-card"><div class="metric-label">DOCS ISSUED (CURRENT MONTH) <i data-lucide="file-text"></i></div><strong id="dashboard-documents">0</strong><span class="trend positive">From Supabase</span></article>
+                    <article class="metric-card"><div class="metric-label">OPEN CONCERNS <i data-lucide="message-square"></i></div><strong id="dashboard-concerns">0</strong><span class="trend positive">From Supabase</span></article>
+                </section>
+
+                <section class="visual-grid">
+                    <article class="panel registration-panel">
+                        <div class="panel-heading"><h2>Resident Registrations</h2><span id="registration-range"></span></div>
+                        <div class="chart-wrap" id="registration-chart" aria-busy="true">
+                            <div class="y-axis" id="registration-y-axis" aria-hidden="true"><span>4</span><span>3</span><span>2</span><span>1</span><span>0</span></div>
+                            <svg class="line-chart" viewBox="0 0 820 220" preserveAspectRatio="none" aria-label="Resident registration chart" role="img">
+                                <defs><linearGradient id="chart-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#F59E0B" stop-opacity=".22"/><stop offset="1" stop-color="#10B981" stop-opacity=".02"/></linearGradient></defs>
+                                <g class="grid-lines" id="registration-grid-lines"><path d="M0 10H820M0 62.5H820M0 115H820M0 167.5H820M0 220H820"/></g>
+                                <path class="area" id="registration-area" d="M0 220 L820 220 V220 H0Z"/>
+                                <path class="line gold" id="registered-line" d="M0 220 L820 220"/>
+                                <path class="line green" id="verified-line" d="M0 220 L820 220"/>
+                                <g id="registered-points" aria-label="Registered residents"></g>
+                                <g id="verified-points" aria-label="Verified residents"></g>
+                            </svg>
+                            <div class="x-axis" id="registration-labels"></div>
+                            <div class="chart-status" id="registration-status" role="status">Loading registration data...</div>
+                            <div class="registration-tooltip" id="registration-tooltip" role="status" aria-live="polite" hidden>
+                                <strong data-tooltip-month></strong>
+                                <span data-tooltip-values></span>
+                            </div>
+                        </div>
+                        <div class="legend"><span><i class="legend-dot gold"></i>Registered</span><span><i class="legend-dot green"></i>Verified</span></div>
+                    </article>
+                    <article class="panel age-panel">
+                        <div class="panel-heading"><h2>Age Demographics</h2></div>
+                        <div class="donut-wrap"><div class="donut" id="age-donut"></div></div>
+                        <div class="age-legend" id="age-legend"></div>
+                    </article>
+                </section>
+                <section class="visual-grid admin-overview-grid">
+                    <article class="panel overview-chart"><div class="panel-heading"><h2>Document Requests by Type</h2><span>From Supabase</span></div><div class="bar-chart" id="document-type-chart" aria-label="Document request totals by type"></div><div class="legend"><span><i class="legend-dot purple"></i>Business</span><span><i class="legend-dot gold"></i>Clearance</span><span><i class="legend-dot green"></i>Indigency</span><span><i class="legend-dot blue"></i>Residency</span></div></article>
+                    <article class="panel overview-chart"><div class="panel-heading"><h2>Concerns Trend</h2><span>Last 7 months</span></div><div class="trend-chart" id="concerns-trend-chart"></div><div class="legend"><span><i class="legend-dot red"></i>Escalated</span><span><i class="legend-dot gold"></i>Open</span><span><i class="legend-dot green"></i>Resolved</span></div></article>
+                </section>
+                <section class="panel officials-overview"><div class="panel-heading"><h2>Department Officials Overview</h2><span id="officials-overview-count">Loading...</span></div><div class="overview-table" id="officials-overview-table"><div><b>NAME</b><b>DEPARTMENT</b><b>POSITION</b><b>STATUS</b></div></div></section>
+                <aside class="governance-alert"><i data-lucide="shield-check"></i><div><strong>Data quality review</strong><p id="governance-summary">Loading current data quality metrics...</p></div><button class="outline-button" type="button" data-action="review-alerts">Review Now</button></aside>
+                </div>
+
+                <div class="app-view" id="manage-officials-view" hidden><section class="page-heading"><div><h1>Manage Barangay Officials</h1><p>Register and manage barangay department officials — Admin only</p></div><button class="primary-button" type="button" id="register-official"><i data-lucide="user-plus"></i> Register Official</button></section><section class="resident-table-panel officials-panel"><div class="table-toolbar"><div class="table-search"><i data-lucide="search"></i><input id="official-search" placeholder="Search officials..." aria-label="Search officials" /></div><select id="official-department-filter" aria-label="Filter officials by department"><option value="all">All Departments</option><option>Health &amp; Sanitation</option><option>Peace &amp; Order</option><option>Infrastructure</option><option>Social Services</option><option>DRRMC</option></select></div><div class="resident-table-wrap"><table class="resident-table"><thead><tr><th>OFFICIAL ID</th><th>NAME</th><th>DEPARTMENT</th><th>POSITION</th><th>EMAIL</th><th>PHONE</th><th>STATUS</th></tr></thead><tbody id="official-rows"></tbody></table></div><div class="table-footer"><span id="official-count">Showing 0 officials</span></div></section></div>
+
+                <div id="official-dashboard-view"{% if not official_mode %} hidden{% endif %}><section class="page-heading official-heading"><div><h1 id="official-dashboard-title">Department Dashboard</h1><p id="official-dashboard-subtitle">Welcome, department official</p></div><div class="sync"><i data-lucide="activity"></i> Live sync: <time id="official-sync-time"></time></div></section><section class="department-banner"><i data-lucide="users-round"></i><div><strong id="official-department-label">Department</strong><p>Your dashboard is filtered to department-related records and concerns.</p></div></section><section class="resident-metrics official-metrics"><article class="metric-card"><div class="metric-label">OPEN CONCERNS <i data-lucide="message-square"></i></div><strong id="official-open-concerns">0</strong></article><article class="metric-card"><div class="metric-label">PENDING DOCS <i data-lucide="file-text"></i></div><strong id="official-pending-docs">0</strong></article><article class="metric-card"><div class="metric-label">RESOLVED (<span id="official-resolved-month"></span>) <i data-lucide="circle-check"></i></div><strong id="official-resolved">0</strong></article><article class="metric-card"><div class="metric-label">DEPT. RESIDENTS <i data-lucide="users-round"></i></div><strong id="official-residents">0</strong></article></section><section class="data-panel department-panel"><h2><i data-lucide="message-square"></i> Department Concerns</h2><div class="record-list" id="official-concerns-list"></div></section><section class="data-panel department-panel"><h2><i data-lucide="file-text"></i> Department Document Requests</h2><div class="record-list" id="official-documents-list"></div></section></div>
+
+                <div id="residents-view" hidden>
+                    <section class="page-heading residents-heading"><div><h1>Resident Management</h1><p>Manage and verify resident profiles and household records</p></div><button class="primary-button" type="button" id="add-resident"><i data-lucide="user-plus"></i> Add Resident</button></section>
+                    <section class="resident-metrics">
+                        <article class="metric-card"><div class="metric-label">TOTAL RESIDENTS <i data-lucide="users-round"></i></div><strong id="residents-total">0</strong><span class="trend positive">From Supabase</span></article>
+                        <article class="metric-card"><div class="metric-label">VERIFIED <i data-lucide="circle-check"></i></div><strong id="residents-verified">0</strong><span class="trend positive">From Supabase</span></article>
+                        <article class="metric-card"><div class="metric-label">PENDING VERIFICATION <i data-lucide="clock-3"></i></div><strong id="residents-pending">0</strong><span class="trend negative">From Supabase</span></article>
+                    </section>
+                    <section class="resident-table-panel">
+                        <div class="table-toolbar"><div class="table-search"><i data-lucide="search"></i><input id="resident-search" placeholder="Search by name or ID..." aria-label="Search residents by name or ID" /></div><select id="status-filter" aria-label="Filter residents by status"><option value="all">All</option><option value="Verified">Verified</option><option value="Pending">Pending</option><option value="Inactive">Inactive</option></select><button class="outline-button" type="button" id="export-residents"><i data-lucide="download"></i> Export</button></div>
+                        <div class="resident-table-wrap"><table class="resident-table"><thead><tr><th>RESIDENT ID</th><th>FULL NAME</th><th>ADDRESS</th><th>HOUSEHOLD</th><th>AGE / GENDER</th><th>STATUS</th><th>RESIDENT SINCE</th><th></th></tr></thead><tbody id="resident-rows"></tbody></table></div>
+                        <div class="table-footer"><span id="resident-count">Showing 0 residents</span><div class="pagination"><button class="current" type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">...</button><button type="button">24</button></div></div>
+                    </section>
+                </div>
+
+                <div class="app-view" id="documents-view" hidden><section class="page-heading"><div><h1>Document Processing</h1><p>Certificate issuance and document request management</p></div><button class="primary-button" type="button" data-action="new-document"><i data-lucide="file-plus-2"></i> New Request</button></section><section class="metric-grid compact-metrics"><article class="metric-card"><div class="metric-label">TOTAL REQUESTS</div><strong id="documents-total">0</strong><span class="trend positive">From Supabase</span></article><article class="metric-card"><div class="metric-label">PENDING</div><strong id="documents-pending">0</strong></article><article class="metric-card"><div class="metric-label">APPROVED</div><strong id="documents-approved">0</strong></article><article class="metric-card"><div class="metric-label">REJECTED</div><strong id="documents-rejected">0</strong></article></section><section class="data-panel"><div class="filter-tabs" data-filter-target="documents"><button class="current" data-filter="all">All</button><button data-filter="Pending">Pending</button><button data-filter="Processing">Processing</button><button data-filter="Approved">Approved</button><button data-filter="Rejected">Rejected</button><input placeholder="Search..." data-search="documents"></div><div class="record-list" id="documents-list"></div></section></div>
+
+                <div class="app-view" id="concerns-view" hidden><section class="page-heading"><div><h1>Community Concerns</h1><p>Track and resolve resident-submitted community issues</p></div><button class="primary-button" type="button" data-action="log-concern"><i data-lucide="message-square-plus"></i> Log Concern</button></section><div class="filter-tabs" data-filter-target="concerns"><button class="current" data-filter="all">All</button><button data-filter="Open">Open</button><button data-filter="In Progress">In Progress</button><button data-filter="Escalated">Escalated</button><button data-filter="Resolved">Resolved</button></div><div class="record-list concern-list" id="concerns-list"></div></div>
+
+                <div class="app-view" id="announcements-view" hidden><section class="page-heading"><div><h1>Announcements</h1><p>Publish and manage public announcements and advisories</p></div><button class="primary-button" type="button" data-action="new-announcement"><i data-lucide="send"></i> New Announcement</button></section><div class="record-list announcement-list" id="announcements-list"></div></div>
+
+                <div class="app-view" id="weather-alerts-view" hidden><section class="page-heading"><div><h1>Weather &amp; Emergency Monitoring</h1><p>Real-time weather data and disaster preparedness — Ormoc City, Leyte</p></div><button class="outline-button" type="button" data-action="broadcast"><i data-lucide="radio"></i> Broadcast</button></section><div class="alert-banner" id="weather-banner"></div><section class="metric-grid compact-metrics"><article class="metric-card"><div class="metric-label">TEMPERATURE</div><strong>28.4°C</strong><span class="trend">From weather service</span></article><article class="metric-card"><div class="metric-label">RAINFALL (24H)</div><strong>42.8 mm</strong><span class="trend">Heavy rain expected</span></article><article class="metric-card"><div class="metric-label">WIND SPEED</div><strong>35 km/h</strong><span class="trend">NE direction</span></article><article class="metric-card"><div class="metric-label">VISIBILITY</div><strong>8 km</strong><span class="trend">Partly cloudy</span></article></section><section class="data-panel"><h2>Recent Alerts</h2><div class="record-list" id="weather-list"></div></section></div>
+
+                <div class="app-view" id="reports-view" hidden><section class="page-heading"><div><h1>Reports &amp; Records</h1><p>Generate, download, and manage official barangay reports</p></div></section><div class="report-grid"><button class="report-card" data-action="download-report" data-report="residents">Monthly Resident Registration Report <i data-lucide="download"></i></button><button class="report-card" data-action="download-report" data-report="documents">Document Issuance Summary <i data-lucide="download"></i></button><button class="report-card" data-action="download-report" data-report="concerns">Community Concerns Monitoring Report <i data-lucide="download"></i></button><button class="report-card" data-action="download-report" data-report="demographics">Demographic Profile Report <i data-lucide="download"></i></button><button class="report-card" data-action="download-report" data-report="weather-alerts">Emergency Preparedness Report <i data-lucide="download"></i></button><button class="report-card" data-action="download-report" data-report="audit">AI Governance Audit Log <i data-lucide="download"></i></button></div></div>
+
+                <div class="app-view" id="settings-view" hidden><section class="page-heading"><div><h1>System Settings</h1><p>Configure system preferences, security, and integrations</p></div></section><div class="settings-grid"><button class="setting-card" data-setting="general">General<small>Barangay profile, language, timezone</small></button><button class="setting-card" data-setting="security">Security &amp; Access<small>RBAC roles, passwords, audit trails</small></button><button class="setting-card" data-setting="notifications">Notifications<small>SMS, email, and push notification settings</small></button><button class="setting-card" data-setting="governance">AI Governance<small>Validation rules and automation settings</small></button><button class="setting-card" data-setting="backup">Data &amp; Backup<small>Export, backup, and data privacy settings</small></button></div></div>
+            </div>
+        </main>
+    </div>
+    <div class="modal" id="resident-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2 id="resident-modal-title">Register New Resident</h2><p>Create a new resident profile.</p></div><button type="button" class="modal-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="resident-form"><label>Full name<input name="name" required placeholder="e.g. Maria Santos"></label><label>Address<input name="address" required placeholder="e.g. Purok 3, Blk 4 Lot 2"></label><label>Household ID<input name="household" placeholder="e.g. HH-0042"></label><div class="form-row"><label>Age<input name="age" type="number" min="1" max="120" required></label><label>Gender<select name="gender"><option>Female</option><option>Male</option><option>Other</option></select></label></div><label>Email<input name="email" type="email" placeholder="e.g. maria@email.com"></label><label>Phone<input name="phone" placeholder="e.g. 09171234567"></label><button class="primary-button" type="submit">Register Resident</button></form></div></div>
+    <div class="modal" id="workflow-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2 id="workflow-title">New request</h2><p id="workflow-description">Complete the details below.</p></div><button type="button" class="modal-close workflow-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="workflow-form"><label id="workflow-type-field">Document type<select name="document_type"><option>Barangay Clearance</option><option>Certificate of Residency</option><option>Certificate of Indigency</option><option>Business Clearance</option></select></label><label id="workflow-resident-field" hidden>Resident name<input name="resident_name" required placeholder="Resident requesting the document"></label><label id="workflow-purpose-field" hidden>Purpose<input name="purpose" placeholder="Reason for the request"></label><label id="workflow-address-field" hidden>Applicant address<input name="applicant_address" placeholder="Complete residential address"></label><label id="workflow-contact-field" hidden>Contact number<input name="applicant_contact" placeholder="e.g. 09171234567"></label><label id="workflow-birth-date-field" hidden>Date of birth<input name="applicant_date_of_birth" type="date"></label><label id="workflow-birth-place-field" hidden>Place of birth<input name="applicant_place_of_birth"></label><label id="workflow-civil-status-field" hidden>Civil status<select name="applicant_civil_status"><option value="">Choose civil status</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></label><label id="workflow-business-name-field" hidden>Business name<input name="business_name"></label><label id="workflow-business-address-field" hidden>Business address<input name="business_address"></label><label id="workflow-category-field" hidden>Category<select name="category"><option>Infrastructure</option><option>Health &amp; Sanitation</option><option>Peace &amp; Order</option><option>Social Services</option><option>Other</option><option>General</option><option>Assembly</option><option>Health</option><option>Emergency</option><option>Livelihood</option></select></label><label id="workflow-priority-field" hidden>Priority<select name="priority"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></label><label id="workflow-title-field" hidden>Title<input name="title" placeholder="Describe the concern or announcement"></label><label id="workflow-description-field" hidden>Description<textarea name="description" rows="4" placeholder="Provide supporting details"></textarea></label><label id="workflow-audience-field" hidden>Audience<select name="audience"><option>All Residents</option><option>18–45 yrs</option><option>Seniors 60+</option></select></label><button class="primary-button" type="submit">Submit</button></form></div></div>
+    <div class="modal" id="alert-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2>Broadcast emergency alert</h2><p>Publish an alert to the weather and alerts dashboards.</p></div><button type="button" class="modal-close alert-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="alert-form"><label>Alert type<input name="alert_type" required placeholder="e.g. ACTIVE ADVISORY"></label><label>Title<input name="title" required placeholder="Emergency alert title"></label><label>Description<textarea name="description" rows="4" required placeholder="Provide official instructions"></textarea></label><label>Severity<select name="severity"><option>Advisory</option><option>Warning</option><option>Critical</option><option>Escalated</option></select></label><button class="primary-button" type="submit">Broadcast alert</button></form></div></div>
+    <div class="modal" id="status-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2>Update status</h2><p>Choose the current processing status.</p></div><button type="button" class="modal-close status-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="status-form"><input type="hidden" name="id"><input type="hidden" name="kind"><label>Status<select name="status"><option>Pending</option><option>In Progress</option><option>Processing</option><option>Approved</option><option>Rejected</option><option>Resolved</option></select></label><label id="schedule-date-field">Pickup date<input type="date" name="scheduled_date"></label><label id="schedule-time-field">Pickup time<input type="time" name="scheduled_time"></label><button class="primary-button" type="submit">Save status</button></form></div></div>
+    <div class="modal" id="official-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2>Register Barangay Official</h2><p>Admin access only</p></div><button type="button" class="modal-close official-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="official-form"><label>Full name<input name="full_name" required placeholder="e.g. Dr. Maria Santos"></label><label>Position / designation<input name="position" required placeholder="e.g. Barangay Health Officer"></label><label>Email address<input name="email" type="email" required placeholder="name@brgy.gov.ph"></label><label>Phone number<input name="phone" required placeholder="e.g. 09171234567"></label><label>Temporary password<input name="password" type="password" minlength="8" required placeholder="At least 8 characters"></label><label>Department<select name="department" required><option value="">Choose department</option><option>Health &amp; Sanitation</option><option>Peace &amp; Order</option><option>Infrastructure</option><option>Social Services</option><option>DRRMC</option></select></label><button class="primary-button" type="submit">Register Official</button></form></div></div>
+    <div class="modal" id="profile-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2>View Profile</h2><p>Update your personal information.</p></div><button type="button" class="modal-close profile-close" aria-label="Close profile"><i data-lucide="x"></i></button></div><form id="profile-form"><div class="profile-photo-editor"><div class="avatar profile-preview" id="profile-preview">KR</div><label class="outline-button">Change photo<input id="profile-photo" type="file" accept="image/png,image/jpeg,image/webp" hidden></label></div><label>Full name<input name="full_name" required></label><label>Position / designation<input name="position"></label><label>Phone number<input name="phone"></label><button class="primary-button" type="submit">Save profile</button></form></div></div>
+    <div class="modal" id="password-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2>Account Settings</h2><p>Change your account password.</p></div><button type="button" class="modal-close password-close" aria-label="Close account settings"><i data-lucide="x"></i></button></div><form id="password-form"><label>New password<input name="password" type="password" minlength="8" required placeholder="At least 8 characters"></label><label>Confirm password<input name="confirmation" type="password" minlength="8" required placeholder="Repeat your new password"></label><button class="primary-button" type="submit">Update password</button></form></div></div>
+    <div class="toast" role="status" aria-live="polite"></div>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="{{ url_for('static', filename='live-clock.js') }}"></script>
+    <script>
+        lucide.createIcons();
+
+        const sidebar = document.querySelector('.sidebar');
+        const toast = document.querySelector('.toast');
+        const smartBarangayTime = window.smartBarangayTime;
+        smartBarangayTime.startLiveClock({ syncSelector: '#dashboard-sync-time', monthSelector: '#official-resolved-month' });
+        smartBarangayTime.startLiveClock({ syncSelector: '#official-sync-time' });
+        document.querySelector('#registration-range').textContent = smartBarangayTime.formatCurrentMonthRange();
+        let currentRole = document.body.dataset.dashboardRole || null;
+        const showToast = (message) => {
+            toast.textContent = message;
+            toast.classList.add('visible');
+            window.clearTimeout(showToast.timer);
+            showToast.timer = window.setTimeout(() => toast.classList.remove('visible'), 2400);
+        };
+        const applyRoleAccess = async () => {
+            const response = await fetch('/api/me');
+            if (!response.ok) { window.location.href = '/login'; return; }
+            const result = await response.json();
+            currentRole = result.user.role === 'official' ? 'barangay_official' : result.user.role;
+            const officialSections = new Set(['Dashboard', 'Residents', 'Documents', 'Concerns', 'Announcements']);
+            document.querySelectorAll('.nav-item[data-section]').forEach((item) => {
+                const allowed = currentRole === 'barangay_official' ? officialSections.has(item.dataset.section) : result.access.includes(item.dataset.section);
+                item.hidden = !allowed;
+            });
+            document.querySelector('.profile strong').textContent = result.user.full_name || result.user.email;
+            document.querySelector('.profile small').textContent = currentRole.replace('_', ' ');
+            document.querySelector('#profile-form [name="full_name"]').value = result.user.full_name || '';
+            document.querySelector('#profile-form [name="position"]').value = result.user.position || '';
+            document.querySelector('#profile-form [name="phone"]').value = result.user.phone || '';
+            if (result.user.avatar_url) { document.querySelector('.avatar').style.backgroundImage = `url(${result.user.avatar_url})`; document.querySelector('.avatar').textContent = ''; document.querySelector('#profile-preview').style.backgroundImage = `url(${result.user.avatar_url})`; document.querySelector('#profile-preview').textContent = ''; }
+            const isOfficial = currentRole === 'barangay_official';
+            document.querySelector('#dashboard-title').textContent = isOfficial ? `${result.user.department || 'Barangay'} Operations Dashboard` : 'Administrator Dashboard';
+            document.querySelector('#dashboard-subtitle').textContent = isOfficial ? `${result.user.department || 'Department'} · Barangay Don Felipe Larrazabal · Ormoc City, Leyte` : 'All barangay systems · Don Felipe Larrazabal · Ormoc City, Leyte';
+            if (isOfficial) {
+                document.querySelector('.nav-item[data-section="Residents"] span').textContent = 'Register Residents';
+                document.querySelector('#dashboard-view').hidden = true;
+                document.querySelector('#official-dashboard-view').hidden = false;
+            }
+        };
+        applyRoleAccess();
+
+        const loadOfficialDashboard = async () => {
+            if (currentRole !== 'barangay_official') return;
+            const department = document.body.dataset.dashboardDepartment || 'Department';
+            const [concernsResponse, documentsResponse, residentsResponse] = await Promise.all([fetch('/api/concerns'), fetch('/api/documents'), fetch('/api/residents')]);
+            const concerns = concernsResponse.ok ? (await concernsResponse.json()).data || [] : [];
+            const documents = documentsResponse.ok ? (await documentsResponse.json()).data || [] : [];
+            const residents = residentsResponse.ok ? (await residentsResponse.json()).data || [] : [];
+            document.querySelector('#official-dashboard-title').textContent = department;
+            document.querySelector('#official-dashboard-subtitle').textContent = `Welcome, ${document.querySelector('.profile strong').textContent} · ${department}`;
+            document.querySelector('#official-department-label').textContent = `${department} Department`;
+            document.querySelector('#official-open-concerns').textContent = concerns.filter((item) => !['Resolved'].includes(item.status)).length;
+            document.querySelector('#official-pending-docs').textContent = documents.filter((item) => ['Pending', 'In Progress', 'Processing'].includes(item.status)).length;
+            document.querySelector('#official-resolved').textContent = concerns.filter((item) => item.status === 'Resolved').length;
+            document.querySelector('#official-residents').textContent = residents.length;
+            document.querySelector('#official-concerns-list').innerHTML = concerns.length ? concerns.slice(0, 6).map((item) => `<div class="department-row"><div><strong>${escapeHtml(item.title)}</strong><small>By ${escapeHtml(item.submitted_by)} · ${escapeHtml(smartBarangayTime.formatDate(item.submitted_at))}</small></div><span class="tag priority-${String(item.priority || '').toLowerCase()}">${escapeHtml(item.priority)}</span><em class="status ${String(item.status || 'Pending').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status)}</em><button class="status-edit" data-kind="concern" data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(item.status || 'Pending')}" type="button">Edit status</button></div>`).join('') : '<div class="empty-state">No concerns for this department.</div>';
+            document.querySelector('#official-documents-list').innerHTML = documents.length ? documents.slice(0, 6).map((item) => {
+                const status = String(item.status || 'Pending');
+                const readyForDownload = ['Approved', 'Resolved'].includes(status);
+                return `<div class="department-row"><div><strong>${escapeHtml(item.document_type)}</strong><small>${escapeHtml(item.resident_name)} · ${escapeHtml(smartBarangayTime.formatDate(item.date_requested))}</small></div><em class="status ${status.toLowerCase().replaceAll(' ', '-')}">${escapeHtml(status)}</em><button class="status-edit" data-kind="document" data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(status)}" data-scheduled-date="${escapeHtml(item.scheduled_date || '')}" data-scheduled-time="${escapeHtml(item.scheduled_time || '')}" type="button">Edit status</button><button class="outline-button certificate-download" data-id="${escapeHtml(item.id)}" type="button" ${readyForDownload ? '' : 'disabled'}>${readyForDownload ? 'Download PDF' : 'PDF unavailable'}</button></div>`;
+            }).join('') : '<div class="empty-state">No document requests for this department.</div>';
+        };
+
+        let officialsData = [];
+        const renderOfficials = () => {
+            const query = document.querySelector('#official-search').value.trim().toLowerCase();
+            const department = document.querySelector('#official-department-filter').value;
+            const filtered = officialsData.filter((official) => `${official.full_name} ${official.email} ${official.department || ''}`.toLowerCase().includes(query) && (department === 'all' || official.department === department));
+            document.querySelector('#official-rows').innerHTML = filtered.length ? filtered.map((official, index) => `<tr><td>OFF-${String(index + 1).padStart(3, '0')}</td><td><strong>${escapeHtml(official.full_name)}</strong></td><td>${escapeHtml(official.department || 'Unassigned')}</td><td>${escapeHtml(official.position || 'Department Official')}</td><td>${escapeHtml(official.email)}</td><td>${escapeHtml(official.phone || '—')}</td><td><span class="status approved">Active</span></td></tr>`).join('') : '<tr><td class="empty-state" colspan="7">No officials found.</td></tr>';
+            document.querySelector('#official-count').textContent = `Showing ${filtered.length} official${filtered.length === 1 ? '' : 's'}`;
+            const overview = document.querySelector('#officials-overview-table');
+            if (overview) {
+                overview.innerHTML = `<div><b>NAME</b><b>DEPARTMENT</b><b>POSITION</b><b>STATUS</b></div>${officialsData.length ? officialsData.slice(0, 6).map((official) => `<div><strong>${escapeHtml(official.full_name)}</strong><span>${escapeHtml(official.department || 'Unassigned')}</span><span>${escapeHtml(official.position || 'Department Official')}</span><span class="status approved">Active</span></div>`).join('') : '<div class="empty-state">No official records in Supabase.</div>'}`;
+                document.querySelector('#officials-overview-count').textContent = `${officialsData.length} official${officialsData.length === 1 ? '' : 's'}`;
+            }
+        };
+        const loadOfficials = async () => {
+            try {
+                const response = await fetch('/api/officials');
+                if (!response.ok) throw new Error();
+                officialsData = (await response.json()).data || [];
+            } catch {
+                officialsData = [];
+                showToast('Could not load barangay officials');
+            }
+            renderOfficials();
+        };
+        if (currentRole === 'admin') loadOfficials();
+
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
+        const chartWidth = 820;
+        const chartTop = 10;
+        const chartBottom = 220;
+        const normalizeChartValues = (values, length) => Array.from({ length }, (_, index) => {
+            const value = Number(values?.[index]);
+            return Number.isFinite(value) ? Math.max(0, value) : 0;
+        });
+        const chartPoints = (values, scaleMax) => values.map((value, index) => ({
+            value,
+            x: values.length === 1 ? chartWidth / 2 : (index / (values.length - 1)) * chartWidth,
+            y: chartBottom - (value / scaleMax) * (chartBottom - chartTop),
+        }));
+        const chartPath = (points) => points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+        const chartAreaPath = (points) => {
+            if (!points.length) return '';
+            return `${chartPath(points)} L${points[points.length - 1].x.toFixed(1)} ${chartBottom} L${points[0].x.toFixed(1)} ${chartBottom} Z`;
+        };
+        const setRegistrationStatus = (state, hasData) => {
+            const chart = document.querySelector('#registration-chart');
+            const status = document.querySelector('#registration-status');
+            chart.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
+            if (state === 'loading') {
+                status.textContent = 'Loading registration data...';
+                status.hidden = false;
+            } else if (state === 'error') {
+                status.textContent = 'Registration data is unavailable. Try again shortly.';
+                status.hidden = false;
+            } else {
+                status.textContent = hasData ? '' : 'No registrations recorded in this period.';
+                status.hidden = hasData;
+            }
+        };
+        const showRegistrationTooltip = (point) => {
+            const chart = document.querySelector('#registration-chart');
+            const tooltip = document.querySelector('#registration-tooltip');
+            const month = point.dataset.label || 'Selected month';
+            const registered = Number(point.dataset.registered || 0).toLocaleString();
+            const verified = Number(point.dataset.verified || 0).toLocaleString();
+            const pointBounds = point.getBoundingClientRect();
+            const chartBounds = chart.getBoundingClientRect();
+            tooltip.querySelector('[data-tooltip-month]').textContent = month;
+            tooltip.querySelector('[data-tooltip-values]').textContent = `Registered: ${registered} · Verified: ${verified}`;
+            tooltip.hidden = false;
+            const halfWidth = tooltip.offsetWidth / 2;
+            const left = Math.min(chartBounds.width - halfWidth - 4, Math.max(halfWidth + 4, pointBounds.left - chartBounds.left + pointBounds.width / 2));
+            const top = pointBounds.top - chartBounds.top - tooltip.offsetHeight - 9;
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top < 0 ? pointBounds.bottom - chartBounds.top + 9 : top}px`;
+        };
+        const attachRegistrationPointEvents = () => {
+            document.querySelectorAll('#registered-points .chart-point, #verified-points .chart-point').forEach((point) => {
+                point.addEventListener('pointerenter', () => showRegistrationTooltip(point));
+                point.addEventListener('pointerleave', () => { document.querySelector('#registration-tooltip').hidden = true; });
+                point.addEventListener('focus', () => showRegistrationTooltip(point));
+                point.addEventListener('blur', () => { document.querySelector('#registration-tooltip').hidden = true; });
+                point.addEventListener('click', () => showRegistrationTooltip(point));
+                point.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        showRegistrationTooltip(point);
+                    }
+                });
+            });
+        };
+        const renderRegistrationChart = (registrations, state = 'ready') => {
+            const rawLabels = Array.isArray(registrations.labels) ? registrations.labels : [];
+            const rawRegistered = Array.isArray(registrations.registered) ? registrations.registered : [];
+            const rawVerified = Array.isArray(registrations.verified) ? registrations.verified : [];
+            const pointCount = Math.max(rawLabels.length, rawRegistered.length, rawVerified.length, 1);
+            const labels = Array.from({ length: pointCount }, (_, index) => rawLabels[index] || `Month ${index + 1}`);
+            const registered = normalizeChartValues(rawRegistered, pointCount);
+            const verified = normalizeChartValues(rawVerified, pointCount);
+            const highestValue = Math.max(...registered, ...verified, 0);
+            const tickSize = Math.max(1, Math.ceil(highestValue / 4));
+            const scaleMax = tickSize * 4;
+            const registeredPoints = chartPoints(registered, scaleMax);
+            const verifiedPoints = chartPoints(verified, scaleMax);
+            const ticks = [scaleMax, tickSize * 3, tickSize * 2, tickSize, 0];
+            const yAxis = document.querySelector('#registration-y-axis');
+            const gridLines = document.querySelector('#registration-grid-lines');
+            yAxis.innerHTML = ticks.map((tick) => `<span>${tick.toLocaleString()}</span>`).join('');
+            gridLines.innerHTML = ticks.map((_, index) => `<path d="M0 ${chartTop + (index / 4) * (chartBottom - chartTop)}H${chartWidth}"/>`).join('');
+            document.querySelector('#registered-line').setAttribute('d', chartPath(registeredPoints));
+            document.querySelector('#verified-line').setAttribute('d', chartPath(verifiedPoints));
+            document.querySelector('#registration-area').setAttribute('d', chartAreaPath(registeredPoints));
+            const pointMarkup = (points, seriesName) => points.map((point, index) => {
+                const label = labels[index];
+                const registeredValue = registered[index];
+                const verifiedValue = verified[index];
+                const ariaLabel = `${label}: ${registeredValue} registered, ${verifiedValue} verified`;
+                return `<circle class="chart-point ${seriesName}" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="4" tabindex="0" role="img" aria-label="${escapeHtml(ariaLabel)}" data-label="${escapeHtml(label)}" data-registered="${registeredValue}" data-verified="${verifiedValue}"></circle>`;
+            }).join('');
+            document.querySelector('#registered-points').innerHTML = pointMarkup(registeredPoints, 'gold');
+            document.querySelector('#verified-points').innerHTML = pointMarkup(verifiedPoints, 'green');
+            document.querySelector('#registration-labels').innerHTML = rawLabels.length ? labels.map((label) => `<span>${escapeHtml(label)}</span>`).join('') : '';
+            document.querySelector('.line-chart').setAttribute('aria-label', `Resident registrations for ${labels.join(', ')}`);
+            setRegistrationStatus(state, highestValue > 0);
+            attachRegistrationPointEvents();
+        };
+        const setDashboardValue = (id, value) => { document.querySelector(`#${id}`).textContent = Number(value || 0).toLocaleString(); };
+        const renderDashboard = (summary, options = {}) => {
+            const source = summary || {};
+            summary = {
+                total_residents: 0,
+                households: 0,
+                documents_issued: 0,
+                open_concerns: 0,
+                registrations: { labels: [], registered: [], verified: [] },
+                age_groups: { '0-12': 0, '13-17': 0, '18-35': 0, '36-59': 0, '60+': 0 },
+                documents_by_type: {},
+                concern_statuses: {},
+                ...source,
+                registrations: { labels: [], registered: [], verified: [], ...(source.registrations || {}) },
+                age_groups: { '0-12': 0, '13-17': 0, '18-35': 0, '36-59': 0, '60+': 0, ...(source.age_groups || {}) },
+            };
+            setDashboardValue('dashboard-total-residents', summary.total_residents);
+            setDashboardValue('dashboard-households', summary.households);
+            setDashboardValue('dashboard-documents', summary.documents_issued);
+            setDashboardValue('dashboard-concerns', summary.open_concerns);
+            renderRegistrationChart(summary.registrations, options.registrationState || 'ready');
+            const ageColors = ['#F59E0B', '#1D63B8', '#059669', '#8B5CF6', '#EF4444'];
+            const ageLabels = [['0-12', '0–12'], ['13-17', '13–17'], ['18-35', '18–35'], ['36-59', '36–59'], ['60+', '60+']];
+            const totalAges = Object.values(summary.age_groups).reduce((total, value) => total + value, 0);
+            let angle = 0;
+            const segments = ageLabels.map(([key]) => {
+                const next = angle + ((summary.age_groups[key] || 0) / (totalAges || 1)) * 360;
+                const segment = `${ageColors[ageLabels.findIndex(([name]) => name === key)]} ${angle}deg ${next}deg`;
+                angle = next;
+                return segment;
+            });
+            document.querySelector('#age-donut').style.background = `conic-gradient(${segments.join(', ')})`;
+            document.querySelector('#age-legend').innerHTML = ageLabels.map(([key, label], index) => `<span><i class="legend-dot" style="background:${ageColors[index]}"></i>${label} · ${Math.round(((summary.age_groups[key] || 0) / (totalAges || 1)) * 100)}%</span>`).join('');
+            document.querySelector('#residents-total').textContent = Number(summary.total_residents || 0).toLocaleString();
+            document.querySelector('#residents-verified').textContent = Number(summary.verified || 0).toLocaleString();
+            document.querySelector('#residents-pending').textContent = Number(summary.pending || 0).toLocaleString();
+            const documentChart = document.querySelector('#document-type-chart');
+            const documentEntries = Object.entries(summary.documents_by_type || {});
+            const documentMax = Math.max(...documentEntries.map(([, value]) => Number(value) || 0), 1);
+            documentChart.innerHTML = documentEntries.length
+                ? documentEntries.map(([label, value], index) => `<i class="dynamic-bar" style="--bar:${Math.round((Number(value) / documentMax) * 100)}%; --bar-color:${['#F59E0B', '#1D63B8', '#059669', '#8B5CF6'][index % 4]}" title="${escapeHtml(label)}: ${value}"></i>`).join('')
+                : '<span class="empty-state">No document requests yet.</span>';
+            const trendChart = document.querySelector('#concerns-trend-chart');
+            const trendValues = summary.concerns_trend || [];
+            const trendMax = Math.max(...trendValues.map((value) => Number(value) || 0), 1);
+            trendChart.innerHTML = trendValues.length
+                ? trendValues.map((value, index) => `<i class="trend-bar" title="Month ${index + 1}: ${value}" style="height:${Math.max(8, Math.round((Number(value) / trendMax) * 100))}%"></i>`).join('')
+                : '<span class="empty-state">No concern history yet.</span>';
+            const statusCounts = Object.entries(summary.concern_statuses || {}).map(([status, count]) => `${status}: ${count}`).join(' · ');
+            document.querySelector('#governance-summary').textContent = statusCounts || 'No concern records require review.';
+        };
+        const loadDashboard = async () => {
+            setRegistrationStatus('loading', false);
+            try {
+                const response = await fetch('/api/dashboard');
+                if (!response.ok) throw new Error('Dashboard sync failed');
+                const result = await response.json();
+                renderDashboard(result.data, { registrationState: 'ready' });
+            } catch (error) {
+                renderDashboard({}, { registrationState: 'error' });
+                showToast('Could not sync dashboard from Supabase');
+            }
+        };
+        loadOfficialDashboard();
+        loadDashboard();
+        const pageData = {};
+        const loadPageData = async (section) => {
+            const endpoints = { Documents: ['/api/documents', 'documents'], Concerns: ['/api/concerns', 'concerns'], Announcements: ['/api/announcements', 'announcements'], 'Weather & Alerts': ['/api/weather-alerts', 'weather'] };
+            if (!endpoints[section] || pageData[section]) return;
+            try { const response = await fetch(endpoints[section][0]); if (!response.ok) throw new Error(); pageData[section] = (await response.json()).data; renderPageData(section); } catch { pageData[section] = []; renderPageData(section); showToast(`${section} is empty or unavailable`); }
+        };
+        const canManageRecords = () => ['admin', 'barangay_official'].includes(currentRole);
+        const documentStatusClass = (status) => String(status || 'Pending').toLowerCase().replaceAll(' ', '-');
+        const renderDocumentRecord = (record) => {
+            const status = String(record.status || 'Pending');
+            const readyForDownload = ['Approved', 'Resolved'].includes(status);
+            const actions = canManageRecords()
+                ? `<button class="status-edit" data-kind="document" data-id="${escapeHtml(record.id)}" data-status="${escapeHtml(status)}" data-scheduled-date="${escapeHtml(record.scheduled_date || '')}" data-scheduled-time="${escapeHtml(record.scheduled_time || '')}" type="button">Edit status</button><button class="outline-button certificate-download" data-id="${escapeHtml(record.id)}" type="button" ${readyForDownload ? '' : 'disabled'}>${readyForDownload ? 'Download PDF' : 'PDF unavailable'}</button>`
+                : '';
+            const details = record.scheduled_date
+                ? `Pickup: ${smartBarangayTime.formatDate(record.scheduled_date)} ${record.scheduled_time || ''}`
+                : record.purpose || record.processor || '—';
+            return `<div class="record-row"><b>${escapeHtml(record.request_id)}</b><strong>${escapeHtml(record.resident_name)}</strong><span>${escapeHtml(record.document_type)}</span><time>${escapeHtml(smartBarangayTime.formatDate(record.date_requested))}</time><em class="status ${documentStatusClass(status)}">${escapeHtml(status)}</em><small>${escapeHtml(details)}</small>${actions ? `<div class="record-actions">${actions}</div>` : ''}</div>`;
+        };
+        const renderConcernRecord = (record) => {
+            const status = String(record.status || 'Pending');
+            const actions = canManageRecords() ? `<button class="status-edit" data-kind="concern" data-id="${escapeHtml(record.id)}" data-status="${escapeHtml(status)}" type="button">Edit status</button>` : '';
+            return `<article class="concern-row"><div><b>${escapeHtml(record.concern_id)}</b><span class="tag">${escapeHtml(record.category)}</span><span class="tag priority-${String(record.priority || '').toLowerCase()}">${escapeHtml(record.priority)}</span><h3>${escapeHtml(record.title)}</h3><p>${escapeHtml(record.description || 'No additional description provided.')}</p><small>Submitted by ${escapeHtml(record.submitted_by)} · ${escapeHtml(smartBarangayTime.formatDate(record.submitted_at))}</small></div><div><em class="status ${documentStatusClass(status)}">${escapeHtml(status)}</em>${actions}</div></article>`;
+        };
+        const renderPageData = (section) => {
+            const records = pageData[section] || [];
+            if (section === 'Documents') {
+                const count = (status) => records.filter((record) => status === 'all' || record.status === status).length;
+                ['total', 'pending', 'approved', 'rejected'].forEach((key) => document.querySelector(`#documents-${key}`).textContent = count(key === 'total' ? 'all' : key[0].toUpperCase() + key.slice(1)));
+                document.querySelector('#documents-list').innerHTML = records.length ? records.map(renderDocumentRecord).join('') : '<div class="empty-state">No document requests in Supabase.</div>';
+            }
+            if (section === 'Concerns') document.querySelector('#concerns-list').innerHTML = records.length ? records.map(renderConcernRecord).join('') : '<div class="empty-state">No concerns in Supabase.</div>';
+            if (section === 'Announcements') document.querySelector('#announcements-list').innerHTML = records.length ? records.map((record) => `<article class="announcement-row"><span class="tag">${escapeHtml(record.category)}</span><span class="status ${record.status.toLowerCase()}">${escapeHtml(record.status)}</span><h3>${escapeHtml(record.title)}</h3><p>${escapeHtml(record.description || '')}</p><small>By ${escapeHtml(record.author)} · ${escapeHtml(smartBarangayTime.formatDate(record.published_at))} · Audience: ${escapeHtml(record.audience)}</small></article>`).join('') : '<div class="empty-state">No announcements in Supabase.</div>';
+            if (section === 'Weather & Alerts') { const alert = records[0]; document.querySelector('#weather-banner').innerHTML = alert ? `<b>${escapeHtml(alert.alert_type)}</b><h2>${escapeHtml(alert.title)}</h2><p>${escapeHtml(alert.description)}</p>` : '<div class="empty-state">No weather alerts in Supabase.</div>'; document.querySelector('#weather-list').innerHTML = records.slice(0, 5).map((record) => `<div class="record-row"><strong>${escapeHtml(record.title)}</strong><time>${escapeHtml(smartBarangayTime.formatDateTime(record.issued_at))}</time><em class="status">${escapeHtml(record.severity)}</em></div>`).join(''); }
+        };
+        document.querySelectorAll('.filter-tabs[data-filter-target]').forEach((tabs) => tabs.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => {
+            tabs.querySelectorAll('button').forEach((tab) => tab.classList.remove('current')); button.classList.add('current');
+            const section = tabs.dataset.filterTarget === 'documents' ? 'Documents' : 'Concerns';
+            const records = pageData[section] || []; const filter = button.dataset.filter;
+            if (section === 'Documents') document.querySelector('#documents-list').innerHTML = records.filter((record) => filter === 'all' || record.status === filter).map(renderDocumentRecord).join('') || '<div class="empty-state">No matching document requests.</div>';
+            if (section === 'Concerns') document.querySelector('#concerns-list').innerHTML = records.filter((record) => filter === 'all' || record.status === filter).map(renderConcernRecord).join('') || '<div class="empty-state">No matching concerns.</div>';
+        })));
+        document.querySelectorAll('input[data-search="documents"]').forEach((input) => input.addEventListener('input', () => {
+            const query = input.value.toLowerCase();
+            document.querySelector('#documents-list').querySelectorAll('.record-row').forEach((row) => { row.hidden = !row.textContent.toLowerCase().includes(query); });
+        }));
+        const workflowModal = document.querySelector('#workflow-modal');
+        const openWorkflow = (type) => {
+            workflowModal.hidden = false;
+            workflowModal.dataset.type = type;
+            workflowModal.dataset.latitude = '';
+            workflowModal.dataset.longitude = '';
+            document.querySelector('#workflow-form').reset();
+            document.querySelector('#workflow-title').textContent = type === 'document' ? 'New document request' : type === 'concern' ? 'Log community concern' : 'New announcement';
+            document.querySelector('#workflow-description').textContent = type === 'document' ? 'Choose the certificate or clearance to process.' : type === 'concern' ? 'Capture the issue details and submit its location.' : 'Publish an update for barangay residents.';
+            const fields = {
+                type: document.querySelector('#workflow-type-field'),
+                resident: document.querySelector('#workflow-resident-field'),
+                purpose: document.querySelector('#workflow-purpose-field'),
+                address: document.querySelector('#workflow-address-field'),
+                contact: document.querySelector('#workflow-contact-field'),
+                birthDate: document.querySelector('#workflow-birth-date-field'),
+                birthPlace: document.querySelector('#workflow-birth-place-field'),
+                civilStatus: document.querySelector('#workflow-civil-status-field'),
+                businessName: document.querySelector('#workflow-business-name-field'),
+                businessAddress: document.querySelector('#workflow-business-address-field'),
+                category: document.querySelector('#workflow-category-field'),
+                priority: document.querySelector('#workflow-priority-field'),
+                title: document.querySelector('#workflow-title-field'),
+                description: document.querySelector('#workflow-description-field'),
+                audience: document.querySelector('#workflow-audience-field'),
+            };
+            Object.entries(fields).forEach(([name, field]) => {
+                const visible = type === 'document'
+                    ? ['type', 'resident', 'purpose', 'address', 'contact', 'birthDate', 'birthPlace', 'civilStatus', 'businessName', 'businessAddress'].includes(name)
+                    : type === 'concern'
+                        ? ['category', 'priority', 'title', 'description'].includes(name)
+                        : ['title', 'description', 'audience', 'category'].includes(name);
+                field.hidden = !visible;
+                field.style.display = visible ? 'grid' : 'none';
+            });
+            fields.resident.querySelector('input').required = type === 'document';
+            fields.title.querySelector('input').required = type !== 'document';
+            fields.businessName.querySelector('input').required = false;
+            fields.businessAddress.querySelector('input').required = false;
+            if (type !== 'document') {
+                const categories = type === 'concern'
+                    ? ['Infrastructure', 'Health & Sanitation', 'Peace & Order', 'Social Services', 'Other']
+                    : ['General', 'Assembly', 'Health', 'Emergency', 'Livelihood', 'Social Services'];
+                fields.category.querySelector('select').innerHTML = categories.map((category) => `<option>${category}</option>`).join('');
+            }
+        };
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('.status-edit');
+            if (!button) return;
+            const statusModal = document.querySelector('#status-modal');
+            const isDocument = button.dataset.kind === 'document';
+            const statusField = statusModal.querySelector('[name="status"]');
+            statusModal.hidden = false;
+            statusModal.dataset.kind = button.dataset.kind;
+            statusModal.querySelector('[name="id"]').value = button.dataset.id;
+            statusModal.querySelector('[name="kind"]').value = button.dataset.kind;
+            statusField.innerHTML = (isDocument ? ['Pending', 'In Progress', 'Processing', 'Approved', 'Rejected', 'Resolved'] : ['Pending', 'Open', 'In Progress', 'Escalated', 'Resolved']).map((status) => `<option>${status}</option>`).join('');
+            statusField.value = button.dataset.status || statusField.options[0].value;
+            document.querySelector('#schedule-date-field').hidden = !isDocument;
+            document.querySelector('#schedule-time-field').hidden = !isDocument;
+            statusModal.querySelector('[name="scheduled_date"]').value = button.dataset.scheduledDate || '';
+            statusModal.querySelector('[name="scheduled_time"]').value = button.dataset.scheduledTime || '';
+        });
+        document.addEventListener('click', async (event) => {
+            const button = event.target.closest('.certificate-download');
+            if (!button || button.disabled) return;
+            try {
+                const response = await fetch(`/api/documents/${encodeURIComponent(button.dataset.id)}/certificate.pdf`);
+                if (!response.ok) {
+                    const result = await response.json();
+                    throw new Error(result.error || 'Certificate could not be generated');
+                }
+                const blob = await response.blob();
+                const downloadUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = `smartbarangay-certificate-${button.dataset.id}.pdf`;
+                link.click();
+                URL.revokeObjectURL(downloadUrl);
+                showToast('Certificate PDF downloaded');
+            } catch (error) {
+                showToast(error.message || 'Could not download certificate');
+            }
+        });
+        document.querySelectorAll('.workflow-close').forEach((button) => button.addEventListener('click', () => workflowModal.hidden = true));
+        document.querySelector('.status-close').addEventListener('click', () => document.querySelector('#status-modal').hidden = true);
+        document.querySelector('[data-action="new-document"]').addEventListener('click', () => openWorkflow('document'));
+        document.querySelector('[data-action="log-concern"]').addEventListener('click', () => {
+            if (!navigator.geolocation) return showToast('Location is required on this device');
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                openWorkflow('concern'); workflowModal.dataset.latitude = position.coords.latitude; workflowModal.dataset.longitude = position.coords.longitude;
+            }, () => showToast('Allow location access to report a concern'));
+        });
+        document.querySelector('[data-action="new-announcement"]').addEventListener('click', async () => {
+            if (!['admin', 'barangay_official'].includes(currentRole)) return showToast('Only officials can publish announcements');
+            openWorkflow('announcement');
+        });
+        document.querySelector('[data-action="broadcast"]').addEventListener('click', () => document.querySelector('#alert-modal').hidden = false);
+        document.querySelector('[data-action="review-alerts"]').addEventListener('click', () => document.querySelector('.nav-item[data-section="Concerns"]').click());
+        document.querySelector('.alert-close').addEventListener('click', () => document.querySelector('#alert-modal').hidden = true);
+        document.querySelector('#workflow-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const type = workflowModal.dataset.type;
+            let endpoint;
+            let payload;
+            if (type === 'document') {
+                endpoint = '/api/documents';
+                payload = {
+                    document_type: form.get('document_type'),
+                    resident_name: form.get('resident_name'),
+                    purpose: form.get('purpose'),
+                    applicant_address: form.get('applicant_address'),
+                    applicant_contact: form.get('applicant_contact'),
+                    applicant_date_of_birth: form.get('applicant_date_of_birth'),
+                    applicant_place_of_birth: form.get('applicant_place_of_birth'),
+                    applicant_civil_status: form.get('applicant_civil_status'),
+                    business_name: form.get('business_name'),
+                    business_address: form.get('business_address'),
+                };
+            } else if (type === 'announcement') {
+                endpoint = '/api/announcements';
+                payload = {
+                    category: form.get('category'),
+                    title: form.get('title'),
+                    description: form.get('description'),
+                    audience: form.get('audience'),
+                };
+            } else {
+                endpoint = '/api/concerns';
+                payload = {
+                    category: form.get('category'),
+                    priority: form.get('priority'),
+                    title: form.get('title'),
+                    description: form.get('description'),
+                    latitude: Number(workflowModal.dataset.latitude),
+                    longitude: Number(workflowModal.dataset.longitude),
+                };
+            }
+            try {
+                const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await response.json();
+                showToast(response.ok ? 'Submitted successfully' : result.error || 'Could not submit');
+                if (!response.ok) return;
+                workflowModal.hidden = true;
+                event.currentTarget.reset();
+                const section = type === 'document' ? 'Documents' : type === 'concern' ? 'Concerns' : 'Announcements';
+                delete pageData[section];
+                await loadPageData(section);
+                await loadDashboard();
+                await loadOfficialDashboard();
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+            }
+        });
+        document.querySelector('#status-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const formElement = event.currentTarget;
+            const form = new FormData(formElement);
+            const kind = form.get('kind') || 'document';
+            const payload = { status: form.get('status') };
+            if (kind === 'document') {
+                payload.scheduled_date = form.get('scheduled_date');
+                payload.scheduled_time = form.get('scheduled_time');
+            }
+            try {
+                const response = await fetch(`/api/${kind === 'document' ? 'documents' : 'concerns'}/${form.get('id')}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await response.json();
+                showToast(response.ok ? 'Status updated' : result.error || 'Could not update status');
+                if (!response.ok) return;
+                document.querySelector('#status-modal').hidden = true;
+                formElement.reset();
+                const section = kind === 'document' ? 'Documents' : 'Concerns';
+                delete pageData[section];
+                await loadPageData(section);
+                await loadDashboard();
+                await loadOfficialDashboard();
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+            }
+        });
+        document.querySelector('#alert-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const payload = Object.fromEntries(form.entries());
+            try {
+                const response = await fetch('/api/weather-alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await response.json();
+                showToast(response.ok ? 'Alert broadcast successfully' : result.error || 'Could not broadcast alert');
+                if (!response.ok) return;
+                document.querySelector('#alert-modal').hidden = true;
+                event.currentTarget.reset();
+                delete pageData['Weather & Alerts'];
+                await loadPageData('Weather & Alerts');
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+            }
+        });
+        document.querySelectorAll('[data-action="download-report"]').forEach((button) => button.addEventListener('click', async () => {
+            const report = button.dataset.report;
+            try {
+                const response = await fetch(`/api/reports/${encodeURIComponent(report)}`);
+                if (!response.ok) {
+                    const result = await response.json();
+                    throw new Error(result.error || 'Report could not be generated');
+                }
+                const blob = await response.blob();
+                const downloadUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = `smartbarangay-${report}.csv`;
+                link.click();
+                URL.revokeObjectURL(downloadUrl);
+                showToast('Report downloaded');
+            } catch (error) {
+                showToast(error.message || 'Could not download report');
+            }
+        }));
+        document.querySelectorAll('.pagination button').forEach((button) => button.addEventListener('click', () => {
+            document.querySelectorAll('.pagination button').forEach((page) => page.classList.remove('current'));
+            button.classList.add('current');
+            showToast(`Resident page ${button.textContent} selected`);
+        }));
+        document.querySelectorAll('.setting-card').forEach((button) => button.addEventListener('click', () => {
+            const actions = {
+                general: () => { profileModal.hidden = false; },
+                security: () => { passwordModal.hidden = false; },
+                notifications: () => document.querySelector('.nav-item[data-section="Announcements"]').click(),
+                governance: () => document.querySelector('.nav-item[data-section="Concerns"]').click(),
+                backup: () => document.querySelector('.nav-item[data-section="Reports"]').click(),
+            };
+            const action = actions[button.dataset.setting];
+            if (action) action();
+        }));
+
+        const menuToggle = document.querySelector('.menu-toggle');
+        const isMobile = () => window.matchMedia('(max-width: 700px)').matches;
+        let sidebarOpen = !isMobile();
+        const setSidebarState = (isOpen) => {
+            sidebarOpen = isOpen;
+            sidebar.classList.toggle('open', isMobile() && isOpen);
+            sidebar.classList.toggle('collapsed', !isMobile() && !isOpen);
+            menuToggle.setAttribute('aria-expanded', String(isOpen));
+        };
+        setSidebarState(sidebarOpen);
+        menuToggle.addEventListener('click', () => setSidebarState(!sidebarOpen));
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') setSidebarState(false);
+        });
+
+        let residentData = [];
+        const rows = document.querySelector('#resident-rows');
+        const renderResidents = () => {
+            const query = document.querySelector('#resident-search').value.trim().toLowerCase();
+            const status = document.querySelector('#status-filter').value;
+            const filtered = residentData.filter((resident) => {
+                const matchesQuery = resident.join(' ').toLowerCase().includes(query);
+                return matchesQuery && (status === 'all' || resident[5] === status);
+            });
+            rows.innerHTML = filtered.length ? filtered.map((resident) => `<tr>${resident.slice(0, 7).map((value, index) => index === 5 ? `<td><span class="status ${escapeHtml(value).toLowerCase()}">${escapeHtml(value)}</span></td>` : `<td>${escapeHtml(value)}</td>`).join('')}<td><button class="view-resident" type="button" aria-label="View ${escapeHtml(resident[1])}" data-id="${escapeHtml(resident[7])}" data-name="${escapeHtml(resident[1])}"><i data-lucide="eye"></i></button></td></tr>`).join('') : '<tr><td class="empty-state" colspan="8">No residents found in Supabase.</td></tr>';
+            document.querySelector('#resident-count').textContent = `Showing ${filtered.length} of ${residentData.length} residents`;
+            lucide.createIcons();
+            document.querySelectorAll('.view-resident').forEach((button) => button.addEventListener('click', () => {
+                const resident = residentData.find((item) => String(item[7]) === button.dataset.id);
+                if (!resident) return;
+                const form = document.querySelector('#resident-form');
+                form.elements.name.value = resident[1];
+                form.elements.address.value = resident[2];
+                form.elements.household.value = resident[3] === 'UNASSIGNED' ? '' : resident[3];
+                const [age, gender] = resident[4].split(' / ');
+                form.elements.age.value = age;
+                form.elements.gender.value = gender;
+                form.elements.email.value = '';
+                form.elements.phone.value = '';
+                modal.dataset.editingId = resident[7];
+                document.querySelector('#resident-modal-title').textContent = 'Edit Resident';
+                form.querySelector('button[type="submit"]').textContent = 'Save Resident';
+                modal.hidden = false;
+            }));
+        };
+        const loadResidents = async () => {
+            try {
+                const response = await fetch('/api/residents');
+                if (!response.ok) throw new Error('Supabase is not configured');
+                const result = await response.json();
+                residentData = result.data.map((resident) => [
+                    resident.resident_id,
+                    resident.full_name,
+                    resident.address,
+                    resident.household || 'UNASSIGNED',
+                    `${resident.age} / ${resident.gender}`,
+                    resident.status,
+                    resident.resident_since,
+                    resident.id
+                ]);
+                renderResidents();
+                showToast(`${residentData.length} residents loaded from Supabase`);
+            } catch (error) {
+                residentData = [];
+                renderResidents();
+                showToast('Could not load residents from Supabase');
+            }
+        };
+        renderResidents();
+        loadResidents();
+        document.querySelector('#resident-search').addEventListener('input', renderResidents);
+        document.querySelector('#status-filter').addEventListener('change', renderResidents);
+
+        const navigationViews = { Dashboard: 'dashboard-view', 'Manage Officials': 'manage-officials-view', Residents: 'residents-view', Documents: 'documents-view', Concerns: 'concerns-view', Announcements: 'announcements-view', 'Weather & Alerts': 'weather-alerts-view', Reports: 'reports-view', Settings: 'settings-view' };
+        document.querySelectorAll('.nav-item[data-section]').forEach((item) => item.addEventListener('click', (event) => {
+            event.preventDefault();
+            const section = item.dataset.section;
+            const allowedSections = currentRole === 'barangay_official' ? ['Dashboard', 'Residents', 'Documents', 'Concerns', 'Announcements'] : (currentRole === 'admin' ? ['Dashboard', 'Manage Officials', 'Residents', 'Documents', 'Concerns', 'Announcements', 'Weather & Alerts', 'Reports', 'Settings'] : []);
+            if (!allowedSections.includes(section)) return;
+            document.querySelectorAll('.nav-item').forEach((navItem) => navItem.classList.remove('active'));
+            item.classList.add('active');
+            item.setAttribute('aria-current', 'page');
+            document.querySelectorAll('.nav-item[data-section]').forEach((navItem) => { if (navItem !== item) navItem.removeAttribute('aria-current'); });
+            document.querySelector('.breadcrumb b').textContent = section;
+            const selectedView = navigationViews[section];
+            const roleSelectedView = currentRole === 'barangay_official' && selectedView === 'dashboard-view' ? 'official-dashboard-view' : selectedView;
+            document.querySelectorAll('.app-view, #dashboard-view, #official-dashboard-view, #residents-view').forEach((view) => { view.hidden = view.id !== roleSelectedView; });
+            if (section === 'Dashboard') { loadDashboard(); loadOfficialDashboard(); }
+            if (section === 'Residents') loadResidents();
+            if (section === 'Manage Officials') loadOfficials();
+            loadPageData(section);
+            if (section === 'Weather & Alerts') refreshWeather();
+            document.title = `SmartBarangay | ${section}`;
+            document.querySelector('.search input').placeholder = 'Search residents, documents...';
+            showToast(`${section} selected`);
+            setSidebarState(false);
+        }));
+
+        document.querySelector('.search input').addEventListener('input', (event) => {
+            const query = event.target.value.trim().toLowerCase();
+            document.querySelectorAll('.metric-card, .panel, .record-row, .concern-row, .announcement-row, .report-card, .setting-card').forEach((card) => {
+                card.hidden = Boolean(query) && !card.textContent.toLowerCase().includes(query);
+            });
+        });
+
+        const describeWeather = (code, windSpeed) => {
+            const typhoonSignal = windSpeed >= 185 ? 5 : windSpeed >= 118 ? 4 : windSpeed >= 89 ? 3 : windSpeed >= 62 ? 2 : windSpeed >= 39 ? 1 : 0;
+            if (typhoonSignal) return {label: `Typhoon Signal #${typhoonSignal}`, tone: 'alert'};
+            if ([95, 96, 99].includes(code)) return {label: 'Thunderstorm Alert', tone: 'alert'};
+            if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return {label: 'Rain Alert', tone: 'rain'};
+            if ([1, 2, 3].includes(code)) return {label: 'Cloudy', tone: 'cloudy'};
+            return {label: 'Sunny', tone: 'sunny'};
+        };
+        const updateSignal = (code, windSpeed) => {
+            const signalButton = document.querySelector('[data-action="signal"]');
+            const signal = describeWeather(Number(code), Number(windSpeed) || 0);
+            signalButton.querySelector('.signal-label').textContent = signal.label;
+            signalButton.classList.toggle('resolved', signal.tone === 'sunny' || signal.tone === 'cloudy');
+            signalButton.dataset.weatherState = signal.label;
+        };
+        const refreshWeather = () => {
+            if (!navigator.geolocation) return showToast('Location is not available');
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                try {
+                    const response = await fetch(`/api/weather?lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
+                    if (!response.ok) return showToast('Live weather is unavailable');
+                    const current = (await response.json()).data.current || {};
+                    updateSignal(current.weather_code, current.wind_speed_10m);
+                    document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(1) strong').textContent = `${current.temperature_2m ?? '--'}°C`;
+                    document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(3) strong').textContent = `${current.wind_speed_10m ?? '--'} km/h`;
+                    document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(4) strong').textContent = `${current.visibility ? (current.visibility / 1000).toFixed(1) : '--'} km`;
+                    showToast('Weather updated for your location');
+                } catch {
+                    showToast('Could not reach the weather service');
+                }
+            }, () => showToast('Allow location access for live weather'));
+        };
+
+        const notificationButton = document.querySelector('.notification');
+        const announcementPopover = document.querySelector('#announcement-popover');
+        const notificationList = document.querySelector('#notification-list');
+        const loadNotifications = async () => {
+            try {
+                const response = await fetch('/api/announcements');
+                if (!response.ok) throw new Error();
+                const announcements = (await response.json()).data || [];
+                const activeAnnouncements = announcements.filter((item) => item.status !== 'Expired');
+                notificationList.innerHTML = activeAnnouncements.length ? activeAnnouncements.slice(0, 6).map((item) => `<a class="notification-item" href="#" data-notification-section="Announcements"><span class="tag">${escapeHtml(item.category)}</span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(smartBarangayTime.formatDate(item.published_at || item.created_at))} · ${escapeHtml(item.audience || 'All Residents')}</small></a>`).join('') : '<div class="empty-state">No active announcements.</div>';
+                const badge = document.querySelector('.notification span');
+                badge.textContent = activeAnnouncements.length;
+                badge.hidden = activeAnnouncements.length === 0;
+            } catch {
+                notificationList.innerHTML = '<div class="empty-state">Announcements are unavailable.</div>';
+            }
+        };
+        notificationButton.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            const willOpen = announcementPopover.hidden;
+            announcementPopover.hidden = !willOpen;
+            notificationButton.setAttribute('aria-expanded', String(willOpen));
+            if (willOpen) await loadNotifications();
+        });
+        document.querySelector('.popover-close').addEventListener('click', () => { announcementPopover.hidden = true; notificationButton.setAttribute('aria-expanded', 'false'); });
+        notificationList.addEventListener('click', (event) => { const link = event.target.closest('[data-notification-section]'); if (!link) return; event.preventDefault(); announcementPopover.hidden = true; notificationButton.setAttribute('aria-expanded', 'false'); document.querySelector('.nav-item[data-section="Announcements"]')?.click(); });
+        document.addEventListener('click', (event) => { if (!event.target.closest('.notification-wrap')) { announcementPopover.hidden = true; notificationButton.setAttribute('aria-expanded', 'false'); } });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { announcementPopover.hidden = true; notificationButton.setAttribute('aria-expanded', 'false'); } });
+        loadNotifications();
+
+        document.querySelector('[data-action="signal"]').addEventListener('click', (event) => showToast(`Current weather status: ${event.currentTarget.dataset.weatherState || 'Loading weather...'}`));
+        refreshWeather();
+        window.setInterval(refreshWeather, 10 * 60 * 1000);
+
+        const profile = document.querySelector('.profile');
+        profile.addEventListener('click', () => {
+            const expanded = profile.getAttribute('aria-expanded') === 'true';
+            profile.setAttribute('aria-expanded', String(!expanded));
+            document.querySelector('.profile-menu').classList.toggle('visible', !expanded);
+        });
+        const profileModal = document.querySelector('#profile-modal');
+        const passwordModal = document.querySelector('#password-modal');
+        document.querySelector('.profile-menu button:first-child').addEventListener('click', () => { profileModal.hidden = false; document.querySelector('.profile-menu').classList.remove('visible'); profile.setAttribute('aria-expanded', 'false'); });
+        document.querySelector('.profile-menu button:last-child').addEventListener('click', () => { passwordModal.hidden = false; document.querySelector('.profile-menu').classList.remove('visible'); profile.setAttribute('aria-expanded', 'false'); });
+        document.querySelector('.profile-close').addEventListener('click', () => { profileModal.hidden = true; });
+        document.querySelector('.password-close').addEventListener('click', () => { passwordModal.hidden = true; });
+        document.querySelector('#profile-photo').addEventListener('change', (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.addEventListener('load', () => { document.querySelector('#profile-preview').style.backgroundImage = `url(${reader.result})`; document.querySelector('#profile-preview').textContent = ''; document.querySelector('#profile-form').dataset.avatarUrl = reader.result; }); reader.readAsDataURL(file); });
+        document.querySelector('#profile-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const payload = { full_name: form.get('full_name'), position: form.get('position'), phone: form.get('phone') };
+            if (event.currentTarget.dataset.avatarUrl) payload.avatar_url = event.currentTarget.dataset.avatarUrl;
+            try {
+                const response = await fetch('/api/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await response.json();
+                if (!response.ok) return showToast(result.error || 'Could not save profile');
+                document.querySelector('.profile strong').textContent = payload.full_name;
+                if (payload.avatar_url) {
+                    document.querySelector('.profile .avatar').style.backgroundImage = `url(${payload.avatar_url})`;
+                    document.querySelector('.profile .avatar').textContent = '';
+                }
+                profileModal.hidden = true;
+                showToast('Profile updated');
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+            }
+        });
+        document.querySelector('#password-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            try {
+                const response = await fetch('/api/account/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: form.get('password'), confirmation: form.get('confirmation') }) });
+                const result = await response.json();
+                if (!response.ok) return showToast(result.error || 'Could not update password');
+                passwordModal.hidden = true;
+                event.currentTarget.reset();
+                showToast('Password updated successfully');
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+            }
+        });
+        document.querySelector('[data-action="logout"]').addEventListener('click', async (event) => { event.preventDefault(); await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; });
+
+        const modal = document.querySelector('#resident-modal');
+        document.querySelector('#add-resident').addEventListener('click', () => { delete modal.dataset.editingId; document.querySelector('#resident-modal-title').textContent = 'Register New Resident'; document.querySelector('#resident-form button[type="submit"]').textContent = 'Register Resident'; document.querySelector('#resident-form').reset(); modal.hidden = false; document.querySelector('#resident-form input').focus(); });
+        document.querySelector('.modal-close').addEventListener('click', () => { modal.hidden = true; });
+        document.querySelector('#resident-form').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const formData = new FormData(form);
+            const editingId = modal.dataset.editingId;
+            const isEditing = Boolean(editingId);
+            fetch(isEditing ? `/api/residents/${encodeURIComponent(editingId)}` : '/api/residents', {
+                method: isEditing ? 'PATCH' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ full_name: formData.get('name'), address: formData.get('address'), household: formData.get('household'), email: formData.get('email'), phone: formData.get('phone'), age: formData.get('age'), gender: formData.get('gender') })
+            }).then(async (response) => {
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Could not save resident');
+                const resident = result.data;
+                const row = [resident.resident_id, resident.full_name, resident.address, resident.household || 'UNASSIGNED', `${resident.age} / ${resident.gender}`, resident.status, resident.resident_since, resident.id];
+                if (isEditing) residentData[residentData.findIndex((item) => String(item[7]) === String(editingId))] = row;
+                else residentData.push(row);
+                renderResidents();
+                modal.hidden = true;
+                form.reset();
+                delete modal.dataset.editingId;
+                document.querySelector('#resident-modal-title').textContent = 'Register New Resident';
+                form.querySelector('button[type="submit"]').textContent = 'Register Resident';
+                await loadDashboard();
+                showToast(isEditing ? 'Resident profile updated in Supabase' : 'Resident profile saved to Supabase');
+            }).catch((error) => showToast(error.message || 'Could not save. Check your Supabase setup.'));
+        });
+        document.querySelector('#export-residents').addEventListener('click', () => {
+            const csv = ['Resident ID,Full Name,Address,Household,Age / Gender,Status,Resident Since', ...residentData.map((resident) => resident.join(','))].join('\n');
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+            link.download = 'smartbarangay-residents.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+            showToast('Resident list exported');
+        });
+        const officialModal = document.querySelector('#official-modal');
+        document.querySelector('#register-official').addEventListener('click', () => { officialModal.hidden = false; });
+        document.querySelector('.official-close').addEventListener('click', () => { officialModal.hidden = true; });
+        document.querySelector('#official-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const payload = Object.fromEntries(new FormData(event.currentTarget));
+            payload.role = 'barangay_official';
+            try {
+                const response = await fetch('/api/admin/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                const result = await response.json();
+                showToast(response.ok ? 'Official registered successfully' : (result.error || 'Official registration failed'));
+                if (response.ok) { officialModal.hidden = true; event.currentTarget.reset(); await loadOfficials(); }
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+            }
+        });
+        document.querySelector('#official-search').addEventListener('input', renderOfficials);
+        document.querySelector('#official-department-filter').addEventListener('change', renderOfficials);
+    </script>
+</body> 
+</html>

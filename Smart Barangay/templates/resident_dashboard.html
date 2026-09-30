@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SmartBarangay | Resident Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="resident-app">
+        <aside class="resident-sidebar">
+            <div class="resident-brand"><div class="brand-mark"><i data-lucide="shield"></i></div><div><strong>SmartBarangay</strong><span>Resident Portal</span></div></div>
+            <div class="resident-account"><strong id="resident-sidebar-name">Resident</strong><small id="resident-sidebar-id">Resident account</small></div>
+            <nav class="resident-nav" aria-label="Resident navigation">
+                <button class="resident-nav-item active" type="button" data-view="resident-home"><i data-lucide="layout-dashboard"></i>My Dashboard</button>
+                <button class="resident-nav-item" type="button" data-view="resident-documents"><i data-lucide="file-text"></i>Request Documents</button>
+                <button class="resident-nav-item" type="button" data-view="resident-concerns"><i data-lucide="message-square"></i>Report a Concern</button>
+                <button class="resident-nav-item" type="button" data-view="resident-announcements"><i data-lucide="megaphone"></i>Announcements</button>
+                <button class="resident-nav-item" type="button" data-view="resident-weather"><i data-lucide="cloud-lightning"></i>Weather &amp; Alerts</button>
+            </nav>
+            <button class="resident-logout" id="resident-logout" type="button"><i data-lucide="log-out"></i>Logout</button>
+        </aside>
+
+        <main class="resident-main-shell">
+            <header class="resident-topbar">
+                <button class="resident-menu-toggle" id="resident-menu-toggle" type="button" aria-label="Toggle navigation"><i data-lucide="menu"></i></button>
+                <div class="resident-location"><i data-lucide="map-pin"></i> Barangay Don Felipe Larrazabal</div>
+                <div class="resident-top-actions">
+                    <button class="icon-button resident-notification" id="resident-notification" type="button" aria-label="Announcements"><i data-lucide="bell"></i><span id="resident-notification-count">0</span></button>
+                    <button class="resident-profile" id="resident-profile" type="button">
+                        <div class="avatar" id="resident-avatar">RP</div>
+                        <div><strong id="resident-name">Resident</strong><small>Resident</small></div>
+                        <i data-lucide="chevron-down"></i>
+                    </button>
+                    <div class="resident-profile-menu" id="resident-profile-menu" hidden>
+                        <button type="button" data-action="resident-profile-view">View profile</button>
+                        <button type="button" data-action="resident-account-settings">Account settings</button>
+                        <button type="button" id="resident-menu-logout">Logout</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="resident-page-content">
+                <section class="resident-view active" id="resident-home">
+                    <section class="resident-welcome">
+                        <div>
+                            <span class="eyebrow">MY BARANGAY</span>
+                            <h1>Good day, <span id="welcome-name">Resident</span></h1>
+                            <p>Manage your requests, reports, and community updates in one place.</p>
+                        </div>
+                        <div class="resident-welcome-actions">
+                            <div class="sync resident-sync"><i data-lucide="activity"></i> Live sync: <time id="resident-sync-time"></time></div>
+                            <button class="primary-button" id="resident-request" type="button"><i data-lucide="file-plus-2"></i> Request a document</button>
+                        </div>
+                    </section>
+                    <aside class="resident-safety-note"><i data-lucide="shield-check"></i><div><strong>Safety notice</strong><p>Barangay services never ask for your password, PIN, or payment through chat. Submit each concern or document request only once.</p></div></aside>
+                    <section class="resident-stat-grid">
+                        <article class="resident-stat"><span>MY REQUESTS</span><strong id="home-doc-count">0</strong><i data-lucide="file-text"></i></article>
+                        <article class="resident-stat"><span>APPROVED</span><strong id="home-approved-count">0</strong><i data-lucide="circle-check"></i></article>
+                        <article class="resident-stat"><span>PENDING</span><strong id="home-pending-count">0</strong><i data-lucide="clock-3"></i></article>
+                        <article class="resident-stat"><span>MY CONCERNS</span><strong id="home-concern-count">0</strong><i data-lucide="message-square"></i></article>
+                    </section>
+                    <section class="resident-portal-card">
+                        <div class="portal-card-heading"><h2>My Document Requests</h2><button class="text-button" type="button" data-view="resident-documents">View all</button></div>
+                        <div id="my-documents" class="portal-list"></div>
+                    </section>
+                    <section class="resident-portal-card updates-card">
+                        <div class="portal-card-heading"><h2>Latest Announcements</h2><button class="text-button" type="button" data-view="resident-announcements">View all</button></div>
+                        <div id="resident-announcements-preview" class="portal-list"></div>
+                    </section>
+                </section>
+
+                <section class="resident-view" id="resident-documents">
+                    <section class="resident-page-heading">
+                        <div><h1>Request Documents</h1><p>Request official barangay certificates and clearances</p></div>
+                        <button class="primary-button" id="resident-request-page" type="button"><i data-lucide="plus"></i> New Request</button>
+                    </section>
+                    <aside class="resident-policy"><i data-lucide="shield-check"></i><div><strong>Document Request Policy</strong><p>Each document type can only be requested once every 30 days. Duplicate or fraudulent requests may be flagged.</p></div></aside>
+                    <section class="resident-portal-card resident-request-card" id="resident-document-request-panel" hidden>
+                        <div class="portal-card-heading">
+                            <div><h2>New Document Request</h2><p>Choose the document you need from the barangay office.</p></div>
+                            <button type="button" class="modal-close" id="resident-document-request-close" aria-label="Close request form"><i data-lucide="x"></i></button>
+                        </div>
+                        <form id="resident-document-request-form">
+                            <div class="request-form-grid">
+                                <label>Document type<select name="document_type"><option>Barangay Clearance</option><option>Certificate of Residency</option><option>Certificate of Indigency</option><option>Business Clearance</option></select></label>
+                                <label>Full legal name<input name="full_name" required autocomplete="name"></label>
+                                <label>Complete address<input name="address" required autocomplete="street-address" placeholder="House/Lot, Purok, Barangay, City"></label>
+                                <label>Contact number<input name="contact_number" required autocomplete="tel" placeholder="e.g. 09171234567"></label>
+                                <label>Date of birth<input name="date_of_birth" type="date" required></label>
+                                <label>Place of birth<input name="place_of_birth" required placeholder="Municipality / Province"></label>
+                                <label>Civil status<select name="civil_status" required><option value="">Choose civil status</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></label>
+                                <label>Purpose<input name="purpose" placeholder="e.g. Employment or school enrollment" required></label>
+                            </div>
+                            <div class="business-request-fields" id="resident-business-fields" hidden>
+                                <p class="form-section-label">Business details</p>
+                                <div class="request-form-grid">
+                                    <label>Business name<input name="business_name" placeholder="Registered business name"></label>
+                                    <label>Business address<input name="business_address" placeholder="Location of the business"></label>
+                                </div>
+                            </div>
+                            <div class="resident-request-actions"><button type="button" class="outline-button" id="resident-document-request-cancel">Cancel</button><button class="primary-button" type="submit">Submit Request</button></div>
+                        </form>
+                    </section>
+                    <section class="resident-portal-card"><div class="portal-card-heading"><h2>My Document Requests</h2></div><div id="documents-list" class="portal-list"></div></section>
+                </section>
+
+                <section class="resident-view" id="resident-concerns">
+                    <section class="resident-page-heading">
+                        <div><h1>Report a Concern</h1><p>Submit community concerns to the barangay</p></div>
+                        <button class="primary-button" id="resident-report-page" type="button"><i data-lucide="plus"></i> New Report</button>
+                    </section>
+                    <aside class="resident-policy"><i data-lucide="shield-check"></i><div><strong>Concern Reporting Policy</strong><p>Maximum of 3 concern reports per day. Duplicate reports for the same issue are rejected.</p></div></aside>
+                    <section class="resident-portal-card resident-request-card" id="resident-concern-report-panel" hidden>
+                        <div class="portal-card-heading">
+                            <div><h2>New Concern Report</h2><p>Your current location will be attached to this report.</p></div>
+                            <button type="button" class="modal-close" id="resident-concern-report-close" aria-label="Close report form"><i data-lucide="x"></i></button>
+                        </div>
+                        <form id="resident-concern-report-form">
+                            <label>Category<select name="category"><option>Infrastructure</option><option>Health &amp; Sanitation</option><option>Peace &amp; Order</option><option>Social Services</option><option>Other</option></select></label>
+                            <label>Subject<input name="title" placeholder="Brief description of the concern..." required></label>
+                            <label>Detailed description<textarea name="description" rows="4" placeholder="Provide specific details: location, time, frequency, affected residents..."></textarea></label>
+                            <div class="resident-request-actions"><button type="button" class="outline-button" id="resident-concern-report-cancel">Cancel</button><button class="primary-button" type="submit">Submit Report</button></div>
+                        </form>
+                    </section>
+                    <section class="resident-portal-card"><div class="portal-card-heading"><h2>My Reported Concerns</h2></div><div id="concerns-list" class="portal-list"></div></section>
+                </section>
+
+                <section class="resident-view" id="resident-announcements">
+                    <section class="resident-page-heading"><div><h1>Announcements</h1><p>Official barangay announcements and advisories</p></div></section>
+                    <div id="announcements-list" class="resident-announcement-list"></div>
+                </section>
+
+                <section class="resident-view" id="resident-weather">
+                    <section class="resident-page-heading">
+                        <div><h1>Weather &amp; Emergency Monitoring</h1><p>Live weather conditions and disaster preparedness</p></div>
+                        <button class="outline-button" id="resident-weather-refresh" type="button"><i data-lucide="refresh-cw"></i> Refresh</button>
+                    </section>
+                    <div class="resident-alert-banner" id="resident-weather-alert"><i data-lucide="cloud-lightning"></i><div><strong>Loading weather...</strong><p>Checking current conditions for your location.</p></div></div>
+                    <section class="resident-weather-grid">
+                        <article class="resident-weather-card"><span>TEMPERATURE</span><strong id="resident-temperature">--°C</strong></article>
+                        <article class="resident-weather-card"><span>RAINFALL</span><strong id="resident-rainfall">-- mm</strong></article>
+                        <article class="resident-weather-card"><span>WIND SPEED</span><strong id="resident-wind">-- km/h</strong></article>
+                        <article class="resident-weather-card"><span>VISIBILITY</span><strong id="resident-visibility">-- km</strong></article>
+                    </section>
+                    <section class="resident-portal-card"><div class="portal-card-heading"><h2>Recent Official Alerts</h2></div><div id="resident-weather-list" class="portal-list"></div></section>
+                </section>
+
+                <section class="resident-view" id="resident-profile">
+                    <section class="resident-page-heading"><div><h1>My Profile</h1><p>View your registered account information</p></div></section>
+                    <section class="resident-portal-card resident-profile-card">
+                        <div class="profile-photo-editor"><div class="avatar profile-preview" id="resident-profile-avatar">RP</div></div>
+                        <dl>
+                            <dt>Full name</dt><dd id="resident-profile-name">Resident</dd>
+                            <dt>Email</dt><dd id="resident-profile-email">--</dd>
+                            <dt>Account type</dt><dd>Resident</dd>
+                        </dl>
+                    </section>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal" id="resident-action-modal" hidden>
+        <div class="modal-card">
+            <div class="modal-heading">
+                <div><h2 id="resident-modal-title">New request</h2><p id="resident-modal-description">Submit a request to the barangay office.</p></div>
+                <button type="button" class="modal-close" id="resident-modal-close" aria-label="Close"><i data-lucide="x"></i></button>
+            </div>
+            <form id="resident-action-form">
+                <label id="resident-category-field">Category<select name="category"><option>Infrastructure</option><option>Health &amp; Sanitation</option><option>Peace &amp; Order</option><option>Social Services</option><option>Other</option></select></label>
+                <label id="resident-document-field">Document type<select name="document_type"><option>Barangay Clearance</option><option>Certificate of Residency</option><option>Certificate of Indigency</option><option>Business Clearance</option></select></label>
+                <label id="resident-purpose-field">Purpose<input name="purpose" placeholder="e.g. Employment or school enrollment"></label>
+                <label id="resident-concern-field">Concern description<textarea name="title" rows="4" placeholder="Describe the issue..."></textarea></label>
+                <button class="primary-button" type="submit">Submit</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="resident-profile-modal" hidden>
+        <div class="modal-card">
+            <div class="modal-heading">
+                <div><h2>View Profile</h2><p>Update your personal information.</p></div>
+                <button type="button" class="modal-close resident-profile-close" aria-label="Close profile"><i data-lucide="x"></i></button>
+            </div>
+            <form id="resident-profile-form">
+                <div class="profile-photo-editor">
+                    <div class="avatar profile-preview" id="resident-profile-preview">RP</div>
+                    <label class="outline-button">Change photo<input id="resident-profile-photo" type="file" accept="image/png,image/jpeg,image/webp" hidden></label>
+                </div>
+                <label>Full name<input name="full_name" required></label>
+                <label>Position / designation<input name="position"></label>
+                <label>Phone number<input name="phone"></label>
+                <button class="primary-button" type="submit">Save profile</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="resident-password-modal" hidden>
+        <div class="modal-card">
+            <div class="modal-heading">
+                <div><h2>Account Settings</h2><p>Change your account password.</p></div>
+                <button type="button" class="modal-close resident-password-close" aria-label="Close account settings"><i data-lucide="x"></i></button>
+            </div>
+            <form id="resident-password-form">
+                <label>New password<input name="password" type="password" minlength="8" required placeholder="At least 8 characters"></label>
+                <label>Confirm password<input name="confirmation" type="password" minlength="8" required placeholder="Repeat your new password"></label>
+                <button class="primary-button" type="submit">Update password</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" role="status" aria-live="polite"></div>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="{{ url_for('static', filename='live-clock.js') }}"></script>
+    <script>
+        lucide.createIcons();
+
+        const toast = document.querySelector('.toast');
+        const smartBarangayTime = window.smartBarangayTime;
+        smartBarangayTime.startLiveClock({ syncSelector: '#resident-sync-time' });
+        const showToast = (message) => {
+            toast.textContent = message;
+            toast.classList.add('visible');
+            clearTimeout(showToast.timer);
+            showToast.timer = setTimeout(() => toast.classList.remove('visible'), 2600);
+        };
+
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
+        let actionType = 'document';
+        let requestInFlight = false;
+
+        const modal = document.querySelector('#resident-action-modal');
+        const residentProfileModal = document.querySelector('#resident-profile-modal');
+        const residentPasswordModal = document.querySelector('#resident-password-modal');
+        const residentProfileForm = document.querySelector('#resident-profile-form');
+        const residentPasswordForm = document.querySelector('#resident-password-form');
+        const documentRequestPanel = document.querySelector('#resident-document-request-panel');
+        const documentRequestForm = document.querySelector('#resident-document-request-form');
+        const concernReportPanel = document.querySelector('#resident-concern-report-panel');
+        const concernReportForm = document.querySelector('#resident-concern-report-form');
+
+        const setView = (viewId) => {
+            document.querySelectorAll('.resident-view').forEach((view) => view.classList.toggle('active', view.id === viewId));
+            document.querySelectorAll('.resident-nav-item').forEach((item) => item.classList.toggle('active', item.dataset.view === viewId));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (viewId === 'resident-weather') loadWeather();
+        };
+
+        document.querySelectorAll('[data-view]').forEach((button) => {
+            button.addEventListener('click', () => {
+                setView(button.dataset.view);
+                document.querySelector('#resident-profile-menu').hidden = true;
+            });
+        });
+
+        const loadProfile = async () => {
+            const response = await fetch('/api/me');
+            if (!response.ok) return window.location.href = '/login';
+            const result = await response.json();
+            const user = result.user;
+            const name = user.full_name || user.email || 'Resident';
+            const initials = name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+
+            document.querySelectorAll('#resident-name, #resident-sidebar-name, #resident-profile-name').forEach((element) => element.textContent = name);
+            document.querySelector('#welcome-name').textContent = name.split(' ')[0];
+            document.querySelector('#resident-sidebar-id').textContent = user.email || 'Resident account';
+            document.querySelector('#resident-profile-email').textContent = user.email || '--';
+            document.querySelectorAll('#resident-avatar, #resident-profile-avatar, #resident-profile-preview').forEach((element) => {
+                element.textContent = initials;
+                element.style.backgroundImage = '';
+            });
+            if (user.avatar_url) {
+                document.querySelectorAll('#resident-avatar, #resident-profile-avatar, #resident-profile-preview').forEach((element) => {
+                    element.style.backgroundImage = `url(${user.avatar_url})`;
+                    element.textContent = '';
+                });
+            }
+            if (residentProfileForm) {
+                residentProfileForm.full_name.value = user.full_name || '';
+                residentProfileForm.position.value = user.position || '';
+                residentProfileForm.phone.value = user.phone || '';
+            }
+            if (documentRequestForm) documentRequestForm.full_name.value = user.full_name || '';
+        };
+
+        const renderLists = (documents, concerns, announcements) => {
+            document.querySelector('#home-doc-count').textContent = documents.length;
+            document.querySelector('#home-approved-count').textContent = documents.filter((item) => item.status === 'Approved').length;
+            document.querySelector('#home-pending-count').textContent = documents.filter((item) => ['Pending', 'Processing', 'In Progress'].includes(item.status)).length;
+            document.querySelector('#home-concern-count').textContent = concerns.length;
+
+            const documentsHtml = documents.length
+                ? documents.map((item) => `<div class="portal-row"><strong>${escapeHtml(item.document_type)}</strong><span class="status ${String(item.status || '').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status || 'Pending')}</span><small>${escapeHtml(item.request_id || '')} · Requested ${escapeHtml(smartBarangayTime.formatDate(item.date_requested))}${item.scheduled_date ? ` · Pickup ${escapeHtml(smartBarangayTime.formatDate(item.scheduled_date))}` : ''}</small></div>`).join('')
+                : '<div class="empty-state">No document requests yet.</div>';
+            document.querySelector('#my-documents').innerHTML = documents.slice(0, 4).length ? documentsHtml : '<div class="empty-state">No document requests yet.</div>';
+            document.querySelector('#documents-list').innerHTML = documentsHtml;
+
+            const concernsHtml = concerns.length
+                ? concerns.map((item) => `<div class="portal-row"><strong>${escapeHtml(item.title)}</strong><span class="status ${String(item.status || '').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status || 'Open')}</span><small>${escapeHtml(item.concern_id || '')} · ${escapeHtml(smartBarangayTime.formatDate(item.submitted_at))}</small>${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}</div>`).join('')
+                : '<div class="empty-state">No concern reports yet.</div>';
+            document.querySelector('#concerns-list').innerHTML = concernsHtml;
+
+            const activeAnnouncements = announcements.filter((item) => item.status !== 'Expired');
+            const renderAnnouncement = (item) => `<article class="resident-announcement"><span class="tag">${escapeHtml(item.category || 'General')}</span><span class="status approved">${escapeHtml(item.status || 'Active')}</span><h3>${escapeHtml(item.title || 'Announcement')}</h3><p>${escapeHtml(item.summary || item.description || '')}</p><small>${escapeHtml(smartBarangayTime.formatDateTime(item.created_at || item.date || item.published_at))}</small></article>`;
+            const announcementsHtml = activeAnnouncements.length
+                ? activeAnnouncements.map(renderAnnouncement).join('')
+                : '<div class="empty-state">No announcements yet.</div>';
+            document.querySelector('#resident-announcements-preview').innerHTML = activeAnnouncements.length ? activeAnnouncements.slice(0, 3).map(renderAnnouncement).join('') : announcementsHtml;
+            document.querySelector('#announcements-list').innerHTML = announcementsHtml;
+        };
+
+        const loadData = async () => {
+            let responses;
+            try {
+                responses = await Promise.all([fetch('/api/documents'), fetch('/api/concerns'), fetch('/api/announcements')]);
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+                return;
+            }
+            if (responses.some((response) => response.status === 401)) return window.location.href = '/login';
+            if (responses.some((response) => !response.ok)) {
+                renderLists([], [], []);
+                showToast('Your resident data is currently unavailable');
+                return;
+            }
+            const documents = responses[0].ok ? (await responses[0].json()).data || [] : [];
+            const concerns = responses[1].ok ? (await responses[1].json()).data || [] : [];
+            const announcements = responses[2].ok ? (await responses[2].json()).data || [] : [];
+            renderLists(documents, concerns, announcements);
+            const active = announcements.filter((item) => item.status !== 'Expired');
+            document.querySelector('#resident-notification-count').textContent = active.length;
+        };
+
+        const openModal = (type) => {
+            actionType = type;
+            if (type === 'document') {
+                setView('resident-documents');
+                documentRequestPanel.hidden = false;
+                documentRequestForm.reset();
+                documentRequestForm.full_name.value = document.querySelector('#resident-profile-name').textContent || '';
+                updateBusinessRequestFields();
+                documentRequestPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            setView('resident-concerns');
+            concernReportPanel.hidden = false;
+            concernReportForm.reset();
+            concernReportPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
+
+        document.querySelector('#resident-request').addEventListener('click', () => openModal('document'));
+        const updateBusinessRequestFields = () => {
+            const isBusinessClearance = documentRequestForm.document_type.value === 'Business Clearance';
+            const businessFields = document.querySelector('#resident-business-fields');
+            businessFields.hidden = !isBusinessClearance;
+            businessFields.querySelectorAll('input').forEach((input) => { input.required = isBusinessClearance; });
+        };
+        documentRequestForm.document_type.addEventListener('change', updateBusinessRequestFields);
+        document.querySelector('#resident-request-page').addEventListener('click', () => {
+            setView('resident-documents');
+            documentRequestPanel.hidden = false;
+            documentRequestForm.reset();
+            documentRequestForm.full_name.value = document.querySelector('#resident-profile-name').textContent || '';
+            updateBusinessRequestFields();
+            documentRequestPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        document.querySelector('#resident-report-page').addEventListener('click', () => openModal('concern'));
+        document.querySelector('#resident-modal-close').addEventListener('click', () => modal.hidden = true);
+        document.querySelector('#resident-document-request-close').addEventListener('click', () => documentRequestPanel.hidden = true);
+        document.querySelector('#resident-document-request-cancel').addEventListener('click', () => documentRequestPanel.hidden = true);
+        document.querySelector('#resident-concern-report-close').addEventListener('click', () => concernReportPanel.hidden = true);
+        document.querySelector('#resident-concern-report-cancel').addEventListener('click', () => concernReportPanel.hidden = true);
+
+        documentRequestForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (requestInFlight) return showToast('Please wait for the current request to finish');
+            requestInFlight = true;
+            const form = new FormData(event.currentTarget);
+            try {
+                const response = await fetch('/api/documents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        document_type: form.get('document_type'),
+                        full_name: form.get('full_name'),
+                        address: form.get('address'),
+                        contact_number: form.get('contact_number'),
+                        date_of_birth: form.get('date_of_birth'),
+                        place_of_birth: form.get('place_of_birth'),
+                        civil_status: form.get('civil_status'),
+                        purpose: form.get('purpose'),
+                        business_name: form.get('business_name'),
+                        business_address: form.get('business_address'),
+                    })
+                });
+                const result = await response.json();
+                if (!response.ok) return showToast(result.error || 'Could not submit');
+                documentRequestPanel.hidden = true;
+                event.currentTarget.reset();
+                updateBusinessRequestFields();
+                showToast('Document request submitted successfully');
+                await loadData();
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+            } finally {
+                requestInFlight = false;
+            }
+        });
+
+        concernReportForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (requestInFlight) return showToast('Please wait for the current request to finish');
+            if (!navigator.geolocation) return showToast('Location access is required');
+            requestInFlight = true;
+            let position;
+            try {
+                position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject));
+            } catch {
+                requestInFlight = false;
+                return showToast('Allow location access to submit your report');
+            }
+            const form = new FormData(event.currentTarget);
+            try {
+                const response = await fetch('/api/concerns', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category: form.get('category'),
+                        priority: 'Medium',
+                        title: form.get('title'),
+                        description: form.get('description'),
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    })
+                });
+                const result = await response.json();
+                if (!response.ok) return showToast(result.error || 'Could not submit report');
+                concernReportPanel.hidden = true;
+                event.currentTarget.reset();
+                showToast('Concern report submitted successfully');
+                await loadData();
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+            } finally {
+                requestInFlight = false;
+            }
+        });
+
+        document.querySelector('#resident-action-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (requestInFlight) return showToast('Please wait for the current request to finish');
+            requestInFlight = true;
+            const form = new FormData(event.currentTarget);
+            let payload;
+            let endpoint;
+            if (actionType === 'document') {
+                endpoint = '/api/documents';
+                payload = { document_type: form.get('document_type'), purpose: form.get('purpose') };
+            } else {
+                endpoint = '/api/concerns';
+                payload = { category: form.get('category'), priority: 'Medium', title: form.get('title') };
+                if (!navigator.geolocation) {
+                    requestInFlight = false;
+                    return showToast('Location access is required');
+                }
+                try {
+                    const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject));
+                    payload.latitude = position.coords.latitude;
+                    payload.longitude = position.coords.longitude;
+                } catch {
+                    requestInFlight = false;
+                    return showToast('Allow location access to submit your report');
+                }
+            }
+            try {
+                const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await response.json();
+                if (!response.ok) return showToast(result.error || 'Could not submit');
+                modal.hidden = true;
+                event.currentTarget.reset();
+                showToast('Submitted successfully');
+                await loadData();
+            } catch {
+                showToast('Could not reach the Supabase-backed API');
+            } finally {
+                requestInFlight = false;
+            }
+        });
+
+        const loadWeather = async () => {
+            if (!navigator.geolocation) return showToast('Location is not available');
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                try {
+                    const response = await fetch(`/api/weather?lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
+                    if (!response.ok) return showToast('Weather unavailable');
+                    const data = (await response.json()).data;
+                    const current = data.current || {};
+                    document.querySelector('#resident-temperature').textContent = `${current.temperature_2m ?? '--'}°C`;
+                    document.querySelector('#resident-rainfall').textContent = `${current.precipitation ?? '--'} mm`;
+                    document.querySelector('#resident-wind').textContent = `${current.wind_speed_10m ?? '--'} km/h`;
+                    document.querySelector('#resident-visibility').textContent = `${current.visibility ? (current.visibility / 1000).toFixed(1) : '--'} km`;
+                    const code = Number(current.weather_code);
+                    const state = [95, 96, 99].includes(code) ? 'Thunderstorm Alert' : [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code) ? 'Rain Alert' : [1, 2, 3].includes(code) ? 'Cloudy' : 'Sunny';
+                    document.querySelector('#resident-weather-alert').innerHTML = `<i data-lucide="${state === 'Sunny' ? 'sun' : state === 'Rain Alert' ? 'cloud-rain' : 'cloud-lightning'}"></i><div><strong>${state}</strong><p>Live conditions for your current location.</p></div>`;
+                    lucide.createIcons();
+                } catch {
+                    showToast('Could not reach the weather service');
+                }
+            }, () => showToast('Allow location access for weather'));
+        };
+
+        document.querySelector('#resident-weather-refresh').addEventListener('click', loadWeather);
+        document.querySelector('#resident-notification').addEventListener('click', () => setView('resident-announcements'));
+
+        const profileButton = document.querySelector('#resident-profile');
+        profileButton.addEventListener('click', () => {
+            const menu = document.querySelector('#resident-profile-menu');
+            menu.hidden = !menu.hidden;
+        });
+
+        document.querySelectorAll('#resident-profile-menu button[data-action]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const menu = document.querySelector('#resident-profile-menu');
+                menu.hidden = true;
+                if (button.dataset.action === 'resident-profile-view') {
+                    residentProfileModal.hidden = false;
+                    await loadProfile();
+                }
+                if (button.dataset.action === 'resident-account-settings') {
+                    residentPasswordModal.hidden = false;
+                    residentPasswordForm.reset();
+                }
+            });
+        });
+
+        document.querySelector('.resident-profile-close').addEventListener('click', () => residentProfileModal.hidden = true);
+        document.querySelector('.resident-password-close').addEventListener('click', () => residentPasswordModal.hidden = true);
+
+        residentProfileForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const payload = {
+                full_name: residentProfileForm.full_name.value.trim(),
+                position: residentProfileForm.position.value.trim(),
+                phone: residentProfileForm.phone.value.trim(),
+            };
+            try {
+                const response = await fetch('/api/profile', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Profile update failed');
+                residentProfileModal.hidden = true;
+                await loadProfile();
+                showToast('Profile updated');
+            } catch (error) {
+                showToast(error.message || 'Could not update profile');
+            }
+        });
+
+        residentPasswordForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const password = residentPasswordForm.password.value.trim();
+            const confirmation = residentPasswordForm.confirmation.value.trim();
+            if (password.length < 8) return showToast('Password must be at least 8 characters');
+            if (password !== confirmation) return showToast('Passwords do not match');
+            try {
+                const response = await fetch('/api/account/password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password, confirmation }),
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Password update failed');
+                residentPasswordModal.hidden = true;
+                residentPasswordForm.reset();
+                showToast('Password updated');
+            } catch (error) {
+                showToast(error.message || 'Could not update password');
+            }
+        });
+
+        document.querySelector('#resident-logout').addEventListener('click', async () => {
+            await fetch('/api/logout', { method: 'POST' });
+            window.location.href = '/login';
+        });
+        document.querySelector('#resident-menu-logout').addEventListener('click', () => document.querySelector('#resident-logout').click());
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('.resident-top-actions')) document.querySelector('#resident-profile-menu').hidden = true;
+        });
+        document.querySelector('#resident-menu-toggle').addEventListener('click', () => document.querySelector('.resident-sidebar').classList.toggle('open'));
+
+        loadProfile();
+        loadData();
+    </script>
+</body>
+</html>

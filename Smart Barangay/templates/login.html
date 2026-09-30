@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SmartBarangay | Sign in</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-page">
+    <main class="login-card">
+        <div class="brand login-brand">
+            <div class="brand-mark"><i data-lucide="shield"></i></div>
+            <div>
+                <strong>SmartBarangay</strong>
+                <span>Barangay Don Felipe Larrazabal</span>
+            </div>
+        </div>
+        <div class="login-heading">
+            <span class="civic-badge"><i data-lucide="landmark"></i> Official Barangay Portal</span>
+            <h1>Welcome back</h1>
+            <p>Sign in to access your barangay workspace and citizen services.</p>
+        </div>
+        <form id="login-form" class="login-form">
+            <label>Email address
+                <input type="email" name="email" autocomplete="email" required placeholder="you@example.com">
+            </label>
+            <label>Password
+                <input type="password" name="password" autocomplete="current-password" required placeholder="Enter your password">
+            </label>
+            <button class="primary-button" type="submit">Sign in <i data-lucide="arrow-right"></i></button>
+            <p class="login-error" id="login-error" role="alert"></p>
+        </form>
+    </main>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        lucide.createIcons();
+        document.querySelector('#login-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const error = document.querySelector('#login-error');
+            error.textContent = '';
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(Object.fromEntries(new FormData(form)))
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                error.textContent = result.error || 'Sign in failed';
+                return;
+            }
+            window.location.href = '/';
+        });
+    </script>
+</body>
+</html>

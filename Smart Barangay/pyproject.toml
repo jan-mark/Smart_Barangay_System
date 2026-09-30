@@ -1,0 +1,13 @@
+[project]
+name = "smart-barangay"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "Flask>=3.0,<4.0",
+    "supabase>=2.0,<3.0",
+    "python-dotenv>=1.0,<2.0",
+    "reportlab>=4.0,<5.0",
+]
+
+[tool.vercel]
+entrypoint = "main:app"
