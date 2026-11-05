@@ -8,15 +8,16 @@ from functools import wraps
 from urllib.parse import urlencode
 from urllib.request import urlopen
 import json
+import httpx
 from xml.sax.saxutils import escape as xml_escape
 
 from flask import Flask, jsonify, make_response, redirect, render_template, request, session, url_for
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image as RLImage, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from supabase_repository import (
     RepositoryConfigurationError,
@@ -30,12 +31,21 @@ from time_utils import manila_now, manila_today
 app = Flask(__name__, static_folder="public/static", static_url_path="/static")
 app.secret_key = os.getenv("FLASK_SECRET_KEY") or "change-this-development-secret"
 app.config.update(
+    TEMPLATES_AUTO_RELOAD=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.getenv("FLASK_SESSION_SECURE", "false").lower() == "true",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
     MAX_CONTENT_LENGTH=2 * 1024 * 1024,
 )
+
+@app.after_request
+def add_no_cache_headers(response):
+    if response.content_type.startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 ROLE_ACCESS = {
     "admin": {"Dashboard", "Manage Officials", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports", "Settings"},
@@ -438,19 +448,53 @@ def download_report(report_name: str):
     return response
 
 
+DEFAULT_BARANGAY_WEATHER = {
+    "current": {
+        "temperature_2m": 29.5,
+        "relative_humidity_2m": 74,
+        "precipitation": 0.0,
+        "wind_speed_10m": 10.5,
+        "visibility": 40000.0,
+        "weather_code": 1,
+    },
+    "location": "Barangay Don Felipe Larrazabal, Ormoc City",
+    "fallback": True,
+}
+
+
 @app.get("/api/weather")
 @login_required
 def weather():
+    default_lat = 11.0050
+    default_lon = 124.6075
     try:
-        latitude = float(request.args["lat"])
-        longitude = float(request.args["lon"])
-        query = urlencode({"latitude": latitude, "longitude": longitude, "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,visibility,weather_code", "hourly": "precipitation_probability,precipitation", "timezone": "auto"})
-        with urlopen(f"https://api.open-meteo.com/v1/forecast?{query}", timeout=8) as response:
-            return jsonify({"data": json.load(response)})
-    except (KeyError, ValueError):
-        return jsonify({"error": "Valid lat and lon are required"}), 400
+        lat_val = request.args.get("lat")
+        lon_val = request.args.get("lon")
+        latitude = float(lat_val) if lat_val is not None and str(lat_val).strip() else default_lat
+        longitude = float(lon_val) if lon_val is not None and str(lon_val).strip() else default_lon
+    except (ValueError, TypeError):
+        latitude = default_lat
+        longitude = default_lon
+
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "current": "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,visibility,weather_code",
+        "hourly": "precipitation_probability,precipitation",
+        "timezone": "auto",
+    }
+    try:
+        with httpx.Client(timeout=6.0) as client:
+            resp = client.get("https://api.open-meteo.com/v1/forecast", params=params)
+            resp.raise_for_status()
+            weather_data = resp.json()
+            is_default = (abs(latitude - default_lat) < 0.01 and abs(longitude - default_lon) < 0.01)
+            weather_data["location"] = "Barangay Don Felipe Larrazabal, Ormoc City" if is_default else "Detected Location"
+            return jsonify({"data": weather_data})
     except Exception as error:
-        return jsonify({"error": f"Weather provider unavailable: {error}"}), 502
+        fallback = dict(DEFAULT_BARANGAY_WEATHER)
+        fallback["error_note"] = str(error)
+        return jsonify({"data": fallback, "fallback": True})
 
 
 @app.post("/api/residents")
@@ -468,10 +512,36 @@ def create_resident():
             return jsonify({"error": "Age must be between 1 and 120"}), 400
         if gender not in {"Female", "Male", "Other"}:
             return jsonify({"error": "Choose a valid gender"}), 400
+        is_head = bool(payload.get("is_head", False))
+        household_role = str(payload.get("household_role", "Head" if is_head else "Member")).strip()
+        if household_role.lower() in ("head", "household leader", "leader"):
+            is_head = True
+            household_role = "Head"
+        is_pwd = bool(payload.get("is_pwd", False))
+        is_solo_parent = bool(payload.get("is_solo_parent", False))
+        is_4ps = bool(payload.get("is_4ps", False))
+        sector = str(payload.get("sector", "")).strip() or None
+        if not sector:
+            sectors = []
+            if is_head: sectors.append("Leader")
+            if is_pwd: sectors.append("PWD")
+            if is_solo_parent: sectors.append("Solo Parent")
+            if is_4ps: sectors.append("4Ps")
+            if age >= 60: sectors.append("Senior")
+            elif age < 18: sectors.append("Minor")
+            else: sectors.append("Adult")
+            sector = ", ".join(sectors)
+
         resident = supabase_repository.add_resident({
             "full_name": str(payload["full_name"]).strip(),
             "address": str(payload["address"]).strip(),
             "household": str(payload.get("household", "UNASSIGNED")).strip() or "UNASSIGNED",
+            "household_role": household_role,
+            "is_head": is_head,
+            "is_pwd": is_pwd,
+            "is_solo_parent": is_solo_parent,
+            "is_4ps": is_4ps,
+            "sector": sector,
             "email": str(payload.get("email", "")).strip() or None,
             "phone": str(payload.get("phone", "")).strip() or None,
             "age": age,
@@ -494,10 +564,30 @@ def create_resident():
 def update_resident(resident_id: int):
     payload = request.get_json(silent=True) or {}
     updates: dict[str, object] = {}
-    for field in ("full_name", "address", "household", "email", "phone"):
+    for field in ("full_name", "address", "household", "email", "phone", "gender", "household_role", "sector"):
         if field in payload:
             value = str(payload[field] or "").strip()
             updates[field] = value or None
+    if "age" in payload:
+        try:
+            updates["age"] = int(payload["age"])
+        except (ValueError, TypeError):
+            pass
+    if "is_head" in payload:
+        updates["is_head"] = bool(payload["is_head"])
+        if updates["is_head"] and not updates.get("household_role"):
+            updates["household_role"] = "Head"
+    if "household_role" in payload:
+        role_val = str(payload["household_role"]).strip()
+        updates["household_role"] = role_val
+        if role_val.lower() in ("head", "household leader", "leader"):
+            updates["is_head"] = True
+    if "is_pwd" in payload:
+        updates["is_pwd"] = bool(payload["is_pwd"])
+    if "is_solo_parent" in payload:
+        updates["is_solo_parent"] = bool(payload["is_solo_parent"])
+    if "is_4ps" in payload:
+        updates["is_4ps"] = bool(payload["is_4ps"])
     if "status" in payload:
         status = str(payload["status"]).strip()
         if status not in {"Verified", "Pending", "Inactive"}:
@@ -548,15 +638,12 @@ def create_document():
             required_fields = {
                 "Address": applicant_address,
                 "Contact number": applicant_contact,
-                "Date of birth": applicant_date_of_birth,
-                "Place of birth": applicant_place_of_birth,
-                "Civil status": applicant_civil_status,
                 "Purpose": purpose,
             }
             missing = [label for label, value in required_fields.items() if not value]
             if missing:
                 return jsonify({"error": f"Complete the following fields: {', '.join(missing)}"}), 400
-            if applicant_civil_status not in CIVIL_STATUSES:
+            if applicant_civil_status and applicant_civil_status not in CIVIL_STATUSES:
                 return jsonify({"error": "Choose a valid civil status"}), 400
             if document_type == "Business Clearance" and (not business_name or not business_address):
                 return jsonify({"error": "Business name and business address are required for a Business Clearance"}), 400
@@ -628,193 +715,316 @@ def update_document(document_id):
 
 def _certificate_pdf(document: dict) -> bytes:
     styles = getSampleStyleSheet()
+
     header_style = ParagraphStyle(
         "CertificateHeader",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=11,
-        leading=14,
+        fontName="Helvetica",
+        fontSize=10.5,
+        leading=14.5,
         alignment=TA_CENTER,
-        textColor=colors.HexColor("#1c355e"),
+        textColor=colors.black,
+    )
+    office_style = ParagraphStyle(
+        "CertificateOffice",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=12,
+        leading=16,
+        alignment=TA_CENTER,
+        textColor=colors.black,
     )
     title_style = ParagraphStyle(
         "CertificateTitle",
-        parent=styles["Title"],
-        fontName="Helvetica-Bold",
-        fontSize=18,
-        leading=22,
+        parent=styles["Normal"],
+        fontName="Helvetica-BoldOblique",
+        fontSize=14,
+        leading=18,
         alignment=TA_CENTER,
-        textColor=colors.HexColor("#15233b"),
-        spaceBefore=12,
-        spaceAfter=18,
+        textColor=colors.black,
+    )
+    to_whom_style = ParagraphStyle(
+        "CertificateToWhom",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=11,
+        leading=16,
+        alignment=TA_LEFT,
+        textColor=colors.black,
     )
     body_style = ParagraphStyle(
         "CertificateBody",
-        parent=styles["BodyText"],
+        parent=styles["Normal"],
         fontName="Helvetica",
         fontSize=11,
-        leading=17,
+        leading=18,
         alignment=TA_JUSTIFY,
-        textColor=colors.HexColor("#26364f"),
-        spaceAfter=12,
+        firstLineIndent=36,
+        textColor=colors.black,
     )
-    label_style = ParagraphStyle(
-        "CertificateLabel",
-        parent=styles["BodyText"],
+    captain_name_style = ParagraphStyle(
+        "CertificateCaptainName",
+        parent=styles["Normal"],
         fontName="Helvetica-Bold",
+        fontSize=11,
+        leading=15,
+        alignment=TA_CENTER,
+        textColor=colors.black,
+    )
+    captain_sub_style = ParagraphStyle(
+        "CertificateCaptainSub",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10.5,
+        leading=14,
+        alignment=TA_CENTER,
+        textColor=colors.black,
+    )
+    sig_label_style = ParagraphStyle(
+        "CertificateSigLabel",
+        parent=styles["Normal"],
+        fontName="Helvetica-Oblique",
         fontSize=9,
         leading=12,
-        textColor=colors.HexColor("#52627c"),
+        alignment=TA_CENTER,
+        textColor=colors.black,
     )
-    value_style = ParagraphStyle(
-        "CertificateValue",
-        parent=styles["BodyText"],
+    bottom_left_style = ParagraphStyle(
+        "CertificateBottomLeft",
+        parent=styles["Normal"],
         fontName="Helvetica",
-        fontSize=10,
-        leading=13,
-        textColor=colors.HexColor("#17243a"),
+        fontSize=9,
+        leading=15,
+        alignment=TA_LEFT,
+        textColor=colors.black,
     )
-    signature_style = ParagraphStyle(
-        "CertificateSignature",
-        parent=styles["BodyText"],
+    dry_seal_style = ParagraphStyle(
+        "CertificateDrySeal",
+        parent=styles["Normal"],
         fontName="Helvetica",
         fontSize=9,
         leading=12,
         alignment=TA_CENTER,
-        textColor=colors.HexColor("#26364f"),
+        textColor=colors.black,
     )
 
-    def text(value: object, fallback: str = "Not provided") -> str:
+    def text(value: object, fallback: str = "") -> str:
         return xml_escape(str(value).strip()) if value not in (None, "") else fallback
 
-    document_type = str(document.get("document_type", "Barangay Certificate"))
-    title = {
-        "Barangay Clearance": "BARANGAY CLEARANCE",
-        "Certificate of Residency": "CERTIFICATE OF RESIDENCY",
-        "Certificate of Indigency": "CERTIFICATE OF INDIGENCY",
-        "Business Clearance": "BARANGAY BUSINESS CLEARANCE",
-    }.get(document_type, document_type.upper())
-    full_name = text(document.get("resident_name"))
-    purpose = text(document.get("purpose"))
-    issue_date = manila_today().strftime("%B %d, %Y")
-    request_id = text(document.get("request_id"))
-    processor = text(document.get("processor"), "Barangay Authorized Official")
+    document_type = str(document.get("document_type", "Barangay Clearance"))
+    full_name = text(document.get("resident_name"), "RESIDENT NAME").upper()
+    purpose = text(document.get("purpose"), "").strip()
+    request_id = text(document.get("request_id"), "")
+
+    today = manila_today()
+    day = today.day
+    if 11 <= (day % 100) <= 13:
+        ord_suffix = "th"
+    else:
+        ord_suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    issue_date_phrase = f"Issued this {day}<sup>{ord_suffix}</sup> day of {today.strftime('%B')} {today.year} at Barangay Don Felipe Larrazabal, Ormoc City, Leyte."
 
     if document_type == "Barangay Clearance":
-        certification = (
-            f"This is to certify that <b>{full_name}</b>, whose personal information appears below, "
-            "is a resident of this barangay and, based on the records available to this office, "
-            "has no pending derogatory record as of the date of issuance. This clearance is issued "
-            f"upon the request of the interested party for <b>{purpose}</b>."
+        cert_title = "BARANGAY CLEARANCE"
+        p1 = (
+            f"This is to certify that <u><b>{full_name}</b></u> of legal age, "
+            "male/female and a bonafide resident of Barangay Don Felipe Larrazabal, Ormoc City, Leyte and "
+            "he/she is known to me and is a person of good moral character, peaceful and "
+            "law-abiding citizen."
         )
+        if purpose and purpose.lower() not in ("not provided", "none", "general", "whatever legal purposes it may serve"):
+            p2 = f"This certification is issued upon the request of above-mentioned name for {purpose} and whatever legal purposes it may serve."
+        else:
+            p2 = "This certification is issued upon the request of above-mentioned name for whatever legal purposes it may serve."
     elif document_type == "Certificate of Residency":
-        certification = (
-            f"This is to certify that <b>{full_name}</b> is a bona fide resident of Barangay Don Felipe "
-            "Larrazabal, City of Ormoc, Leyte. This certification is issued upon the request of the "
-            f"interested party for <b>{purpose}</b>."
+        cert_title = "CERTIFICATE OF RESIDENCY"
+        p1 = (
+            f"This is to certify that <u><b>{full_name}</b></u> of legal age, "
+            "male/female is a bona fide resident of Barangay Don Felipe Larrazabal, Ormoc City, Leyte."
         )
+        if purpose and purpose.lower() not in ("not provided", "none", "general", "whatever legal purposes it may serve"):
+            p2 = f"This certification is issued upon the request of above-mentioned name for {purpose}."
+        else:
+            p2 = "This certification is issued upon the request of above-mentioned name for whatever legal purposes it may serve."
     elif document_type == "Certificate of Indigency":
-        certification = (
-            f"This is to certify that <b>{full_name}</b> is a resident of Barangay Don Felipe Larrazabal, "
-            "City of Ormoc, Leyte, and is certified in the barangay records as belonging to a financially "
-            f"indigent household for the stated purpose of <b>{purpose}</b>."
+        cert_title = "CERTIFICATE OF INDIGENCY"
+        p1 = (
+            f"This is to certify that <u><b>{full_name}</b></u> of legal age, "
+            "male/female is a bona fide resident of Barangay Don Felipe Larrazabal, Ormoc City, Leyte, "
+            "and belongs to an indigent family in this barangay."
         )
+        if purpose and purpose.lower() not in ("not provided", "none", "general", "whatever legal purposes it may serve"):
+            p2 = f"This certification is issued upon the request of above-mentioned name for {purpose}."
+        else:
+            p2 = "This certification is issued upon the request of above-mentioned name for whatever legal assistance it may serve."
     else:
-        business = text(document.get("business_name"))
-        business_address = text(document.get("business_address"))
-        certification = (
-            f"This is to certify that <b>{full_name}</b> is authorized to apply for or operate the business "
-            f"<b>{business}</b> at <b>{business_address}</b>, subject to applicable laws, ordinances, and "
-            f"barangay requirements. This clearance is issued for <b>{purpose}</b>."
+        cert_title = "BARANGAY BUSINESS CLEARANCE"
+        business = text(document.get("business_name"), "BUSINESS NAME").upper()
+        business_address = text(document.get("business_address"), "Barangay Don Felipe Larrazabal, Ormoc City, Leyte").upper()
+        p1 = (
+            f"This is to certify that <u><b>{full_name}</b></u> is hereby granted clearance to operate or register "
+            f"the business <b>{business}</b> located at <b>{business_address}</b>, subject to applicable laws, "
+            "ordinances, and barangay regulations."
         )
-
-    details = [
-        [Paragraph("CERTIFICATE / REQUEST NO.", label_style), Paragraph(request_id, value_style)],
-        [Paragraph("FULL LEGAL NAME", label_style), Paragraph(full_name, value_style)],
-        [Paragraph("ADDRESS", label_style), Paragraph(text(document.get("applicant_address")), value_style)],
-        [Paragraph("CONTACT NUMBER", label_style), Paragraph(text(document.get("applicant_contact")), value_style)],
-        [Paragraph("DATE OF BIRTH", label_style), Paragraph(text(document.get("applicant_date_of_birth")), value_style)],
-        [Paragraph("PLACE OF BIRTH", label_style), Paragraph(text(document.get("applicant_place_of_birth")), value_style)],
-        [Paragraph("CIVIL STATUS", label_style), Paragraph(text(document.get("applicant_civil_status")), value_style)],
-        [Paragraph("PURPOSE", label_style), Paragraph(purpose, value_style)],
-    ]
-    if document_type == "Business Clearance":
-        details.extend(
-            [
-                [Paragraph("BUSINESS NAME", label_style), Paragraph(text(document.get("business_name")), value_style)],
-                [Paragraph("BUSINESS ADDRESS", label_style), Paragraph(text(document.get("business_address")), value_style)],
-            ]
-        )
+        if purpose and purpose.lower() not in ("not provided", "none", "general", "whatever legal purposes it may serve"):
+            p2 = f"This certification is issued upon the request of above-mentioned name for {purpose}."
+        else:
+            p2 = "This certification is issued upon the request of above-mentioned name for business clearance requirements."
 
     buffer = io.BytesIO()
     pdf = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=0.7 * inch,
-        leftMargin=0.7 * inch,
-        topMargin=0.6 * inch,
+        rightMargin=0.75 * inch,
+        leftMargin=0.75 * inch,
+        topMargin=0.65 * inch,
         bottomMargin=0.65 * inch,
-        title=f"{title} - {request_id}",
+        title=f"{cert_title} - {request_id}",
         author="SmartBarangay",
     )
-    story = [
-        Paragraph("REPUBLIC OF THE PHILIPPINES", header_style),
-        Paragraph("Province of Leyte", header_style),
-        Paragraph("CITY OF ORMOC", header_style),
-        Paragraph("BARANGAY DON FELIPE LARRAZABAL", header_style),
-        Spacer(1, 0.16 * inch),
-        Paragraph(title, title_style),
-        Paragraph(certification, body_style),
-        Table(
-            details,
-            colWidths=[2.05 * inch, 4.65 * inch],
-            hAlign="CENTER",
-            style=TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eef3fa")),
-                    ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#8395b0")),
-                    ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#c8d2e0")),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 9),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 9),
-                    ("TOPPADDING", (0, 0), (-1, -1), 7),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-                ]
-            ),
-        ),
-        Spacer(1, 0.25 * inch),
-        Paragraph(f"Issued this {issue_date} at Barangay Don Felipe Larrazabal, City of Ormoc, Leyte.", body_style),
-        Spacer(1, 0.25 * inch),
-        Table(
+
+    usable_width = A4[0] - 1.5 * inch
+
+    barangay_logo_path = os.path.join(app.root_path, "public", "static", "barangay_logo.png")
+    municipality_logo_path = os.path.join(app.root_path, "public", "static", "municipality_logo.png")
+
+    b_logo = RLImage(barangay_logo_path, width=68, height=68) if os.path.exists(barangay_logo_path) else ""
+    m_logo = RLImage(municipality_logo_path, width=68, height=68) if os.path.exists(municipality_logo_path) else ""
+
+    header_text = Paragraph(
+        "Republic of the Philippines<br/>"
+        "Province of Leyte<br/>"
+        "City of Ormoc<br/>"
+        "Barangay Don Felipe Larrazabal",
+        header_style,
+    )
+
+    header_table = Table(
+        [[b_logo, header_text, m_logo]],
+        colWidths=[78, usable_width - 156, 78],
+        hAlign="CENTER",
+    )
+    header_table.setStyle(
+        TableStyle(
             [
-                [Paragraph("Prepared / Processed by", signature_style), Paragraph("Approved by", signature_style)],
-                [Paragraph("<br/><br/>" + processor, signature_style), Paragraph("<br/><br/>____________________________", signature_style)],
-                [Paragraph("Barangay Records Officer", signature_style), Paragraph("Authorized Barangay Official", signature_style)],
-            ],
-            colWidths=[3.35 * inch, 3.35 * inch],
-            hAlign="CENTER",
-            style=TableStyle(
-                [
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LINEABOVE", (0, 1), (0, 1), 0.6, colors.HexColor("#26364f")),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ]
-            ),
-        ),
-        Spacer(1, 0.22 * inch),
-        Paragraph(
-            "This document is generated from the SmartBarangay records system. It must be signed by an authorized official and bear the official barangay seal before release.",
-            ParagraphStyle(
-                "CertificateFooter",
-                parent=styles["Normal"],
-                fontSize=8,
-                leading=10,
-                alignment=TA_CENTER,
-                textColor=colors.HexColor("#66758d"),
-            ),
-        ),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (0, 0), (0, 0), "LEFT"),
+                ("ALIGN", (1, 0), (1, 0), "CENTER"),
+                ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+
+    captain_table = Table(
+        [
+            [Paragraph("<u><b>HON. NENITO S. ANONAT</b></u>", captain_name_style)],
+            [Paragraph("Punong Barangay", captain_sub_style)],
+        ],
+        colWidths=[240],
+        hAlign="RIGHT",
+    )
+    captain_table.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 1),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ]
+        )
+    )
+
+    sig_table = Table(
+        [
+            [Paragraph("________________________", captain_name_style)],
+            [Paragraph("Signature over printed name", sig_label_style)],
+        ],
+        colWidths=[200],
+        hAlign="LEFT",
+    )
+    sig_table.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 1),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ]
+        )
+    )
+
+    sig_grid = Table(
+        [
+            ["", captain_table],
+            [sig_table, ""],
+        ],
+        colWidths=[usable_width * 0.48, usable_width * 0.52],
+        hAlign="CENTER",
+    )
+    sig_grid.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ]
+        )
+    )
+
+    bottom_left = Paragraph(
+        "Comm. Tax Cert. No.: __________<br/>"
+        "Issued On: ____________________<br/>"
+        "O.R. No.: _____________________<br/>"
+        "Issued On: ____________________",
+        bottom_left_style,
+    )
+
+    dry_seal = Paragraph(
+        "Not valid<br/>without<br/>dry seal",
+        dry_seal_style,
+    )
+
+    bottom_table = Table(
+        [[bottom_left, dry_seal]],
+        colWidths=[usable_width * 0.7, usable_width * 0.3],
+        hAlign="CENTER",
+    )
+    bottom_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+
+    story = [
+        header_table,
+        Spacer(1, 22),
+        Paragraph("OFFICE OF THE PUNONG BARANGAY", office_style),
+        Spacer(1, 16),
+        Paragraph(f"<i><b>{cert_title}</b></i>", title_style),
+        Spacer(1, 32),
+        Paragraph("<b>TO WHOM IT MAY CONCERN:</b>", to_whom_style),
+        Spacer(1, 18),
+        Paragraph(p1, body_style),
+        Spacer(1, 18),
+        Paragraph(p2, body_style),
+        Spacer(1, 18),
+        Paragraph(issue_date_phrase, body_style),
+        Spacer(1, 45),
+        sig_grid,
+        Spacer(1, 40),
+        bottom_table,
     ]
+
     pdf.build(story)
     return buffer.getvalue()
 

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -47,7 +47,10 @@
                 <section class="resident-view active" id="resident-home">
                     <section class="resident-welcome">
                         <div>
-                            <span class="eyebrow">MY BARANGAY</span>
+                            <div class="heading-badge-wrap">
+                                <span class="capstone-tag"><i data-lucide="graduation-cap"></i> IT Capstone Project</span>
+                                <span class="lgu-tag"><i data-lucide="landmark"></i> Resident Portal</span>
+                            </div>
                             <h1>Good day, <span id="welcome-name">Resident</span></h1>
                             <p>Manage your requests, reports, and community updates in one place.</p>
                         </div>
@@ -86,14 +89,14 @@
                         </div>
                         <form id="resident-document-request-form">
                             <div class="request-form-grid">
-                                <label>Document type<select name="document_type"><option>Barangay Clearance</option><option>Certificate of Residency</option><option>Certificate of Indigency</option><option>Business Clearance</option></select></label>
-                                <label>Full legal name<input name="full_name" required autocomplete="name"></label>
-                                <label>Complete address<input name="address" required autocomplete="street-address" placeholder="House/Lot, Purok, Barangay, City"></label>
-                                <label>Contact number<input name="contact_number" required autocomplete="tel" placeholder="e.g. 09171234567"></label>
-                                <label>Date of birth<input name="date_of_birth" type="date" required></label>
-                                <label>Place of birth<input name="place_of_birth" required placeholder="Municipality / Province"></label>
-                                <label>Civil status<select name="civil_status" required><option value="">Choose civil status</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></label>
-                                <label>Purpose<input name="purpose" placeholder="e.g. Employment or school enrollment" required></label>
+                                <label id="resident-req-type-field">Document type<select name="document_type"><option>Barangay Clearance</option><option>Certificate of Residency</option><option>Certificate of Indigency</option><option>Business Clearance</option></select></label>
+                                <label id="resident-req-name-field"><span class="label-text">Full legal name</span><input name="full_name" required autocomplete="name"></label>
+                                <label id="resident-req-address-field"><span class="label-text">Complete address</span><input name="address" required autocomplete="street-address" placeholder="House/Lot, Purok, Barangay, City"></label>
+                                <label id="resident-req-contact-field"><span class="label-text">Contact number</span><input name="contact_number" required autocomplete="tel" placeholder="e.g. 09171234567"></label>
+                                <label id="resident-req-birthdate-field" style="display: none;" hidden><span class="label-text">Date of birth</span><input name="date_of_birth" type="date"></label>
+                                <label id="resident-req-birthplace-field" style="display: none;" hidden><span class="label-text">Place of birth</span><input name="place_of_birth" placeholder="Municipality / Province"></label>
+                                <label id="resident-req-civilstatus-field" style="display: none;" hidden><span class="label-text">Civil status</span><select name="civil_status"><option value="">Choose civil status</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></label>
+                                <label id="resident-req-purpose-field" style="grid-column: span 2;"><span class="label-text">Purpose / Reason</span><input name="purpose" list="resident-purpose-suggestions" placeholder="Reason for the request" required><datalist id="resident-purpose-suggestions"></datalist></label>
                             </div>
                             <div class="business-request-fields" id="resident-business-fields" hidden>
                                 <p class="form-section-label">Business details</p>
@@ -141,7 +144,7 @@
                     </section>
                     <div class="resident-alert-banner" id="resident-weather-alert"><i data-lucide="cloud-lightning"></i><div><strong>Loading weather...</strong><p>Checking current conditions for your location.</p></div></div>
                     <section class="resident-weather-grid">
-                        <article class="resident-weather-card"><span>TEMPERATURE</span><strong id="resident-temperature">--°C</strong></article>
+                        <article class="resident-weather-card"><span>TEMPERATURE</span><strong id="resident-temperature">--Â°C</strong></article>
                         <article class="resident-weather-card"><span>RAINFALL</span><strong id="resident-rainfall">-- mm</strong></article>
                         <article class="resident-weather-card"><span>WIND SPEED</span><strong id="resident-wind">-- km/h</strong></article>
                         <article class="resident-weather-card"><span>VISIBILITY</span><strong id="resident-visibility">-- km</strong></article>
@@ -294,13 +297,13 @@
             document.querySelector('#home-concern-count').textContent = concerns.length;
 
             const documentsHtml = documents.length
-                ? documents.map((item) => `<div class="portal-row"><strong>${escapeHtml(item.document_type)}</strong><span class="status ${String(item.status || '').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status || 'Pending')}</span><small>${escapeHtml(item.request_id || '')} · Requested ${escapeHtml(smartBarangayTime.formatDate(item.date_requested))}${item.scheduled_date ? ` · Pickup ${escapeHtml(smartBarangayTime.formatDate(item.scheduled_date))}` : ''}</small></div>`).join('')
+                ? documents.map((item) => `<div class="portal-row"><strong>${escapeHtml(item.document_type)}</strong><span class="status ${String(item.status || '').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status || 'Pending')}</span><small>${escapeHtml(item.request_id || '')} Â· Requested ${escapeHtml(smartBarangayTime.formatDate(item.date_requested))}${item.scheduled_date ? ` Â· Pickup ${escapeHtml(smartBarangayTime.formatDate(item.scheduled_date))}` : ''}</small></div>`).join('')
                 : '<div class="empty-state">No document requests yet.</div>';
             document.querySelector('#my-documents').innerHTML = documents.slice(0, 4).length ? documentsHtml : '<div class="empty-state">No document requests yet.</div>';
             document.querySelector('#documents-list').innerHTML = documentsHtml;
 
             const concernsHtml = concerns.length
-                ? concerns.map((item) => `<div class="portal-row"><strong>${escapeHtml(item.title)}</strong><span class="status ${String(item.status || '').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status || 'Open')}</span><small>${escapeHtml(item.concern_id || '')} · ${escapeHtml(smartBarangayTime.formatDate(item.submitted_at))}</small>${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}</div>`).join('')
+                ? concerns.map((item) => `<div class="portal-row"><strong>${escapeHtml(item.title)}</strong><span class="status ${String(item.status || '').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status || 'Open')}</span><small>${escapeHtml(item.concern_id || '')} Â· ${escapeHtml(smartBarangayTime.formatDate(item.submitted_at))}</small>${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}</div>`).join('')
                 : '<div class="empty-state">No concern reports yet.</div>';
             document.querySelector('#concerns-list').innerHTML = concernsHtml;
 
@@ -318,7 +321,7 @@
             try {
                 responses = await Promise.all([fetch('/api/documents'), fetch('/api/concerns'), fetch('/api/announcements')]);
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
                 return;
             }
             if (responses.some((response) => response.status === 401)) return window.location.href = '/login';
@@ -354,10 +357,64 @@
 
         document.querySelector('#resident-request').addEventListener('click', () => openModal('document'));
         const updateBusinessRequestFields = () => {
-            const isBusinessClearance = documentRequestForm.document_type.value === 'Business Clearance';
+            const docType = documentRequestForm.document_type.value;
+            const isBusiness = docType === 'Business Clearance';
+            const isClearance = docType === 'Barangay Clearance';
+
+            const birthDateField = document.querySelector('#resident-req-birthdate-field');
+            const birthPlaceField = document.querySelector('#resident-req-birthplace-field');
+            const civilStatusField = document.querySelector('#resident-req-civilstatus-field');
             const businessFields = document.querySelector('#resident-business-fields');
-            businessFields.hidden = !isBusinessClearance;
-            businessFields.querySelectorAll('input').forEach((input) => { input.required = isBusinessClearance; });
+            const nameLabel = document.querySelector('#resident-req-name-field .label-text');
+            const purposeInput = documentRequestForm.purpose;
+            const datalist = document.querySelector('#resident-purpose-suggestions');
+
+            // Business section
+            businessFields.hidden = !isBusiness;
+            businessFields.querySelectorAll('input').forEach((input) => { input.required = isBusiness; });
+
+            // Personal/birth info
+            if (birthDateField) {
+                birthDateField.hidden = true;
+                birthDateField.style.display = 'none';
+            }
+            if (birthPlaceField) {
+                birthPlaceField.hidden = true;
+                birthPlaceField.style.display = 'none';
+            }
+            if (civilStatusField) {
+                civilStatusField.hidden = true;
+                civilStatusField.style.display = 'none';
+            }
+
+            if (nameLabel) {
+                nameLabel.textContent = isBusiness ? 'Business Owner / Applicant name' : 'Full legal name';
+            }
+
+            const purposeMap = {
+                'Barangay Clearance': {
+                    placeholder: 'e.g. Local Employment, Police Clearance, NBI, Postal ID',
+                    options: ['Local Employment', 'Job Application / Pre-employment', 'Police Clearance Requirement', 'NBI Clearance Requirement', 'Postal ID / Valid ID Application', 'Bank Requirement', 'Travel / Visa Application']
+                },
+                'Certificate of Residency': {
+                    placeholder: 'e.g. Proof of Residency, Bank Requirement, Utility Connection',
+                    options: ['Proof of Residency', 'Bank Account Opening', 'School Enrollment / Transfer', 'Electric Service Connection', 'Water Service Connection', 'Government ID Requirement']
+                },
+                'Certificate of Indigency': {
+                    placeholder: 'e.g. Medical Assistance, Hospitalization, Scholarship, Financial Aid',
+                    options: ['Medical Assistance / Hospitalization', 'Financial Assistance (AICS)', 'Educational / Scholarship Assistance', 'Burial Assistance', 'DSWD Requirement', 'PAO Legal Aid']
+                },
+                'Business Clearance': {
+                    placeholder: 'e.g. New Business Permit, Permit Renewal, DTI Registration',
+                    options: ['New Barangay Business Permit', 'Annual Business Permit Renewal', 'Mayor\'s Permit Requirement', 'DTI Registration', 'BIR Registration']
+                }
+            };
+
+            const cfg = purposeMap[docType] || purposeMap['Barangay Clearance'];
+            if (purposeInput) purposeInput.placeholder = cfg.placeholder;
+            if (datalist) {
+                datalist.innerHTML = cfg.options.map((opt) => `<option value="${escapeHtml(opt)}"></option>`).join('');
+            }
         };
         documentRequestForm.document_type.addEventListener('change', updateBusinessRequestFields);
         document.querySelector('#resident-request-page').addEventListener('click', () => {
@@ -405,7 +462,7 @@
                 showToast('Document request submitted successfully');
                 await loadData();
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
             } finally {
                 requestInFlight = false;
             }
@@ -444,7 +501,7 @@
                 showToast('Concern report submitted successfully');
                 await loadData();
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
             } finally {
                 requestInFlight = false;
             }
@@ -485,32 +542,69 @@
                 showToast('Submitted successfully');
                 await loadData();
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
             } finally {
                 requestInFlight = false;
             }
         });
 
+        const fetchResidentWeather = async (lat, lon) => {
+            const query = (lat !== undefined && lon !== undefined)
+                ? `?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
+                : '';
+            const response = await fetch(`/api/weather${query}`);
+            if (!response.ok) throw new Error('Weather API returned error');
+            const data = (await response.json()).data || {};
+            const current = data.current || {};
+            const tempEl = document.querySelector('#resident-temperature');
+            if (tempEl) tempEl.textContent = `${current.temperature_2m ?? '--'}Â°C`;
+            const rainEl = document.querySelector('#resident-rainfall');
+            if (rainEl) rainEl.textContent = `${current.precipitation ?? '0.0'} mm`;
+            const windEl = document.querySelector('#resident-wind');
+            if (windEl) windEl.textContent = `${current.wind_speed_10m ?? '--'} km/h`;
+            const visEl = document.querySelector('#resident-visibility');
+            if (visEl) visEl.textContent = `${current.visibility ? (current.visibility / 1000).toFixed(1) : '--'} km`;
+
+            const code = Number(current.weather_code);
+            const state = [95, 96, 99].includes(code) ? 'Thunderstorm Alert' : [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code) ? 'Rain Alert' : [1, 2, 3].includes(code) ? 'Cloudy' : 'Sunny';
+            const icon = state === 'Sunny' ? 'sun' : state === 'Rain Alert' ? 'cloud-rain' : state === 'Cloudy' ? 'cloud' : 'cloud-lightning';
+            const locText = data.location || 'Barangay Don Felipe Larrazabal';
+            const alertBanner = document.querySelector('#resident-weather-alert');
+            if (alertBanner) {
+                alertBanner.innerHTML = `<i data-lucide="${icon}"></i><div><strong>${state}</strong><p>Live conditions Â· ${escapeHtml(locText)}</p></div>`;
+                lucide.createIcons();
+            }
+            return data;
+        };
+
         const loadWeather = async () => {
-            if (!navigator.geolocation) return showToast('Location is not available');
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                try {
-                    const response = await fetch(`/api/weather?lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
-                    if (!response.ok) return showToast('Weather unavailable');
-                    const data = (await response.json()).data;
-                    const current = data.current || {};
-                    document.querySelector('#resident-temperature').textContent = `${current.temperature_2m ?? '--'}°C`;
-                    document.querySelector('#resident-rainfall').textContent = `${current.precipitation ?? '--'} mm`;
-                    document.querySelector('#resident-wind').textContent = `${current.wind_speed_10m ?? '--'} km/h`;
-                    document.querySelector('#resident-visibility').textContent = `${current.visibility ? (current.visibility / 1000).toFixed(1) : '--'} km`;
-                    const code = Number(current.weather_code);
-                    const state = [95, 96, 99].includes(code) ? 'Thunderstorm Alert' : [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code) ? 'Rain Alert' : [1, 2, 3].includes(code) ? 'Cloudy' : 'Sunny';
-                    document.querySelector('#resident-weather-alert').innerHTML = `<i data-lucide="${state === 'Sunny' ? 'sun' : state === 'Rain Alert' ? 'cloud-rain' : 'cloud-lightning'}"></i><div><strong>${state}</strong><p>Live conditions for your current location.</p></div>`;
-                    lucide.createIcons();
-                } catch {
-                    showToast('Could not reach the weather service');
-                }
-            }, () => showToast('Allow location access for weather'));
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        try {
+                            await fetchResidentWeather(position.coords.latitude, position.coords.longitude);
+                            showToast('Weather updated for your location');
+                        } catch {
+                            try {
+                                await fetchResidentWeather();
+                                showToast('Weather loaded (Barangay default)');
+                            } catch {
+                                showToast('Could not reach the weather service');
+                            }
+                        }
+                    },
+                    async () => {
+                        try {
+                            await fetchResidentWeather();
+                        } catch {
+                            showToast('Could not reach the weather service');
+                        }
+                    },
+                    { timeout: 5000, maximumAge: 300000 }
+                );
+            } else {
+                fetchResidentWeather().catch(() => showToast('Could not reach the weather service'));
+            }
         };
 
         document.querySelector('#resident-weather-refresh').addEventListener('click', loadWeather);
@@ -597,6 +691,7 @@
 
         loadProfile();
         loadData();
+        loadWeather();
     </script>
 </body>
 </html>

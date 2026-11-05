@@ -3,56 +3,242 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SmartBarangay | Sign in</title>
+    <title>SmartBarangay | Sign In</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body class="login-page">
-    <main class="login-card">
-        <div class="brand login-brand">
-            <div class="brand-mark"><i data-lucide="shield"></i></div>
-            <div>
-                <strong>SmartBarangay</strong>
-                <span>Barangay Don Felipe Larrazabal</span>
+<body class="login-body">
+    <!-- Barangay Hall Background Image with Glassmorphism Backdrop Overlay -->
+    <div class="login-bg-overlay"></div>
+
+    <div class="login-page-wrapper">
+        <!-- Top Navigation Bar with LGU Indicator and Dark/Light Mode Switch -->
+        <header class="login-top-bar">
+            <div class="top-bar-lgu">
+                <i data-lucide="landmark"></i>
+                <span>Barangay Don Felipe Larrazabal &middot; Ormoc City, Leyte</span>
             </div>
+            <div class="top-bar-actions">
+                <button type="button" class="theme-toggle-switch" id="theme-toggle" aria-label="Toggle dark/light mode" title="Switch Theme">
+                    <span class="theme-icon theme-moon"><i data-lucide="moon"></i></span>
+                    <span class="theme-icon theme-sun"><i data-lucide="sun"></i></span>
+                    <span class="theme-switch-slider"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Centered Split Glassmorphic Card -->
+        <div class="login-center-container">
+            <main class="login-split-card" id="login-card">
+                <!-- Left Brand Panel (White Frosted Glass) -->
+                <section class="card-brand-panel">
+                    <div class="concentric-rings-bg" aria-hidden="true"></div>
+
+                    <div class="brand-panel-content">
+                        <div class="brand-gov-tag">
+                            <span>REPUBLIC OF THE PHILIPPINES &middot; CITY OF ORMOC</span>
+                        </div>
+
+                        <!-- Stylized Modern Civic Brand Mark (SDIP/SBS Style) -->
+                        <div class="brand-monogram-box">
+                            <div class="monogram-emblem">
+                                <i data-lucide="shield-check"></i>
+                            </div>
+                            <div class="monogram-text">SBS</div>
+                        </div>
+
+                        <div class="brand-title-wrap">
+                            <h1 class="brand-main-title">SMART BARANGAY SYSTEM</h1>
+                            <div class="brand-divider-line"></div>
+                            <p class="brand-primary-desc">Digital Governance &amp; Citizen Services Portal</p>
+                            <p class="brand-secondary-desc">Barangay Don Felipe Larrazabal &middot; Ormoc City, Leyte</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Right Authentication Panel (Signature Royal Civic Blue Glass) -->
+                <section class="card-form-panel">
+                    <div class="form-panel-header">
+                        <h2 class="form-title">Welcome Back</h2>
+                        <p class="form-subtitle">Please enter your credentials to log in.</p>
+                    </div>
+
+                    <form id="login-form" class="auth-form" novalidate>
+                        <!-- Email Field -->
+                        <div class="auth-field-group">
+                            <label for="login-email" class="auth-field-label">Email Address</label>
+                            <div class="auth-input-wrapper">
+                                <input
+                                    type="email"
+                                    id="login-email"
+                                    name="email"
+                                    required
+                                    placeholder="Enter your email address"
+                                    autocomplete="email"
+                                >
+                            </div>
+                        </div>
+
+                        <!-- Password Field with Show/Hide Eye Toggle -->
+                        <div class="auth-field-group">
+                            <label for="login-password" class="auth-field-label">Password</label>
+                            <div class="auth-input-wrapper has-toggle">
+                                <input
+                                    type="password"
+                                    id="login-password"
+                                    name="password"
+                                    required
+                                    placeholder="Enter your password"
+                                    autocomplete="current-password"
+                                >
+                                <button type="button" class="password-eye-toggle" id="toggle-password" aria-label="Toggle password visibility">
+                                    <i data-lucide="eye" id="eye-icon"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Options Row: Remember Me & Forgot Password -->
+                        <div class="auth-options-row">
+                            <label class="auth-remember-label">
+                                <input type="checkbox" id="remember-me" checked>
+                                <span>Remember me</span>
+                            </label>
+                            <a href="#" class="auth-forgot-link" id="forgot-password-link">Forgot password?</a>
+                        </div>
+
+                        <!-- Prominent Solid White Button (Log In) -->
+                        <button type="submit" class="auth-submit-button" id="submit-btn">
+                            <span class="btn-text">Log In</span>
+                            <i data-lucide="arrow-right" class="btn-arrow"></i>
+                        </button>
+
+                        <!-- Error Message Banner -->
+                        <div class="auth-error-banner" id="login-error" role="alert" style="display: none;"></div>
+                    </form>
+
+                    <!-- Bottom Copyright Notice -->
+                    <footer class="form-panel-footer">
+                        <span>COPYRIGHT &copy; 2026 BARANGAY DON FELIPE LARRAZABAL &middot; ALL RIGHTS RESERVED</span>
+                    </footer>
+                </section>
+            </main>
         </div>
-        <div class="login-heading">
-            <span class="civic-badge"><i data-lucide="landmark"></i> Official Barangay Portal</span>
-            <h1>Welcome back</h1>
-            <p>Sign in to access your barangay workspace and citizen services.</p>
-        </div>
-        <form id="login-form" class="login-form">
-            <label>Email address
-                <input type="email" name="email" autocomplete="email" required placeholder="you@example.com">
-            </label>
-            <label>Password
-                <input type="password" name="password" autocomplete="current-password" required placeholder="Enter your password">
-            </label>
-            <button class="primary-button" type="submit">Sign in <i data-lucide="arrow-right"></i></button>
-            <p class="login-error" id="login-error" role="alert"></p>
-        </form>
-    </main>
+    </div>
+
+    <!-- Password Recovery Modal / Toast helper -->
+    <div class="recovery-toast" id="recovery-toast" style="display: none;">
+        <i data-lucide="info"></i>
+        <span>For account recovery or password resets, please contact the Barangay Administrator or email support@smartbarangay.gov.ph</span>
+    </div>
+
     <script src="https://unpkg.com/lucide@latest"></script>
     <script>
         lucide.createIcons();
-        document.querySelector('#login-form').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const form = event.currentTarget;
-            const error = document.querySelector('#login-error');
-            error.textContent = '';
-            const response = await fetch('/api/login', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(Object.fromEntries(new FormData(form)))
+
+        // 1. Dark / Light Theme Toggle with LocalStorage persistence
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const loginBody = document.body;
+        const currentSavedTheme = localStorage.getItem('smart_theme') || 'dark';
+
+        if (currentSavedTheme === 'light') {
+            loginBody.classList.add('theme-light');
+        } else {
+            loginBody.classList.remove('theme-light');
+        }
+
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => {
+                loginBody.classList.toggle('theme-light');
+                const isLight = loginBody.classList.contains('theme-light');
+                localStorage.setItem('smart_theme', isLight ? 'light' : 'dark');
             });
-            const result = await response.json();
-            if (!response.ok) {
-                error.textContent = result.error || 'Sign in failed';
+        }
+
+        // 2. Password Visibility Toggle
+        const togglePasswordBtn = document.getElementById('toggle-password');
+        const passwordInput = document.getElementById('login-password');
+        const eyeIcon = document.getElementById('eye-icon');
+
+        if (togglePasswordBtn && passwordInput) {
+            togglePasswordBtn.addEventListener('click', () => {
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+                togglePasswordBtn.innerHTML = isPassword ? '<i data-lucide="eye-off"></i>' : '<i data-lucide="eye"></i>';
+                lucide.createIcons();
+            });
+        }
+
+        // 3. Forgot Password Toast
+        const forgotLink = document.getElementById('forgot-password-link');
+        const recoveryToast = document.getElementById('recovery-toast');
+        if (forgotLink && recoveryToast) {
+            forgotLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                recoveryToast.style.display = 'flex';
+                clearTimeout(window.recoveryToastTimer);
+                window.recoveryToastTimer = setTimeout(() => {
+                    recoveryToast.style.display = 'none';
+                }, 5000);
+            });
+        }
+
+        // 4. Authentication Form Submission
+        const loginForm = document.getElementById('login-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const errorAlert = document.getElementById('login-error');
+
+        loginForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            errorAlert.style.display = 'none';
+            errorAlert.textContent = '';
+
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            if (!email || !password) {
+                errorAlert.textContent = 'Please enter both Email and Password.';
+                errorAlert.style.display = 'block';
                 return;
             }
-            window.location.href = '/';
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('loading');
+            }
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    errorAlert.textContent = result.error || 'Invalid credentials. Please try again.';
+                    errorAlert.style.display = 'block';
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                    }
+                    return;
+                }
+
+                if (result.token) {
+                    localStorage.setItem('auth_token', result.token);
+                }
+                window.location.href = '/';
+            } catch (err) {
+                errorAlert.textContent = 'Network or connection error. Please try again.';
+                errorAlert.style.display = 'block';
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('loading');
+                }
+            }
         });
     </script>
 </body>

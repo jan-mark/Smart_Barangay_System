@@ -30,6 +30,13 @@
                 <a class="nav-item" href="#" data-section="Reports"><i data-lucide="bar-chart-3"></i><span>Reports</span></a>
             </nav>
             <div class="sidebar-footer">
+                <div class="sidebar-capstone-badge">
+                    <i data-lucide="graduation-cap"></i>
+                    <div>
+                        <strong>Capstone Edition</strong>
+                        <small>Smart Governance System</small>
+                    </div>
+                </div>
                 <a class="nav-item" href="#" data-section="Settings"><i data-lucide="settings"></i><span>Settings</span></a>
                 <a class="nav-item" href="#" data-action="logout"><i data-lucide="log-out"></i><span>Logout</span></a>
             </div>
@@ -50,13 +57,23 @@
             <div class="page-content">
                 <div class="breadcrumb"><span>SmartBarangay</span><i data-lucide="chevron-right"></i><b>Dashboard</b></div>
                 <div id="dashboard-view"{% if official_mode %} hidden{% endif %}>
-                <section class="page-heading"><div><h1 id="dashboard-title">Resident Analytics Dashboard</h1><p id="dashboard-subtitle">Barangay Don Felipe Larrazabal · Ormoc City, Leyte</p></div><div class="sync"><i data-lucide="activity"></i> Live sync: <time id="dashboard-sync-time"></time></div></section>
+                <section class="page-heading">
+                    <div>
+                        <div class="heading-badge-wrap">
+                            <span class="capstone-tag"><i data-lucide="graduation-cap"></i> IT Capstone Project</span>
+                            <span class="lgu-tag"><i data-lucide="landmark"></i> LGU Ormoc City</span>
+                        </div>
+                        <h1 id="dashboard-title">Resident Analytics Dashboard</h1>
+                        <p id="dashboard-subtitle">Barangay Don Felipe Larrazabal · Ormoc City, Leyte</p>
+                    </div>
+                    <div class="sync"><i data-lucide="activity"></i> Live sync: <time id="dashboard-sync-time"></time></div>
+                </section>
 
                 <section class="metric-grid">
-                    <article class="metric-card"><div class="metric-label">TOTAL RESIDENTS <i data-lucide="users-round"></i></div><strong id="dashboard-total-residents">0</strong><span class="trend positive">From Supabase</span></article>
-                    <article class="metric-card"><div class="metric-label">HOUSEHOLDS <i data-lucide="house"></i></div><strong id="dashboard-households">0</strong><span class="trend positive">From Supabase</span></article>
-                    <article class="metric-card"><div class="metric-label">DOCS ISSUED (CURRENT MONTH) <i data-lucide="file-text"></i></div><strong id="dashboard-documents">0</strong><span class="trend positive">From Supabase</span></article>
-                    <article class="metric-card"><div class="metric-label">OPEN CONCERNS <i data-lucide="message-square"></i></div><strong id="dashboard-concerns">0</strong><span class="trend positive">From Supabase</span></article>
+                    <article class="metric-card"><div class="metric-label">TOTAL RESIDENTS <i data-lucide="users-round"></i></div><strong id="dashboard-total-residents">0</strong></article>
+                    <article class="metric-card"><div class="metric-label">HOUSEHOLDS <i data-lucide="house"></i></div><strong id="dashboard-households">0</strong></article>
+                    <article class="metric-card"><div class="metric-label">DOCS ISSUED (CURRENT MONTH) <i data-lucide="file-text"></i></div><strong id="dashboard-documents">0</strong></article>
+                    <article class="metric-card"><div class="metric-label">OPEN CONCERNS <i data-lucide="message-square"></i></div><strong id="dashboard-concerns">0</strong></article>
                 </section>
 
                 <section class="visual-grid">
@@ -89,7 +106,7 @@
                     </article>
                 </section>
                 <section class="visual-grid admin-overview-grid">
-                    <article class="panel overview-chart"><div class="panel-heading"><h2>Document Requests by Type</h2><span>From Supabase</span></div><div class="bar-chart" id="document-type-chart" aria-label="Document request totals by type"></div><div class="legend"><span><i class="legend-dot purple"></i>Business</span><span><i class="legend-dot gold"></i>Clearance</span><span><i class="legend-dot green"></i>Indigency</span><span><i class="legend-dot blue"></i>Residency</span></div></article>
+                    <article class="panel overview-chart"><div class="panel-heading"><h2>Document Requests by Type</h2></div><div class="bar-chart" id="document-type-chart" aria-label="Document request totals by type"></div><div class="legend"><span><i class="legend-dot purple"></i>Business</span><span><i class="legend-dot gold"></i>Clearance</span><span><i class="legend-dot green"></i>Indigency</span><span><i class="legend-dot blue"></i>Residency</span></div></article>
                     <article class="panel overview-chart"><div class="panel-heading"><h2>Concerns Trend</h2><span>Last 7 months</span></div><div class="trend-chart" id="concerns-trend-chart"></div><div class="legend"><span><i class="legend-dot red"></i>Escalated</span><span><i class="legend-dot gold"></i>Open</span><span><i class="legend-dot green"></i>Resolved</span></div></article>
                 </section>
                 <section class="panel officials-overview"><div class="panel-heading"><h2>Department Officials Overview</h2><span id="officials-overview-count">Loading...</span></div><div class="overview-table" id="officials-overview-table"><div><b>NAME</b><b>DEPARTMENT</b><b>POSITION</b><b>STATUS</b></div></div></section>
@@ -101,20 +118,70 @@
                 <div id="official-dashboard-view"{% if not official_mode %} hidden{% endif %}><section class="page-heading official-heading"><div><h1 id="official-dashboard-title">Department Dashboard</h1><p id="official-dashboard-subtitle">Welcome, department official</p></div><div class="sync"><i data-lucide="activity"></i> Live sync: <time id="official-sync-time"></time></div></section><section class="department-banner"><i data-lucide="users-round"></i><div><strong id="official-department-label">Department</strong><p>Your dashboard is filtered to department-related records and concerns.</p></div></section><section class="resident-metrics official-metrics"><article class="metric-card"><div class="metric-label">OPEN CONCERNS <i data-lucide="message-square"></i></div><strong id="official-open-concerns">0</strong></article><article class="metric-card"><div class="metric-label">PENDING DOCS <i data-lucide="file-text"></i></div><strong id="official-pending-docs">0</strong></article><article class="metric-card"><div class="metric-label">RESOLVED (<span id="official-resolved-month"></span>) <i data-lucide="circle-check"></i></div><strong id="official-resolved">0</strong></article><article class="metric-card"><div class="metric-label">DEPT. RESIDENTS <i data-lucide="users-round"></i></div><strong id="official-residents">0</strong></article></section><section class="data-panel department-panel"><h2><i data-lucide="message-square"></i> Department Concerns</h2><div class="record-list" id="official-concerns-list"></div></section><section class="data-panel department-panel"><h2><i data-lucide="file-text"></i> Department Document Requests</h2><div class="record-list" id="official-documents-list"></div></section></div>
 
                 <div id="residents-view" hidden>
-                    <section class="page-heading residents-heading"><div><h1>Resident Management</h1><p>Manage and verify resident profiles and household records</p></div><button class="primary-button" type="button" id="add-resident"><i data-lucide="user-plus"></i> Add Resident</button></section>
-                    <section class="resident-metrics">
-                        <article class="metric-card"><div class="metric-label">TOTAL RESIDENTS <i data-lucide="users-round"></i></div><strong id="residents-total">0</strong><span class="trend positive">From Supabase</span></article>
-                        <article class="metric-card"><div class="metric-label">VERIFIED <i data-lucide="circle-check"></i></div><strong id="residents-verified">0</strong><span class="trend positive">From Supabase</span></article>
-                        <article class="metric-card"><div class="metric-label">PENDING VERIFICATION <i data-lucide="clock-3"></i></div><strong id="residents-pending">0</strong><span class="trend negative">From Supabase</span></article>
-                    </section>
+                    <section class="page-heading residents-heading"><div><h1>Resident Management</h1><p>Manage, categorize, and verify resident profiles, households, and family sectors</p></div><button class="primary-button" type="button" id="add-resident"><i data-lucide="user-plus"></i> Add Resident</button></section>
+                    
+                    <div class="demographic-strip">
+                        <button type="button" class="demo-pill active" data-sector="all"><i data-lucide="users"></i> All Residents <span class="pill-count" id="count-all">0</span></button>
+                        <button type="button" class="demo-pill" data-sector="leader"><i data-lucide="crown"></i> Household Leaders <span class="pill-count" id="count-leaders">0</span></button>
+                        <button type="button" class="demo-pill" data-sector="kids"><i data-lucide="baby"></i> Kids / Minors (0–17) <span class="pill-count" id="count-kids">0</span></button>
+                        <button type="button" class="demo-pill" data-sector="adults"><i data-lucide="user"></i> Adults (18–59) <span class="pill-count" id="count-adults">0</span></button>
+                        <button type="button" class="demo-pill" data-sector="seniors"><i data-lucide="heart-pulse"></i> Seniors (60+) <span class="pill-count" id="count-seniors">0</span></button>
+                        <button type="button" class="demo-pill" data-sector="pwd"><i data-lucide="accessibility"></i> PWD <span class="pill-count" id="count-pwd">0</span></button>
+                        <button type="button" class="demo-pill" data-sector="solo_parent"><i data-lucide="heart-handshake"></i> Solo Parents <span class="pill-count" id="count-soloparent">0</span></button>
+                        <button type="button" class="demo-pill" data-sector="4ps"><i data-lucide="sparkles"></i> 4Ps <span class="pill-count" id="count-4ps">0</span></button>
+                    </div>
+
                     <section class="resident-table-panel">
-                        <div class="table-toolbar"><div class="table-search"><i data-lucide="search"></i><input id="resident-search" placeholder="Search by name or ID..." aria-label="Search residents by name or ID" /></div><select id="status-filter" aria-label="Filter residents by status"><option value="all">All</option><option value="Verified">Verified</option><option value="Pending">Pending</option><option value="Inactive">Inactive</option></select><button class="outline-button" type="button" id="export-residents"><i data-lucide="download"></i> Export</button></div>
-                        <div class="resident-table-wrap"><table class="resident-table"><thead><tr><th>RESIDENT ID</th><th>FULL NAME</th><th>ADDRESS</th><th>HOUSEHOLD</th><th>AGE / GENDER</th><th>STATUS</th><th>RESIDENT SINCE</th><th></th></tr></thead><tbody id="resident-rows"></tbody></table></div>
+                        <div class="table-toolbar">
+                            <div class="table-search"><i data-lucide="search"></i><input id="resident-search" placeholder="Search by name, resident ID, or household..." aria-label="Search residents by name or ID" /></div>
+                            <select id="sector-filter" aria-label="Filter by demographic or sector">
+                                <option value="all">All Sectors</option>
+                                <option value="leader">👑 Household Leaders</option>
+                                <option value="kids">👶 Kids / Minors (0-17)</option>
+                                <option value="adults">🧑 Adults (18-59)</option>
+                                <option value="seniors">👴 Seniors (60+)</option>
+                                <option value="pwd">♿ PWD (Person with Disability)</option>
+                                <option value="solo_parent">👨‍👧 Solo Parent</option>
+                                <option value="4ps">🌾 4Ps Beneficiary</option>
+                            </select>
+                            <select id="household-filter" aria-label="Filter by family or household">
+                                <option value="all">All Families / Households</option>
+                            </select>
+                            <select id="status-filter" aria-label="Filter residents by status">
+                                <option value="all">All Status</option>
+                                <option value="Verified">Verified</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                            <div class="view-toggle">
+                                <button type="button" class="active" id="view-mode-table" title="List Table View"><i data-lucide="list"></i> Table</button>
+                                <button type="button" id="view-mode-family" title="Family / Household Cards View"><i data-lucide="home"></i> Families</button>
+                            </div>
+                            <button class="outline-button" type="button" id="export-residents"><i data-lucide="download"></i> Export</button>
+                        </div>
+                        <div class="resident-table-wrap" id="resident-table-wrap">
+                            <table class="resident-table">
+                                <thead>
+                                    <tr>
+                                        <th>RESIDENT ID</th>
+                                        <th>FULL NAME</th>
+                                        <th>HOUSEHOLD</th>
+                                        <th>ROLE</th>
+                                        <th>AGE / GENDER</th>
+                                        <th>SECTOR / DEMOGRAPHIC</th>
+                                        <th>STATUS</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resident-rows"></tbody>
+                            </table>
+                        </div>
+                        <div id="family-cards-wrap" class="family-cards-container" hidden></div>
                         <div class="table-footer"><span id="resident-count">Showing 0 residents</span><div class="pagination"><button class="current" type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">...</button><button type="button">24</button></div></div>
                     </section>
                 </div>
 
-                <div class="app-view" id="documents-view" hidden><section class="page-heading"><div><h1>Document Processing</h1><p>Certificate issuance and document request management</p></div><button class="primary-button" type="button" data-action="new-document"><i data-lucide="file-plus-2"></i> New Request</button></section><section class="metric-grid compact-metrics"><article class="metric-card"><div class="metric-label">TOTAL REQUESTS</div><strong id="documents-total">0</strong><span class="trend positive">From Supabase</span></article><article class="metric-card"><div class="metric-label">PENDING</div><strong id="documents-pending">0</strong></article><article class="metric-card"><div class="metric-label">APPROVED</div><strong id="documents-approved">0</strong></article><article class="metric-card"><div class="metric-label">REJECTED</div><strong id="documents-rejected">0</strong></article></section><section class="data-panel"><div class="filter-tabs" data-filter-target="documents"><button class="current" data-filter="all">All</button><button data-filter="Pending">Pending</button><button data-filter="Processing">Processing</button><button data-filter="Approved">Approved</button><button data-filter="Rejected">Rejected</button><input placeholder="Search..." data-search="documents"></div><div class="record-list" id="documents-list"></div></section></div>
+                <div class="app-view" id="documents-view" hidden><section class="page-heading"><div><h1>Document Processing</h1><p>Certificate issuance and document request management</p></div><button class="primary-button" type="button" data-action="new-document"><i data-lucide="file-plus-2"></i> New Request</button></section><section class="metric-grid compact-metrics"><article class="metric-card"><div class="metric-label">TOTAL REQUESTS</div><strong id="documents-total">0</strong></article><article class="metric-card"><div class="metric-label">PENDING</div><strong id="documents-pending">0</strong></article><article class="metric-card"><div class="metric-label">APPROVED</div><strong id="documents-approved">0</strong></article><article class="metric-card"><div class="metric-label">REJECTED</div><strong id="documents-rejected">0</strong></article></section><section class="data-panel"><div class="filter-tabs" data-filter-target="documents"><button class="current" data-filter="all">All</button><button data-filter="Pending">Pending</button><button data-filter="Processing">Processing</button><button data-filter="Approved">Approved</button><button data-filter="Rejected">Rejected</button><input placeholder="Search..." data-search="documents"></div><div class="record-list" id="documents-list"></div></section></div>
 
                 <div class="app-view" id="concerns-view" hidden><section class="page-heading"><div><h1>Community Concerns</h1><p>Track and resolve resident-submitted community issues</p></div><button class="primary-button" type="button" data-action="log-concern"><i data-lucide="message-square-plus"></i> Log Concern</button></section><div class="filter-tabs" data-filter-target="concerns"><button class="current" data-filter="all">All</button><button data-filter="Open">Open</button><button data-filter="In Progress">In Progress</button><button data-filter="Escalated">Escalated</button><button data-filter="Resolved">Resolved</button></div><div class="record-list concern-list" id="concerns-list"></div></div>
 
@@ -128,8 +195,87 @@
             </div>
         </main>
     </div>
-    <div class="modal" id="resident-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2 id="resident-modal-title">Register New Resident</h2><p>Create a new resident profile.</p></div><button type="button" class="modal-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="resident-form"><label>Full name<input name="name" required placeholder="e.g. Maria Santos"></label><label>Address<input name="address" required placeholder="e.g. Purok 3, Blk 4 Lot 2"></label><label>Household ID<input name="household" placeholder="e.g. HH-0042"></label><div class="form-row"><label>Age<input name="age" type="number" min="1" max="120" required></label><label>Gender<select name="gender"><option>Female</option><option>Male</option><option>Other</option></select></label></div><label>Email<input name="email" type="email" placeholder="e.g. maria@email.com"></label><label>Phone<input name="phone" placeholder="e.g. 09171234567"></label><button class="primary-button" type="submit">Register Resident</button></form></div></div>
-    <div class="modal" id="workflow-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2 id="workflow-title">New request</h2><p id="workflow-description">Complete the details below.</p></div><button type="button" class="modal-close workflow-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="workflow-form"><label id="workflow-type-field">Document type<select name="document_type"><option>Barangay Clearance</option><option>Certificate of Residency</option><option>Certificate of Indigency</option><option>Business Clearance</option></select></label><label id="workflow-resident-field" hidden>Resident name<input name="resident_name" required placeholder="Resident requesting the document"></label><label id="workflow-purpose-field" hidden>Purpose<input name="purpose" placeholder="Reason for the request"></label><label id="workflow-address-field" hidden>Applicant address<input name="applicant_address" placeholder="Complete residential address"></label><label id="workflow-contact-field" hidden>Contact number<input name="applicant_contact" placeholder="e.g. 09171234567"></label><label id="workflow-birth-date-field" hidden>Date of birth<input name="applicant_date_of_birth" type="date"></label><label id="workflow-birth-place-field" hidden>Place of birth<input name="applicant_place_of_birth"></label><label id="workflow-civil-status-field" hidden>Civil status<select name="applicant_civil_status"><option value="">Choose civil status</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></label><label id="workflow-business-name-field" hidden>Business name<input name="business_name"></label><label id="workflow-business-address-field" hidden>Business address<input name="business_address"></label><label id="workflow-category-field" hidden>Category<select name="category"><option>Infrastructure</option><option>Health &amp; Sanitation</option><option>Peace &amp; Order</option><option>Social Services</option><option>Other</option><option>General</option><option>Assembly</option><option>Health</option><option>Emergency</option><option>Livelihood</option></select></label><label id="workflow-priority-field" hidden>Priority<select name="priority"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></label><label id="workflow-title-field" hidden>Title<input name="title" placeholder="Describe the concern or announcement"></label><label id="workflow-description-field" hidden>Description<textarea name="description" rows="4" placeholder="Provide supporting details"></textarea></label><label id="workflow-audience-field" hidden>Audience<select name="audience"><option>All Residents</option><option>18–45 yrs</option><option>Seniors 60+</option></select></label><button class="primary-button" type="submit">Submit</button></form></div></div>
+    <div class="modal" id="resident-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2 id="resident-modal-title">Register New Resident</h2><p>Create or update a resident profile and household sector classification.</p></div><button type="button" class="modal-close resident-modal-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="resident-form"><label>Full name<input name="name" required placeholder="e.g. Maria Santos"></label><label>Address<input name="address" required placeholder="e.g. Purok 3, Blk 4 Lot 2, Brgy. Don Felipe Larrazabal"></label><div class="form-row"><label>Household ID<input name="household" placeholder="e.g. HH-0042"></label><label>Household Role<select name="household_role"><option value="Head">👑 Household Leader / Head</option><option value="Spouse">Spouse</option><option value="Child">Child / Son / Daughter</option><option value="Senior Dependent">Senior Dependent / Grandparent</option><option value="Member" selected>Family Member</option><option value="Other">Other Relative</option></select></label></div><div class="form-row"><label>Age<input name="age" type="number" min="1" max="120" required placeholder="e.g. 34"></label><label>Gender<select name="gender"><option>Female</option><option>Male</option><option>Other</option></select></label></div><div class="form-row"><label>Email<input name="email" type="email" placeholder="e.g. maria@email.com"></label><label>Phone<input name="phone" placeholder="e.g. 09171234567"></label></div><label>Status<select name="status"><option value="Verified">Verified</option><option value="Pending" selected>Pending</option><option value="Inactive">Inactive</option></select></label><div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;"><span style="display: block; font-size: 12px; font-weight: 700; color: #0B2545; margin-bottom: 8px;">Special Sectors &amp; Classifications</span><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;"><label style="display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 12px; cursor: pointer;"><input type="checkbox" name="is_head" style="width: 16px; height: 16px;"> 👑 Household Leader</label><label style="display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 12px; cursor: pointer;"><input type="checkbox" name="is_pwd" style="width: 16px; height: 16px;"> ♿ PWD</label><label style="display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 12px; cursor: pointer;"><input type="checkbox" name="is_solo_parent" style="width: 16px; height: 16px;"> 👨‍👧 Solo Parent</label><label style="display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 12px; cursor: pointer;"><input type="checkbox" name="is_4ps" style="width: 16px; height: 16px;"> 🌾 4Ps Beneficiary</label></div><small style="display: block; margin-top: 6px; color: #64748B; font-size: 11px;">Note: Seniors (60+) and Minors (0-17) are automatically detected from age.</small></div><button class="primary-button" type="submit">Register Resident</button></form></div></div>
+    <div class="modal" id="family-modal" hidden>
+        <div class="modal-card modal-card-lg">
+            <div class="modal-heading">
+                <div>
+                    <h2 id="family-modal-title"><i data-lucide="home"></i> Family Background</h2>
+                    <p id="family-modal-subtitle">Full household profile, members roster, and demographic sectors.</p>
+                </div>
+                <button type="button" class="modal-close family-modal-close" aria-label="Close dialog"><i data-lucide="x"></i></button>
+            </div>
+
+            <!-- Family Header Banner -->
+            <div class="family-bg-header" id="family-modal-banner">
+                <div class="family-bg-title">
+                    <h3 id="family-banner-name">Santos Family</h3>
+                    <p><i data-lucide="map-pin"></i> <span id="family-banner-address">Barangay Don Felipe Larrazabal</span> · Household: <b id="family-banner-hh" style="color: #FBBF24;">HH-0042</b></p>
+                </div>
+                <div class="family-bg-stats" id="family-banner-stats"></div>
+            </div>
+
+            <!-- Household Leader Highlight -->
+            <div class="family-section-box" id="family-leader-section">
+                <div class="family-section-title">
+                    <span>👑 Household Leader / Head</span>
+                    <span id="family-leader-status-badge"></span>
+                </div>
+                <div id="family-leader-content"></div>
+            </div>
+
+            <!-- Full Family Members Roster ("Makita ilaha family tanan") -->
+            <div class="family-section-box">
+                <div class="family-section-title">
+                    <span>👨‍👩‍👧‍👦 Family Members (<span id="family-roster-count">0</span>)</span>
+                    <small style="color: #64748B; font-weight: normal; font-size: 11px;">Complete list of registered family members</small>
+                </div>
+                <div class="family-roster-list" id="family-roster-list"></div>
+            </div>
+
+            <!-- Add / Register Member to this Family -->
+            <div class="family-search-panel">
+                <div class="family-section-title" style="margin-bottom: 8px;">
+                    <span>➕ Add Member to this Family</span>
+                    <button class="outline-button" id="family-open-new-resident-btn" type="button" style="font-size: 11px; padding: 4px 10px;">
+                        <i data-lucide="user-plus"></i> Register Brand-New Person
+                    </button>
+                </div>
+                <p style="font-size: 12px; color: #64748B; margin-top: 0; margin-bottom: 12px;">
+                    Search any existing resident in the barangay by name to add or link them into this family, or click "Register Brand-New Person".
+                </p>
+
+                <div class="family-search-input-wrap">
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 220px; position: relative;">
+                            <input id="family-search-resident-input" placeholder="Type resident name or ID to search (e.g. Maria, Juan)..." autocomplete="off" style="width: 100%;">
+                            <div id="family-search-results" class="search-results-dropdown" hidden></div>
+                        </div>
+                        <select id="family-assign-role" style="width: 180px;">
+                            <option value="Child">Child / Son / Daughter</option>
+                            <option value="Spouse">Spouse</option>
+                            <option value="Senior Dependent">Senior Dependent</option>
+                            <option value="Member" selected>Family Member</option>
+                            <option value="Head">Crown as Leader</option>
+                            <option value="Other">Other Relative</option>
+                        </select>
+                        <button class="primary-button" id="family-link-resident-btn" type="button" disabled style="white-space: nowrap;">
+                            <i data-lucide="user-check"></i> Add to Family
+                        </button>
+                    </div>
+                    <div id="family-selected-preview" class="selected-member-preview" hidden>
+                        <div>
+                            <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #1D4ED8; display: block;">Selected to Add:</span>
+                            <strong id="family-selected-name">Selected Resident</strong>
+                            <small id="family-selected-meta" style="color: #64748B; margin-left: 8px;"></small>
+                        </div>
+                        <button type="button" id="family-clear-selected-btn" style="border:0; background:none; color:#EF4444; cursor:pointer; font-size:12px; font-weight:600;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="workflow-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2 id="workflow-title">New request</h2><p id="workflow-description">Complete the details below.</p></div><button type="button" class="modal-close workflow-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="workflow-form"><label id="workflow-type-field">Document type<select name="document_type"><option>Barangay Clearance</option><option>Certificate of Residency</option><option>Certificate of Indigency</option><option>Business Clearance</option></select></label><label id="workflow-resident-field" hidden><span class="label-text">Resident name</span><input name="resident_name" required placeholder="Resident requesting the document"></label><label id="workflow-business-name-field" class="half-width" hidden><span class="label-text">Business name</span><input name="business_name" placeholder="e.g. Larrazabal Grocery Store"></label><label id="workflow-business-address-field" class="half-width" hidden><span class="label-text">Business address / Location</span><input name="business_address" placeholder="e.g. Purok 2, Brgy. Don Felipe Larrazabal"></label><label id="workflow-purpose-field" hidden><span class="label-text">Purpose</span><input name="purpose" list="purpose-suggestions" placeholder="Reason for the request"><datalist id="purpose-suggestions"></datalist></label><label id="workflow-address-field" class="half-width" hidden><span class="label-text">Applicant address</span><input name="applicant_address" placeholder="Complete residential address"></label><label id="workflow-contact-field" class="half-width" hidden><span class="label-text">Contact number</span><input name="applicant_contact" placeholder="e.g. 09171234567"></label><label id="workflow-birth-date-field" style="display: none;" hidden><span class="label-text">Date of birth</span><input name="applicant_date_of_birth" type="date"></label><label id="workflow-birth-place-field" style="display: none;" hidden><span class="label-text">Place of birth</span><input name="applicant_place_of_birth" placeholder="e.g. Ormoc City"></label><label id="workflow-civil-status-field" style="display: none;" hidden><span class="label-text">Civil status</span><select name="applicant_civil_status"><option value="">Choose civil status</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></label><label id="workflow-category-field" class="half-width" hidden><span class="label-text">Category</span><select name="category"><option>Infrastructure</option><option>Health &amp; Sanitation</option><option>Peace &amp; Order</option><option>Social Services</option><option>Other</option><option>General</option><option>Assembly</option><option>Health</option><option>Emergency</option><option>Livelihood</option></select></label><label id="workflow-priority-field" class="half-width" hidden><span class="label-text">Priority</span><select name="priority"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></label><label id="workflow-audience-field" class="half-width" hidden><span class="label-text">Audience</span><select name="audience"><option>All Residents</option><option>18–45 yrs</option><option>Seniors 60+</option></select></label><label id="workflow-title-field" hidden><span class="label-text">Title</span><input name="title" placeholder="Describe the concern or announcement"></label><label id="workflow-description-field" hidden><span class="label-text">Description</span><textarea name="description" rows="3" placeholder="Provide supporting details"></textarea></label><button class="primary-button" type="submit">Submit</button></form></div></div>
     <div class="modal" id="alert-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2>Broadcast emergency alert</h2><p>Publish an alert to the weather and alerts dashboards.</p></div><button type="button" class="modal-close alert-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="alert-form"><label>Alert type<input name="alert_type" required placeholder="e.g. ACTIVE ADVISORY"></label><label>Title<input name="title" required placeholder="Emergency alert title"></label><label>Description<textarea name="description" rows="4" required placeholder="Provide official instructions"></textarea></label><label>Severity<select name="severity"><option>Advisory</option><option>Warning</option><option>Critical</option><option>Escalated</option></select></label><button class="primary-button" type="submit">Broadcast alert</button></form></div></div>
     <div class="modal" id="status-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2>Update status</h2><p>Choose the current processing status.</p></div><button type="button" class="modal-close status-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="status-form"><input type="hidden" name="id"><input type="hidden" name="kind"><label>Status<select name="status"><option>Pending</option><option>In Progress</option><option>Processing</option><option>Approved</option><option>Rejected</option><option>Resolved</option></select></label><label id="schedule-date-field">Pickup date<input type="date" name="scheduled_date"></label><label id="schedule-time-field">Pickup time<input type="time" name="scheduled_time"></label><button class="primary-button" type="submit">Save status</button></form></div></div>
     <div class="modal" id="official-modal" hidden><div class="modal-card"><div class="modal-heading"><div><h2>Register Barangay Official</h2><p>Admin access only</p></div><button type="button" class="modal-close official-close" aria-label="Close dialog"><i data-lucide="x"></i></button></div><form id="official-form"><label>Full name<input name="full_name" required placeholder="e.g. Dr. Maria Santos"></label><label>Position / designation<input name="position" required placeholder="e.g. Barangay Health Officer"></label><label>Email address<input name="email" type="email" required placeholder="name@brgy.gov.ph"></label><label>Phone number<input name="phone" required placeholder="e.g. 09171234567"></label><label>Temporary password<input name="password" type="password" minlength="8" required placeholder="At least 8 characters"></label><label>Department<select name="department" required><option value="">Choose department</option><option>Health &amp; Sanitation</option><option>Peace &amp; Order</option><option>Infrastructure</option><option>Social Services</option><option>DRRMC</option></select></label><button class="primary-button" type="submit">Register Official</button></form></div></div>
@@ -212,7 +358,7 @@
             document.querySelector('#official-count').textContent = `Showing ${filtered.length} official${filtered.length === 1 ? '' : 's'}`;
             const overview = document.querySelector('#officials-overview-table');
             if (overview) {
-                overview.innerHTML = `<div><b>NAME</b><b>DEPARTMENT</b><b>POSITION</b><b>STATUS</b></div>${officialsData.length ? officialsData.slice(0, 6).map((official) => `<div><strong>${escapeHtml(official.full_name)}</strong><span>${escapeHtml(official.department || 'Unassigned')}</span><span>${escapeHtml(official.position || 'Department Official')}</span><span class="status approved">Active</span></div>`).join('') : '<div class="empty-state">No official records in Supabase.</div>'}`;
+                overview.innerHTML = `<div><b>NAME</b><b>DEPARTMENT</b><b>POSITION</b><b>STATUS</b></div>${officialsData.length ? officialsData.slice(0, 6).map((official) => `<div><strong>${escapeHtml(official.full_name)}</strong><span>${escapeHtml(official.department || 'Unassigned')}</span><span>${escapeHtml(official.position || 'Department Official')}</span><span class="status approved">Active</span></div>`).join('') : '<div class="empty-state">No official records found.</div>'}`;
                 document.querySelector('#officials-overview-count').textContent = `${officialsData.length} official${officialsData.length === 1 ? '' : 's'}`;
             }
         };
@@ -362,9 +508,9 @@
             });
             document.querySelector('#age-donut').style.background = `conic-gradient(${segments.join(', ')})`;
             document.querySelector('#age-legend').innerHTML = ageLabels.map(([key, label], index) => `<span><i class="legend-dot" style="background:${ageColors[index]}"></i>${label} · ${Math.round(((summary.age_groups[key] || 0) / (totalAges || 1)) * 100)}%</span>`).join('');
-            document.querySelector('#residents-total').textContent = Number(summary.total_residents || 0).toLocaleString();
-            document.querySelector('#residents-verified').textContent = Number(summary.verified || 0).toLocaleString();
-            document.querySelector('#residents-pending').textContent = Number(summary.pending || 0).toLocaleString();
+            document.querySelector('#residents-total')?.textContent && (document.querySelector('#residents-total').textContent = Number(summary.total_residents || 0).toLocaleString());
+            document.querySelector('#residents-verified')?.textContent && (document.querySelector('#residents-verified').textContent = Number(summary.verified || 0).toLocaleString());
+            document.querySelector('#residents-pending')?.textContent && (document.querySelector('#residents-pending').textContent = Number(summary.pending || 0).toLocaleString());
             const documentChart = document.querySelector('#document-type-chart');
             const documentEntries = Object.entries(summary.documents_by_type || {});
             const documentMax = Math.max(...documentEntries.map(([, value]) => Number(value) || 0), 1);
@@ -389,7 +535,7 @@
                 renderDashboard(result.data, { registrationState: 'ready' });
             } catch (error) {
                 renderDashboard({}, { registrationState: 'error' });
-                showToast('Could not sync dashboard from Supabase');
+                showToast('Could not sync dashboard data');
             }
         };
         loadOfficialDashboard();
@@ -423,11 +569,11 @@
             if (section === 'Documents') {
                 const count = (status) => records.filter((record) => status === 'all' || record.status === status).length;
                 ['total', 'pending', 'approved', 'rejected'].forEach((key) => document.querySelector(`#documents-${key}`).textContent = count(key === 'total' ? 'all' : key[0].toUpperCase() + key.slice(1)));
-                document.querySelector('#documents-list').innerHTML = records.length ? records.map(renderDocumentRecord).join('') : '<div class="empty-state">No document requests in Supabase.</div>';
+                document.querySelector('#documents-list').innerHTML = records.length ? records.map(renderDocumentRecord).join('') : '<div class="empty-state">No document requests found.</div>';
             }
-            if (section === 'Concerns') document.querySelector('#concerns-list').innerHTML = records.length ? records.map(renderConcernRecord).join('') : '<div class="empty-state">No concerns in Supabase.</div>';
-            if (section === 'Announcements') document.querySelector('#announcements-list').innerHTML = records.length ? records.map((record) => `<article class="announcement-row"><span class="tag">${escapeHtml(record.category)}</span><span class="status ${record.status.toLowerCase()}">${escapeHtml(record.status)}</span><h3>${escapeHtml(record.title)}</h3><p>${escapeHtml(record.description || '')}</p><small>By ${escapeHtml(record.author)} · ${escapeHtml(smartBarangayTime.formatDate(record.published_at))} · Audience: ${escapeHtml(record.audience)}</small></article>`).join('') : '<div class="empty-state">No announcements in Supabase.</div>';
-            if (section === 'Weather & Alerts') { const alert = records[0]; document.querySelector('#weather-banner').innerHTML = alert ? `<b>${escapeHtml(alert.alert_type)}</b><h2>${escapeHtml(alert.title)}</h2><p>${escapeHtml(alert.description)}</p>` : '<div class="empty-state">No weather alerts in Supabase.</div>'; document.querySelector('#weather-list').innerHTML = records.slice(0, 5).map((record) => `<div class="record-row"><strong>${escapeHtml(record.title)}</strong><time>${escapeHtml(smartBarangayTime.formatDateTime(record.issued_at))}</time><em class="status">${escapeHtml(record.severity)}</em></div>`).join(''); }
+            if (section === 'Concerns') document.querySelector('#concerns-list').innerHTML = records.length ? records.map(renderConcernRecord).join('') : '<div class="empty-state">No concerns found.</div>';
+            if (section === 'Announcements') document.querySelector('#announcements-list').innerHTML = records.length ? records.map((record) => `<article class="announcement-row"><span class="tag">${escapeHtml(record.category)}</span><span class="status ${record.status.toLowerCase()}">${escapeHtml(record.status)}</span><h3>${escapeHtml(record.title)}</h3><p>${escapeHtml(record.description || '')}</p><small>By ${escapeHtml(record.author)} · ${escapeHtml(smartBarangayTime.formatDate(record.published_at))} · Audience: ${escapeHtml(record.audience)}</small></article>`).join('') : '<div class="empty-state">No announcements found.</div>';
+            if (section === 'Weather & Alerts') { const alert = records[0]; document.querySelector('#weather-banner').innerHTML = alert ? `<b>${escapeHtml(alert.alert_type)}</b><h2>${escapeHtml(alert.title)}</h2><p>${escapeHtml(alert.description)}</p>` : '<div class="empty-state">No weather alerts found.</div>'; document.querySelector('#weather-list').innerHTML = records.slice(0, 5).map((record) => `<div class="record-row"><strong>${escapeHtml(record.title)}</strong><time>${escapeHtml(smartBarangayTime.formatDateTime(record.issued_at))}</time><em class="status">${escapeHtml(record.severity)}</em></div>`).join(''); }
         };
         document.querySelectorAll('.filter-tabs[data-filter-target]').forEach((tabs) => tabs.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => {
             tabs.querySelectorAll('button').forEach((tab) => tab.classList.remove('current')); button.classList.add('current');
@@ -441,14 +587,160 @@
             document.querySelector('#documents-list').querySelectorAll('.record-row').forEach((row) => { row.hidden = !row.textContent.toLowerCase().includes(query); });
         }));
         const workflowModal = document.querySelector('#workflow-modal');
+        const workflowForm = document.querySelector('#workflow-form');
+        const documentTypeSelect = workflowForm.querySelector('[name="document_type"]');
+
+        const documentCategoriesConfig = {
+            'Barangay Clearance': {
+                title: 'New Barangay Clearance Request',
+                description: 'Fill up the application details intended for Barangay Clearance.',
+                visible: ['type', 'resident', 'purpose', 'address', 'contact'],
+                residentLabel: 'Resident / Applicant name',
+                residentPlaceholder: 'Full legal name (e.g. Maria Santos)',
+                purposeLabel: 'Purpose / Reason for clearance',
+                purposePlaceholder: 'e.g. Local Employment, Police / NBI Clearance, Postal ID',
+                addressPlaceholder: 'Complete residential address in Brgy. Don Felipe Larrazabal',
+                purposes: [
+                    'Local Employment',
+                    'Job Application / Pre-employment',
+                    'Police Clearance Requirement',
+                    'NBI Clearance Requirement',
+                    'Postal ID / Government ID Application',
+                    'Bank Account / Financial Requirement',
+                    'Loan Application Requirement',
+                    'School / Scholarship Requirement',
+                    'Travel / Visa Application'
+                ],
+                required: ['resident', 'address', 'purpose']
+            },
+            'Certificate of Residency': {
+                title: 'New Certificate of Residency Request',
+                description: 'Fill up the information intended for Proof of Residency certification.',
+                visible: ['type', 'resident', 'purpose', 'address', 'contact'],
+                residentLabel: 'Resident name',
+                residentPlaceholder: 'Full legal name (e.g. Juan dela Cruz)',
+                purposeLabel: 'Purpose of certification',
+                purposePlaceholder: 'e.g. Proof of Residency, Bank Requirement, Utility Connection',
+                addressPlaceholder: 'Complete residential address in Brgy. Don Felipe Larrazabal',
+                purposes: [
+                    'Proof of Residency',
+                    'Bank Account Opening / Requirement',
+                    'School Enrollment / Transfer Requirement',
+                    'Electric Service Connection',
+                    'Water Service Connection',
+                    'Postal ID / PhilHealth / SSS Requirement',
+                    'COMELEC / Voter Registration',
+                    'Court / Legal Requirement'
+                ],
+                required: ['resident', 'address', 'purpose']
+            },
+            'Certificate of Indigency': {
+                title: 'New Certificate of Indigency Request',
+                description: 'Fill up the details intended for Indigency & Social Welfare assistance.',
+                visible: ['type', 'resident', 'purpose', 'address', 'contact'],
+                residentLabel: 'Resident / Beneficiary name',
+                residentPlaceholder: 'Full legal name of beneficiary (e.g. Pedro Villanueva)',
+                purposeLabel: 'Assistance purpose',
+                purposePlaceholder: 'e.g. Medical Assistance, Hospitalization, Scholarship, Financial Aid',
+                addressPlaceholder: 'Complete residential address in Brgy. Don Felipe Larrazabal',
+                purposes: [
+                    'Medical Assistance / Hospitalization',
+                    'Financial Assistance (AICS)',
+                    'Educational / Scholarship Assistance',
+                    'Burial / Funeral Assistance',
+                    'DSWD Social Welfare Requirement',
+                    'Public Attorney\'s Office (PAO) Legal Aid',
+                    'Senior Citizen Assistance Requirement'
+                ],
+                required: ['resident', 'address', 'purpose']
+            },
+            'Business Clearance': {
+                title: 'New Barangay Business Clearance Request',
+                description: 'Fill up commercial establishment and business owner details.',
+                visible: ['type', 'businessName', 'businessAddress', 'resident', 'contact', 'purpose'],
+                residentLabel: 'Business Owner / Applicant name',
+                residentPlaceholder: 'Full legal name of business owner',
+                purposeLabel: 'Permit purpose',
+                purposePlaceholder: 'e.g. New Business Permit, Annual Renewal, DTI Registration',
+                addressPlaceholder: 'Owner\'s personal residential address',
+                purposes: [
+                    'New Barangay Business Permit',
+                    'Annual Business Permit Renewal',
+                    'Mayor\'s Permit / Municipal License Requirement',
+                    'DTI Business Name Registration',
+                    'BIR Registration Requirement',
+                    'Commercial Stall / Kiosk Clearance'
+                ],
+                required: ['resident', 'businessName', 'businessAddress']
+            }
+        };
+
+        const updateWorkflowDocumentCategorization = () => {
+            if (workflowModal.dataset.type !== 'document') return;
+            const docType = documentTypeSelect.value;
+            const config = documentCategoriesConfig[docType] || documentCategoriesConfig['Barangay Clearance'];
+
+            document.querySelector('#workflow-title').textContent = config.title;
+            document.querySelector('#workflow-description').textContent = config.description;
+
+            const fields = {
+                type: document.querySelector('#workflow-type-field'),
+                resident: document.querySelector('#workflow-resident-field'),
+                purpose: document.querySelector('#workflow-purpose-field'),
+                address: document.querySelector('#workflow-address-field'),
+                contact: document.querySelector('#workflow-contact-field'),
+                birthDate: document.querySelector('#workflow-birth-date-field'),
+                birthPlace: document.querySelector('#workflow-birth-place-field'),
+                civilStatus: document.querySelector('#workflow-civil-status-field'),
+                businessName: document.querySelector('#workflow-business-name-field'),
+                businessAddress: document.querySelector('#workflow-business-address-field'),
+            };
+
+            const residentLabel = fields.resident.querySelector('.label-text');
+            if (residentLabel) residentLabel.textContent = config.residentLabel;
+            const residentInput = fields.resident.querySelector('input');
+            if (residentInput) residentInput.placeholder = config.residentPlaceholder;
+
+            const purposeLabel = fields.purpose.querySelector('.label-text');
+            if (purposeLabel) purposeLabel.textContent = config.purposeLabel;
+            const purposeInput = fields.purpose.querySelector('input');
+            if (purposeInput) purposeInput.placeholder = config.purposePlaceholder;
+
+            const addressInput = fields.address.querySelector('input');
+            if (addressInput) addressInput.placeholder = config.addressPlaceholder;
+
+            const datalist = document.querySelector('#purpose-suggestions');
+            if (datalist && config.purposes) {
+                datalist.innerHTML = config.purposes.map((p) => `<option value="${escapeHtml(p)}"></option>`).join('');
+            }
+
+            Object.entries(fields).forEach(([name, field]) => {
+                const show = config.visible.includes(name);
+                field.hidden = !show;
+                field.style.display = show ? 'grid' : 'none';
+                const input = field.querySelector('input, select');
+                if (input && name !== 'type') {
+                    input.required = config.required.includes(name);
+                    if (!show && input.type !== 'hidden') {
+                        input.value = '';
+                    }
+                }
+            });
+        };
+
+        documentTypeSelect.addEventListener('change', updateWorkflowDocumentCategorization);
+
         const openWorkflow = (type) => {
             workflowModal.hidden = false;
             workflowModal.dataset.type = type;
             workflowModal.dataset.latitude = '';
             workflowModal.dataset.longitude = '';
-            document.querySelector('#workflow-form').reset();
-            document.querySelector('#workflow-title').textContent = type === 'document' ? 'New document request' : type === 'concern' ? 'Log community concern' : 'New announcement';
-            document.querySelector('#workflow-description').textContent = type === 'document' ? 'Choose the certificate or clearance to process.' : type === 'concern' ? 'Capture the issue details and submit its location.' : 'Publish an update for barangay residents.';
+            workflowForm.reset();
+
+            const allDocumentFieldKeys = ['type', 'resident', 'purpose', 'address', 'contact', 'birthDate', 'birthPlace', 'civilStatus', 'businessName', 'businessAddress'];
+            const allConcernFieldKeys = ['category', 'priority', 'title', 'description'];
+            const allAnnouncementFieldKeys = ['title', 'description', 'audience', 'category'];
+
             const fields = {
                 type: document.querySelector('#workflow-type-field'),
                 resident: document.querySelector('#workflow-resident-field'),
@@ -466,26 +758,40 @@
                 description: document.querySelector('#workflow-description-field'),
                 audience: document.querySelector('#workflow-audience-field'),
             };
-            Object.entries(fields).forEach(([name, field]) => {
-                const visible = type === 'document'
-                    ? ['type', 'resident', 'purpose', 'address', 'contact', 'birthDate', 'birthPlace', 'civilStatus', 'businessName', 'businessAddress'].includes(name)
-                    : type === 'concern'
-                        ? ['category', 'priority', 'title', 'description'].includes(name)
-                        : ['title', 'description', 'audience', 'category'].includes(name);
-                field.hidden = !visible;
-                field.style.display = visible ? 'grid' : 'none';
-            });
-            fields.resident.querySelector('input').required = type === 'document';
-            fields.title.querySelector('input').required = type !== 'document';
-            fields.businessName.querySelector('input').required = false;
-            fields.businessAddress.querySelector('input').required = false;
-            if (type !== 'document') {
+
+            if (type === 'document') {
+                ['category', 'priority', 'title', 'description', 'audience'].forEach((key) => {
+                    fields[key].hidden = true;
+                    fields[key].style.display = 'none';
+                    const inp = fields[key].querySelector('input, textarea');
+                    if (inp) inp.required = false;
+                });
+                updateWorkflowDocumentCategorization();
+            } else {
+                document.querySelector('#workflow-title').textContent = type === 'concern' ? 'Log community concern' : 'New announcement';
+                document.querySelector('#workflow-description').textContent = type === 'concern' ? 'Capture the issue details and submit its location.' : 'Publish an update for barangay residents.';
+
+                allDocumentFieldKeys.forEach((key) => {
+                    fields[key].hidden = true;
+                    fields[key].style.display = 'none';
+                    const inp = fields[key].querySelector('input, select');
+                    if (inp) inp.required = false;
+                });
+
+                const activeKeys = type === 'concern' ? allConcernFieldKeys : allAnnouncementFieldKeys;
+                activeKeys.forEach((key) => {
+                    fields[key].hidden = false;
+                    fields[key].style.display = 'grid';
+                });
+                fields.title.querySelector('input').required = true;
+
                 const categories = type === 'concern'
                     ? ['Infrastructure', 'Health & Sanitation', 'Peace & Order', 'Social Services', 'Other']
                     : ['General', 'Assembly', 'Health', 'Emergency', 'Livelihood', 'Social Services'];
                 fields.category.querySelector('select').innerHTML = categories.map((category) => `<option>${category}</option>`).join('');
             }
         };
+
         document.addEventListener('click', (event) => {
             const button = event.target.closest('.status-edit');
             if (!button) return;
@@ -592,7 +898,7 @@
                 await loadDashboard();
                 await loadOfficialDashboard();
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
             }
         });
         document.querySelector('#status-form').addEventListener('submit', async (event) => {
@@ -618,7 +924,7 @@
                 await loadDashboard();
                 await loadOfficialDashboard();
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
             }
         });
         document.querySelector('#alert-form').addEventListener('submit', async (event) => {
@@ -635,7 +941,7 @@
                 delete pageData['Weather & Alerts'];
                 await loadPageData('Weather & Alerts');
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
             }
         });
         document.querySelectorAll('[data-action="download-report"]').forEach((button) => button.addEventListener('click', async () => {
@@ -691,62 +997,673 @@
         });
 
         let residentData = [];
-        const rows = document.querySelector('#resident-rows');
-        const renderResidents = () => {
-            const query = document.querySelector('#resident-search').value.trim().toLowerCase();
-            const status = document.querySelector('#status-filter').value;
-            const filtered = residentData.filter((resident) => {
-                const matchesQuery = resident.join(' ').toLowerCase().includes(query);
-                return matchesQuery && (status === 'all' || resident[5] === status);
-            });
-            rows.innerHTML = filtered.length ? filtered.map((resident) => `<tr>${resident.slice(0, 7).map((value, index) => index === 5 ? `<td><span class="status ${escapeHtml(value).toLowerCase()}">${escapeHtml(value)}</span></td>` : `<td>${escapeHtml(value)}</td>`).join('')}<td><button class="view-resident" type="button" aria-label="View ${escapeHtml(resident[1])}" data-id="${escapeHtml(resident[7])}" data-name="${escapeHtml(resident[1])}"><i data-lucide="eye"></i></button></td></tr>`).join('') : '<tr><td class="empty-state" colspan="8">No residents found in Supabase.</td></tr>';
-            document.querySelector('#resident-count').textContent = `Showing ${filtered.length} of ${residentData.length} residents`;
+        let activeSectorFilter = 'all';
+        let residentViewMode = 'table';
+
+        const renderDemographicCounts = () => {
+            const total = residentData.length;
+            const leaders = residentData.filter((r) => r.is_head || r.household_role === 'Head').length;
+            const kids = residentData.filter((r) => Number(r.age) < 18).length;
+            const adults = residentData.filter((r) => Number(r.age) >= 18 && Number(r.age) < 60).length;
+            const seniors = residentData.filter((r) => Number(r.age) >= 60).length;
+            const pwd = residentData.filter((r) => r.is_pwd).length;
+            const soloparent = residentData.filter((r) => r.is_solo_parent).length;
+            const fourPs = residentData.filter((r) => r.is_4ps).length;
+
+            const householdsSet = new Set(
+                residentData
+                    .map((r) => r.household)
+                    .filter((h) => h && h !== 'UNASSIGNED')
+            );
+
+            const countEl = (id, val) => {
+                const el = document.querySelector(id);
+                if (el) el.textContent = val;
+            };
+
+            countEl('#count-all', total);
+            countEl('#count-leaders', leaders);
+            countEl('#count-kids', kids);
+            countEl('#count-adults', adults);
+            countEl('#count-seniors', seniors);
+            countEl('#count-pwd', pwd);
+            countEl('#count-soloparent', soloparent);
+            countEl('#count-4ps', fourPs);
+
+            countEl('#residents-total', total);
+            countEl('#residents-households', householdsSet.size);
+            countEl('#residents-verified', residentData.filter((r) => r.status === 'Verified').length);
+            countEl('#residents-pending', residentData.filter((r) => r.status === 'Pending').length);
+
+            const hhFilter = document.querySelector('#household-filter');
+            if (hhFilter) {
+                const currentHh = hhFilter.value;
+                const hhMap = {};
+                residentData.forEach((r) => {
+                    const hh = r.household || 'UNASSIGNED';
+                    if (!hhMap[hh]) hhMap[hh] = [];
+                    hhMap[hh].push(r);
+                });
+
+                let hhHtml = '<option value="all">All Families / Households</option>';
+                Object.keys(hhMap).sort().forEach((hh) => {
+                    if (hh === 'UNASSIGNED') {
+                        hhHtml += `<option value="UNASSIGNED">Unassigned Households (${hhMap[hh].length})</option>`;
+                    } else {
+                        const familyName = getFamilyName(hhMap[hh], hh);
+                        hhHtml += `<option value="${escapeHtml(hh)}">${escapeHtml(familyName)} (${escapeHtml(hh)} · ${hhMap[hh].length})</option>`;
+                    }
+                });
+                hhFilter.innerHTML = hhHtml;
+                if (currentHh && Array.from(hhFilter.options).some(o => o.value === currentHh)) {
+                    hhFilter.value = currentHh;
+                }
+            }
+        };
+
+        const getHouseholdMembers = (hh) => {
+            if (!hh || hh === 'UNASSIGNED') return [];
+            return residentData.filter((r) => r.household === hh);
+        };
+
+        const getFamilyName = (members, hh) => {
+            if (!hh || hh === 'UNASSIGNED') return 'Unassigned';
+            const list = Array.isArray(members) && members.length ? members : getHouseholdMembers(hh);
+            if (!list.length) return `Household ${hh}`;
+            const leader = list.find((m) => m.is_head || m.household_role === 'Head') || list[0];
+            if (!leader || !leader.full_name) return `Household ${hh}`;
+            const parts = leader.full_name.trim().split(/\s+/);
+            const lastName = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+            return `${lastName} Family`;
+        };
+
+        let currentInspectingHousehold = null;
+        let selectedResidentToLink = null;
+        let familySearchInitialized = false;
+
+        const openFamilyModal = (hh) => {
+            if (!hh || hh === 'UNASSIGNED') {
+                showToast('This resident is not assigned to a family household.');
+                return;
+            }
+            currentInspectingHousehold = hh;
+            selectedResidentToLink = null;
+            const members = getHouseholdMembers(hh);
+            const familyName = getFamilyName(members, hh);
+            const leader = members.find((m) => m.is_head || m.household_role === 'Head') || members[0];
+            const address = (leader && leader.address) || (members[0] && members[0].address) || 'Barangay Don Felipe Larrazabal';
+
+            const familyModal = document.querySelector('#family-modal');
+            document.querySelector('#family-banner-name').textContent = familyName;
+            document.querySelector('#family-banner-address').textContent = address;
+            document.querySelector('#family-banner-hh').textContent = hh;
+
+            const kids = members.filter((m) => Number(m.age) < 18).length;
+            const adults = members.filter((m) => Number(m.age) >= 18 && Number(m.age) < 60).length;
+            const seniors = members.filter((m) => Number(m.age) >= 60).length;
+            const pwd = members.filter((m) => m.is_pwd).length;
+            const soloParent = members.filter((m) => m.is_solo_parent).length;
+            const fourPs = members.filter((m) => m.is_4ps).length;
+
+            const statsContainer = document.querySelector('#family-banner-stats');
+            statsContainer.innerHTML = `
+                <span class="family-stat-pill"><i data-lucide="users"></i> ${members.length} ${members.length === 1 ? 'Member' : 'Members'}</span>
+                ${seniors ? `<span class="family-stat-pill" style="background: rgba(243, 232, 255, 0.25); color: #E9D5FF;"><i data-lucide="heart-pulse"></i> ${seniors} Senior${seniors > 1 ? 's' : ''}</span>` : ''}
+                ${kids ? `<span class="family-stat-pill" style="background: rgba(224, 242, 254, 0.25); color: #BAE6FD;"><i data-lucide="baby"></i> ${kids} Minor${kids > 1 ? 's' : ''}</span>` : ''}
+                ${pwd ? `<span class="family-stat-pill" style="background: rgba(254, 226, 226, 0.25); color: #FECACA;">♿ ${pwd} PWD</span>` : ''}
+                ${soloParent ? `<span class="family-stat-pill" style="background: rgba(253, 242, 248, 0.25); color: #FBCFE8;">👨‍👧 ${soloParent} Solo Parent</span>` : ''}
+                ${fourPs ? `<span class="family-stat-pill" style="background: rgba(236, 253, 245, 0.25); color: #A7F3D0;">🌾 4Ps</span>` : ''}
+            `;
+
+            const leaderContent = document.querySelector('#family-leader-content');
+            const leaderStatusBadge = document.querySelector('#family-leader-status-badge');
+            if (leader) {
+                leaderStatusBadge.innerHTML = `<span class="status ${escapeHtml(leader.status).toLowerCase()}">${escapeHtml(leader.status)}</span>`;
+                leaderContent.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="family-member-avatar" style="background: #F59E0B; color: #0B2545; font-size: 16px;">👑</div>
+                            <div>
+                                <strong style="font-size: 16px; color: #0B2545;">${escapeHtml(leader.full_name)}</strong>
+                                <div style="font-size: 12px; color: #64748B; margin-top: 2px;">
+                                    ${escapeHtml(leader.household_role || 'Head')} · ${leader.age} yrs old · ${escapeHtml(leader.gender)}
+                                    ${leader.phone ? ` · 📞 ${escapeHtml(leader.phone)}` : ''}
+                                </div>
+                                <div style="margin-top: 6px;">${renderSectorBadges(leader)}</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="outline-button view-resident" data-id="${escapeHtml(leader.id)}" type="button" style="font-size: 12px; padding: 4px 10px;">
+                                <i data-lucide="edit-3"></i> Edit Profile
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                leaderStatusBadge.innerHTML = '';
+                leaderContent.innerHTML = '<span style="color: #64748B; font-style: italic; font-size: 13px;">No household leader designated yet.</span>';
+            }
+
+            document.querySelector('#family-roster-count').textContent = members.length;
+            const rosterList = document.querySelector('#family-roster-list');
+            rosterList.innerHTML = members.map((m) => {
+                const initials = m.full_name.split(/\s+/).map((n) => n[0]).slice(0, 2).join('').toUpperCase();
+                const isLeader = Boolean(m.is_head || m.household_role === 'Head');
+                return `
+                    <div class="family-roster-item">
+                        <div class="family-roster-left">
+                            <div class="family-member-avatar" style="${isLeader ? 'background: #F59E0B; color: #0B2545;' : ''}">${escapeHtml(initials)}</div>
+                            <div class="family-roster-info">
+                                <strong>
+                                    ${escapeHtml(m.full_name)}
+                                    ${isLeader ? '<span class="badge-sector badge-leader"><i data-lucide="crown"></i> Head</span>' : ''}
+                                </strong>
+                                <small>
+                                    ${escapeHtml(m.household_role || 'Member')} · ${escapeHtml(m.age)} yrs / ${escapeHtml(m.gender)} · ID: ${escapeHtml(m.resident_id)}
+                                </small>
+                                <div style="margin-top: 4px;">${renderSectorBadges(m)}</div>
+                            </div>
+                        </div>
+                        <div class="family-roster-right">
+                            <span class="status ${escapeHtml(m.status).toLowerCase()}">${escapeHtml(m.status)}</span>
+                            <button class="outline-button view-resident" data-id="${escapeHtml(m.id)}" type="button" title="Edit ${escapeHtml(m.full_name)}" style="padding: 4px 8px; font-size: 11px;">
+                                <i data-lucide="edit-3"></i> Edit
+                            </button>
+                            ${!isLeader ? `
+                            <button class="outline-button unlink-family-member-btn" data-id="${escapeHtml(m.id)}" data-name="${escapeHtml(m.full_name)}" type="button" title="Remove from this family" style="padding: 4px 8px; font-size: 11px; color: #EF4444; border-color: #FECACA;">
+                                <i data-lucide="user-minus"></i> Remove
+                            </button>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.querySelector('#family-search-resident-input').value = '';
+            document.querySelector('#family-search-results').hidden = true;
+            document.querySelector('#family-selected-preview').hidden = true;
+            document.querySelector('#family-link-resident-btn').disabled = true;
+
+            familyModal.hidden = false;
             lucide.createIcons();
-            document.querySelectorAll('.view-resident').forEach((button) => button.addEventListener('click', () => {
-                const resident = residentData.find((item) => String(item[7]) === button.dataset.id);
-                if (!resident) return;
-                const form = document.querySelector('#resident-form');
-                form.elements.name.value = resident[1];
-                form.elements.address.value = resident[2];
-                form.elements.household.value = resident[3] === 'UNASSIGNED' ? '' : resident[3];
-                const [age, gender] = resident[4].split(' / ');
-                form.elements.age.value = age;
-                form.elements.gender.value = gender;
-                form.elements.email.value = '';
-                form.elements.phone.value = '';
-                modal.dataset.editingId = resident[7];
-                document.querySelector('#resident-modal-title').textContent = 'Edit Resident';
-                form.querySelector('button[type="submit"]').textContent = 'Save Resident';
-                modal.hidden = false;
+            initFamilySearch();
+
+            familyModal.querySelectorAll('.view-resident').forEach((btn) => btn.addEventListener('click', () => {
+                const resId = btn.dataset.id;
+                familyModal.hidden = true;
+                const res = residentData.find((item) => String(item.id) === String(resId));
+                if (res) openResidentEditModal(res);
+            }));
+
+            familyModal.querySelectorAll('.unlink-family-member-btn').forEach((btn) => btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                const name = btn.dataset.name;
+                if (!confirm(`Are you sure you want to remove ${name} from this family household?`)) return;
+                try {
+                    const resp = await fetch(`/api/residents/${encodeURIComponent(id)}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ household: 'UNASSIGNED', household_role: 'Member', is_head: false })
+                    });
+                    const res = await resp.json();
+                    if (!resp.ok) throw new Error(res.error || 'Failed to remove member');
+                    const idx = residentData.findIndex((r) => String(r.id) === String(id));
+                    if (idx !== -1) {
+                        residentData[idx].household = 'UNASSIGNED';
+                        residentData[idx].household_role = 'Member';
+                        residentData[idx].is_head = false;
+                    }
+                    renderDemographicCounts();
+                    renderResidents();
+                    openFamilyModal(hh);
+                    showToast(`${name} removed from family`);
+                } catch (err) {
+                    showToast(err.message || 'Could not remove member');
+                }
             }));
         };
+
+        const initFamilySearch = () => {
+            if (familySearchInitialized) return;
+            familySearchInitialized = true;
+            const searchInput = document.querySelector('#family-search-resident-input');
+            const resultsDropdown = document.querySelector('#family-search-results');
+            const linkBtn = document.querySelector('#family-link-resident-btn');
+            const selectedPreview = document.querySelector('#family-selected-preview');
+            const selectedNameEl = document.querySelector('#family-selected-name');
+            const selectedMetaEl = document.querySelector('#family-selected-meta');
+            const roleSelect = document.querySelector('#family-assign-role');
+
+            searchInput.addEventListener('input', () => {
+                const q = searchInput.value.trim().toLowerCase();
+                if (!q || !currentInspectingHousehold) {
+                    resultsDropdown.hidden = true;
+                    return;
+                }
+                const available = residentData.filter((r) => {
+                    const notInThisFamily = r.household !== currentInspectingHousehold;
+                    const matches = [r.full_name, r.resident_id, r.address, r.email, r.phone].join(' ').toLowerCase().includes(q);
+                    return notInThisFamily && matches;
+                });
+
+                if (!available.length) {
+                    resultsDropdown.innerHTML = '<div style="padding: 10px 14px; font-size: 12px; color: #64748B;">No matching residents found outside this family.</div>';
+                    resultsDropdown.hidden = false;
+                    return;
+                }
+
+                resultsDropdown.innerHTML = available.slice(0, 8).map((r) => `
+                    <div class="search-result-item" data-id="${escapeHtml(r.id)}">
+                        <div>
+                            <strong>${escapeHtml(r.full_name)}</strong>
+                            <small style="color: #64748B; margin-left: 6px;">(${r.age} yrs / ${r.gender}) · ID: ${escapeHtml(r.resident_id)}</small>
+                            <div style="font-size: 11px; color: #94A3B8;">Current: ${escapeHtml(r.household === 'UNASSIGNED' ? 'No family assigned' : r.household)}</div>
+                        </div>
+                        <button class="outline-button" type="button" style="font-size: 11px; padding: 2px 8px;">Select</button>
+                    </div>
+                `).join('');
+                resultsDropdown.hidden = false;
+
+                resultsDropdown.querySelectorAll('.search-result-item').forEach((item) => {
+                    item.addEventListener('click', () => {
+                        const id = item.dataset.id;
+                        selectedResidentToLink = residentData.find((r) => String(r.id) === String(id));
+                        if (selectedResidentToLink) {
+                            selectedNameEl.textContent = selectedResidentToLink.full_name;
+                            selectedMetaEl.textContent = `(${selectedResidentToLink.age} yrs / ${selectedResidentToLink.gender}) · ID: ${selectedResidentToLink.resident_id}`;
+                            selectedPreview.hidden = false;
+                            linkBtn.disabled = false;
+                            resultsDropdown.hidden = true;
+                            searchInput.value = selectedResidentToLink.full_name;
+                        }
+                    });
+                });
+            });
+
+            document.querySelector('#family-clear-selected-btn').addEventListener('click', () => {
+                selectedResidentToLink = null;
+                selectedPreview.hidden = true;
+                linkBtn.disabled = true;
+                searchInput.value = '';
+            });
+
+            linkBtn.addEventListener('click', async () => {
+                if (!selectedResidentToLink || !currentInspectingHousehold) return;
+                const role = roleSelect.value;
+                const isHead = (role === 'Head');
+                const familyMembers = getHouseholdMembers(currentInspectingHousehold);
+                const familyAddress = (familyMembers[0] && familyMembers[0].address) || 'Barangay Don Felipe Larrazabal';
+
+                linkBtn.disabled = true;
+                linkBtn.textContent = 'Adding...';
+
+                try {
+                    const resp = await fetch(`/api/residents/${encodeURIComponent(selectedResidentToLink.id)}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            household: currentInspectingHousehold,
+                            household_role: role,
+                            is_head: isHead,
+                            address: familyAddress
+                        })
+                    });
+                    const res = await resp.json();
+                    if (!resp.ok) throw new Error(res.error || 'Failed to link resident to family');
+
+                    const idx = residentData.findIndex((r) => String(r.id) === String(selectedResidentToLink.id));
+                    if (idx !== -1) {
+                        residentData[idx].household = currentInspectingHousehold;
+                        residentData[idx].household_role = role;
+                        residentData[idx].is_head = isHead;
+                        residentData[idx].address = familyAddress;
+                    }
+
+                    renderDemographicCounts();
+                    renderResidents();
+                    openFamilyModal(currentInspectingHousehold);
+                    showToast(`${selectedResidentToLink.full_name} has been added to ${getFamilyName(null, currentInspectingHousehold)}!`);
+                } catch (err) {
+                    showToast(err.message || 'Could not link resident to family');
+                } finally {
+                    linkBtn.disabled = false;
+                    linkBtn.innerHTML = '<i data-lucide="user-check"></i> Add to Family';
+                    lucide.createIcons();
+                }
+            });
+
+            document.querySelector('#family-open-new-resident-btn').addEventListener('click', () => {
+                if (!currentInspectingHousehold) return;
+                const familyMembers = getHouseholdMembers(currentInspectingHousehold);
+                const familyAddress = (familyMembers[0] && familyMembers[0].address) || 'Barangay Don Felipe Larrazabal';
+                const resModal = document.querySelector('#resident-modal');
+                const familyModal = document.querySelector('#family-modal');
+                familyModal.hidden = true;
+
+                delete resModal.dataset.editingId;
+                document.querySelector('#resident-modal-title').textContent = `Add Member to ${getFamilyName(familyMembers, currentInspectingHousehold)}`;
+                document.querySelector('#resident-form button[type="submit"]').textContent = 'Save & Add to Family';
+                document.querySelector('#resident-form').reset();
+                document.querySelector('#resident-form [name="household"]').value = currentInspectingHousehold;
+                document.querySelector('#resident-form [name="address"]').value = familyAddress;
+                document.querySelector('#resident-form [name="household_role"]').value = 'Child';
+                resModal.hidden = false;
+                document.querySelector('#resident-form [name="name"]').focus();
+            });
+
+            document.querySelector('.family-modal-close').addEventListener('click', () => {
+                document.querySelector('#family-modal').hidden = true;
+            });
+        };
+
+        const renderSectorBadges = (resident) => {
+            const badges = [];
+            const age = Number(resident.age || 0);
+            if (resident.is_head || resident.household_role === 'Head') {
+                badges.push('<span class="badge-sector badge-leader"><i data-lucide="crown"></i> Head</span>');
+            }
+            if (age < 18) {
+                badges.push(`<span class="badge-sector badge-kid">Minor (${age})</span>`);
+            } else if (age >= 60) {
+                badges.push(`<span class="badge-sector badge-senior">Senior (${age})</span>`);
+            } else {
+                badges.push(`<span class="badge-sector badge-adult">Adult (${age})</span>`);
+            }
+            if (resident.is_pwd) {
+                badges.push('<span class="badge-sector badge-pwd">♿ PWD</span>');
+            }
+            if (resident.is_solo_parent) {
+                badges.push('<span class="badge-sector badge-soloparent">👨‍👧 Solo Parent</span>');
+            }
+            if (resident.is_4ps) {
+                badges.push('<span class="badge-sector badge-4ps">🌾 4Ps</span>');
+            }
+            return badges.join(' ');
+        };
+
+        const openResidentEditModal = (resident) => {
+            if (!resident) return;
+            const form = document.querySelector('#resident-form');
+            form.elements.name.value = resident.full_name || '';
+            form.elements.address.value = resident.address || '';
+            form.elements.household.value = (resident.household === 'UNASSIGNED') ? '' : (resident.household || '');
+            form.elements.household_role.value = resident.household_role || (resident.is_head ? 'Head' : 'Member');
+            form.elements.age.value = resident.age || '';
+            form.elements.gender.value = resident.gender || 'Female';
+            form.elements.email.value = resident.email || '';
+            form.elements.phone.value = resident.phone || '';
+            form.elements.status.value = resident.status || 'Pending';
+            form.elements.is_head.checked = Boolean(resident.is_head || resident.household_role === 'Head');
+            form.elements.is_pwd.checked = Boolean(resident.is_pwd);
+            form.elements.is_solo_parent.checked = Boolean(resident.is_solo_parent);
+            form.elements.is_4ps.checked = Boolean(resident.is_4ps);
+
+            modal.dataset.editingId = resident.id;
+            document.querySelector('#resident-modal-title').textContent = 'Edit Resident Profile';
+            form.querySelector('button[type="submit"]').textContent = 'Save Changes';
+            modal.hidden = false;
+        };
+
+        const attachResidentActionEvents = () => {
+            document.querySelectorAll('.view-resident').forEach((button) => button.addEventListener('click', () => {
+                const resident = residentData.find((item) => String(item.id) === String(button.dataset.id));
+                openResidentEditModal(resident);
+            }));
+
+            document.querySelectorAll('.view-family-btn').forEach((button) => button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const hh = button.dataset.household;
+                openFamilyModal(hh);
+            }));
+
+            document.querySelectorAll('.filter-household-click, .filter-this-household-btn').forEach((button) => button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const hh = button.dataset.household;
+                const hhFilter = document.querySelector('#household-filter');
+                if (hhFilter) {
+                    hhFilter.value = hh;
+                    renderResidents();
+                    showToast(`Filtered to family: ${hh}`);
+                }
+            }));
+
+            document.querySelectorAll('.add-family-member-btn').forEach((button) => button.addEventListener('click', () => {
+                const hh = button.dataset.household;
+                const addr = button.dataset.address;
+                delete modal.dataset.editingId;
+                document.querySelector('#resident-modal-title').textContent = `Add Member to ${getFamilyName(null, hh)}`;
+                document.querySelector('#resident-form button[type="submit"]').textContent = 'Add to Family';
+                document.querySelector('#resident-form').reset();
+                document.querySelector('#resident-form [name="household"]').value = (hh === 'UNASSIGNED') ? '' : hh;
+                document.querySelector('#resident-form [name="address"]').value = addr || '';
+                document.querySelector('#resident-form [name="household_role"]').value = 'Member';
+                modal.hidden = false;
+                document.querySelector('#resident-form [name="name"]').focus();
+            }));
+        };
+
+        const renderResidents = () => {
+            const query = (document.querySelector('#resident-search')?.value || '').trim().toLowerCase();
+            const status = document.querySelector('#status-filter')?.value || 'all';
+            const sector = activeSectorFilter;
+            const household = document.querySelector('#household-filter')?.value || 'all';
+
+            const filtered = residentData.filter((r) => {
+                const members = getHouseholdMembers(r.household);
+                const familyName = getFamilyName(members, r.household);
+                const matchesQuery = !query || [r.full_name, r.resident_id, r.household, familyName, r.address, r.phone, r.email, r.sector].join(' ').toLowerCase().includes(query);
+                const matchesStatus = status === 'all' || r.status === status;
+                const matchesHousehold = household === 'all' || (household === 'UNASSIGNED' ? (!r.household || r.household === 'UNASSIGNED') : r.household === household);
+                
+                let matchesSector = true;
+                if (sector === 'leader') matchesSector = Boolean(r.is_head || r.household_role === 'Head');
+                else if (sector === 'kids') matchesSector = Number(r.age) < 18;
+                else if (sector === 'adults') matchesSector = Number(r.age) >= 18 && Number(r.age) < 60;
+                else if (sector === 'seniors') matchesSector = Number(r.age) >= 60;
+                else if (sector === 'pwd') matchesSector = Boolean(r.is_pwd);
+                else if (sector === 'solo_parent') matchesSector = Boolean(r.is_solo_parent);
+                else if (sector === '4ps') matchesSector = Boolean(r.is_4ps);
+
+                return matchesQuery && matchesStatus && matchesHousehold && matchesSector;
+            });
+
+            document.querySelector('#resident-count').textContent = `Showing ${filtered.length} of ${residentData.length} residents`;
+
+            const tableWrap = document.querySelector('#resident-table-wrap');
+            const familyWrap = document.querySelector('#family-cards-wrap');
+
+            if (residentViewMode === 'family') {
+                tableWrap.hidden = true;
+                familyWrap.hidden = false;
+
+                const hhMap = {};
+                filtered.forEach((r) => {
+                    const hh = r.household || 'UNASSIGNED';
+                    if (!hhMap[hh]) hhMap[hh] = [];
+                    hhMap[hh].push(r);
+                });
+
+                if (Object.keys(hhMap).length === 0) {
+                    familyWrap.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;">No families or households match the current filter.</div>';
+                } else {
+                    familyWrap.innerHTML = Object.entries(hhMap).map(([hh, members]) => {
+                        const leader = members.find((m) => m.is_head || m.household_role === 'Head') || members[0];
+                        const nonLeaders = members.filter((m) => m !== leader);
+                        const address = (leader && leader.address) || members[0].address || 'Barangay Don Felipe Larrazabal';
+                        const familyName = getFamilyName(members, hh);
+
+                        return `
+                        <div class="family-card">
+                            <div class="family-card-head">
+                                <div class="family-card-title">
+                                    <h3><i data-lucide="home"></i> ${escapeHtml(familyName)} <span style="font-size: 12px; font-weight: normal; color: #64748B;">(${escapeHtml(hh)})</span></h3>
+                                    <p><i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> ${escapeHtml(address)}</p>
+                                </div>
+                                <span class="family-member-count"><i data-lucide="users"></i> ${members.length} ${members.length === 1 ? 'member' : 'members'}</span>
+                            </div>
+
+                            <div class="family-leader-box">
+                                <div class="family-leader-box-info">
+                                    <strong><i data-lucide="crown"></i> ${escapeHtml(leader.full_name)}</strong>
+                                    <small>${escapeHtml(leader.household_role || 'Head')} · ${leader.age} yrs / ${leader.gender} · ${escapeHtml(leader.status)}</small>
+                                </div>
+                                <button class="outline-button view-resident" data-id="${escapeHtml(leader.id)}" type="button" style="padding: 4px 8px; font-size: 11px;">Profile</button>
+                            </div>
+
+                            ${nonLeaders.length ? `
+                            <div class="family-members-box">
+                                <small style="font-weight: 700; color: #64748B; font-size: 11px;">Family Members (${nonLeaders.length}):</small>
+                                ${nonLeaders.map((m) => `
+                                    <div class="family-member-row">
+                                        <div class="family-member-row-name">
+                                            <span>${escapeHtml(m.full_name)}</span>
+                                            <small style="color: #64748B; font-weight: normal;">(${escapeHtml(m.household_role || 'Member')})</small>
+                                        </div>
+                                        <div class="family-member-row-meta">
+                                            ${renderSectorBadges(m)}
+                                            <button class="view-resident" data-id="${escapeHtml(m.id)}" type="button" title="View details" style="padding: 2px; border:0; background:none; cursor:pointer;"><i data-lucide="eye" style="width:14px; height:14px;"></i></button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            ` : '<div style="font-size: 11px; color: #94A3B8; font-style: italic;">Solo household head</div>'}
+
+                            <div class="family-card-actions">
+                                <button class="primary-button view-family-btn" data-household="${escapeHtml(hh)}" type="button" style="font-size: 11px; padding: 4px 10px;">
+                                    <i data-lucide="users"></i> Family Background (${members.length})
+                                </button>
+                                <button class="outline-button add-family-member-btn" data-household="${escapeHtml(hh)}" data-address="${escapeHtml(address)}" type="button" style="font-size: 11px; padding: 4px 10px;">
+                                    <i data-lucide="user-plus"></i> Add Member
+                                </button>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                }
+            } else {
+                tableWrap.hidden = false;
+                familyWrap.hidden = true;
+
+                const rows = document.querySelector('#resident-rows');
+                rows.innerHTML = filtered.length ? filtered.map((r) => {
+                    const hhMembers = getHouseholdMembers(r.household);
+                    const familyName = getFamilyName(hhMembers, r.household);
+                    const isUnassigned = (!r.household || r.household === 'UNASSIGNED');
+
+                    return `
+                    <tr>
+                        <td>${escapeHtml(r.resident_id)}</td>
+                        <td>
+                            <strong>${escapeHtml(r.full_name)}</strong>
+                            ${(r.is_head || r.household_role === 'Head') ? '<span class="badge-sector badge-leader" style="margin-left: 6px;"><i data-lucide="crown"></i> Leader</span>' : ''}
+                        </td>
+                        <td>
+                            ${isUnassigned ? '<span style="color: #94A3B8; font-style: italic; font-size: 12px;">Unassigned</span>' : `
+                            <button type="button" class="household-pill view-family-btn" data-household="${escapeHtml(r.household)}" title="View ${escapeHtml(familyName)} Background">
+                                <i data-lucide="home"></i> ${escapeHtml(familyName)} <span style="font-weight: normal; opacity: 0.8;">(${escapeHtml(r.household)} · ${hhMembers.length})</span>
+                            </button>
+                            `}
+                        </td>
+                        <td>${escapeHtml(r.household_role || (r.is_head ? 'Head' : 'Member'))}</td>
+                        <td>${escapeHtml(r.age)} / ${escapeHtml(r.gender)}</td>
+                        <td>${renderSectorBadges(r)}</td>
+                        <td><span class="status ${escapeHtml(r.status).toLowerCase()}">${escapeHtml(r.status)}</span></td>
+                        <td>
+                            <div style="display: flex; gap: 6px; align-items: center; justify-content: flex-end;">
+                                ${!isUnassigned ? `
+                                <button class="outline-button view-family-btn" data-household="${escapeHtml(r.household)}" type="button" title="View Full Family Background" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+                                    <i data-lucide="users" style="width: 13px; height: 13px;"></i> Family (${hhMembers.length})
+                                </button>
+                                ` : ''}
+                                <button class="view-resident" type="button" aria-label="Edit ${escapeHtml(r.full_name)}" data-id="${escapeHtml(r.id)}" title="Edit resident details">
+                                    <i data-lucide="edit-3"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    `;
+                }).join('') : '<tr><td class="empty-state" colspan="8">No residents found matching the criteria.</td></tr>';
+            }
+
+            lucide.createIcons();
+            attachResidentActionEvents();
+        };
+
         const loadResidents = async () => {
             try {
                 const response = await fetch('/api/residents');
-                if (!response.ok) throw new Error('Supabase is not configured');
+                if (!response.ok) throw new Error('Database is not configured');
                 const result = await response.json();
-                residentData = result.data.map((resident) => [
-                    resident.resident_id,
-                    resident.full_name,
-                    resident.address,
-                    resident.household || 'UNASSIGNED',
-                    `${resident.age} / ${resident.gender}`,
-                    resident.status,
-                    resident.resident_since,
-                    resident.id
-                ]);
+                residentData = result.data.map((r) => {
+                    const isHead = Boolean(r.is_head || r.household_role === 'Head');
+                    const role = r.household_role || (isHead ? 'Head' : 'Member');
+                    return {
+                        id: r.id,
+                        resident_id: r.resident_id,
+                        full_name: r.full_name,
+                        address: r.address,
+                        household: r.household || 'UNASSIGNED',
+                        household_role: role,
+                        is_head: isHead,
+                        age: Number(r.age || 0),
+                        gender: r.gender,
+                        status: r.status || 'Pending',
+                        resident_since: r.resident_since,
+                        email: r.email || '',
+                        phone: r.phone || '',
+                        is_pwd: Boolean(r.is_pwd),
+                        is_solo_parent: Boolean(r.is_solo_parent),
+                        is_4ps: Boolean(r.is_4ps),
+                        sector: r.sector || ''
+                    };
+                });
+                renderDemographicCounts();
                 renderResidents();
-                showToast(`${residentData.length} residents loaded from Supabase`);
+                showToast(`${residentData.length} residents loaded`);
             } catch (error) {
                 residentData = [];
+                renderDemographicCounts();
                 renderResidents();
-                showToast('Could not load residents from Supabase');
+                showToast('Could not load residents');
             }
         };
+
         renderResidents();
         loadResidents();
+
         document.querySelector('#resident-search').addEventListener('input', renderResidents);
         document.querySelector('#status-filter').addEventListener('change', renderResidents);
+        document.querySelector('#sector-filter').addEventListener('change', (e) => {
+            activeSectorFilter = e.target.value;
+            document.querySelectorAll('.demo-pill').forEach((p) => {
+                p.classList.toggle('active', p.dataset.sector === activeSectorFilter);
+            });
+            renderResidents();
+        });
+        document.querySelector('#household-filter').addEventListener('change', renderResidents);
+
+        document.querySelectorAll('.demo-pill').forEach((pill) => {
+            pill.addEventListener('click', () => {
+                document.querySelectorAll('.demo-pill').forEach((p) => p.classList.remove('active'));
+                pill.classList.add('active');
+                activeSectorFilter = pill.dataset.sector;
+                const sectorSelect = document.querySelector('#sector-filter');
+                if (sectorSelect) sectorSelect.value = activeSectorFilter;
+                renderResidents();
+            });
+        });
+
+        document.querySelector('#view-mode-table')?.addEventListener('click', () => {
+            residentViewMode = 'table';
+            document.querySelector('#view-mode-table').classList.add('active');
+            document.querySelector('#view-mode-family').classList.remove('active');
+            renderResidents();
+        });
+        document.querySelector('#view-mode-family')?.addEventListener('click', () => {
+            residentViewMode = 'family';
+            document.querySelector('#view-mode-family').classList.add('active');
+            document.querySelector('#view-mode-table').classList.remove('active');
+            renderResidents();
+        });
 
         const navigationViews = { Dashboard: 'dashboard-view', 'Manage Officials': 'manage-officials-view', Residents: 'residents-view', Documents: 'documents-view', Concerns: 'concerns-view', Announcements: 'announcements-view', 'Weather & Alerts': 'weather-alerts-view', Reports: 'reports-view', Settings: 'settings-view' };
         document.querySelectorAll('.nav-item[data-section]').forEach((item) => item.addEventListener('click', (event) => {
@@ -790,27 +1707,60 @@
         };
         const updateSignal = (code, windSpeed) => {
             const signalButton = document.querySelector('[data-action="signal"]');
+            if (!signalButton) return;
             const signal = describeWeather(Number(code), Number(windSpeed) || 0);
-            signalButton.querySelector('.signal-label').textContent = signal.label;
+            const labelEl = signalButton.querySelector('.signal-label');
+            if (labelEl) labelEl.textContent = signal.label;
             signalButton.classList.toggle('resolved', signal.tone === 'sunny' || signal.tone === 'cloudy');
             signalButton.dataset.weatherState = signal.label;
         };
+        const fetchWeather = async (lat, lon) => {
+            const query = (lat !== undefined && lon !== undefined)
+                ? `?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
+                : '';
+            const response = await fetch(`/api/weather${query}`);
+            if (!response.ok) throw new Error('Weather API returned error');
+            const json = await response.json();
+            const current = json.data?.current || {};
+            updateSignal(current.weather_code, current.wind_speed_10m);
+            const tempEl = document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(1) strong');
+            if (tempEl) tempEl.textContent = `${current.temperature_2m ?? '--'}°C`;
+            const rainEl = document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(2) strong');
+            if (rainEl) rainEl.textContent = `${current.precipitation ?? '0.0'} mm`;
+            const windEl = document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(3) strong');
+            if (windEl) windEl.textContent = `${current.wind_speed_10m ?? '--'} km/h`;
+            const visEl = document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(4) strong');
+            if (visEl) visEl.textContent = `${current.visibility ? (current.visibility / 1000).toFixed(1) : '--'} km`;
+            return json;
+        };
         const refreshWeather = () => {
-            if (!navigator.geolocation) return showToast('Location is not available');
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                try {
-                    const response = await fetch(`/api/weather?lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
-                    if (!response.ok) return showToast('Live weather is unavailable');
-                    const current = (await response.json()).data.current || {};
-                    updateSignal(current.weather_code, current.wind_speed_10m);
-                    document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(1) strong').textContent = `${current.temperature_2m ?? '--'}°C`;
-                    document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(3) strong').textContent = `${current.wind_speed_10m ?? '--'} km/h`;
-                    document.querySelector('#weather-alerts-view .compact-metrics article:nth-child(4) strong').textContent = `${current.visibility ? (current.visibility / 1000).toFixed(1) : '--'} km`;
-                    showToast('Weather updated for your location');
-                } catch {
-                    showToast('Could not reach the weather service');
-                }
-            }, () => showToast('Allow location access for live weather'));
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        try {
+                            await fetchWeather(position.coords.latitude, position.coords.longitude);
+                            showToast('Weather updated for your location');
+                        } catch {
+                            try {
+                                await fetchWeather();
+                                showToast('Weather loaded (Barangay default)');
+                            } catch {
+                                showToast('Could not reach the weather service');
+                            }
+                        }
+                    },
+                    async () => {
+                        try {
+                            await fetchWeather();
+                        } catch {
+                            showToast('Could not reach the weather service');
+                        }
+                    },
+                    { timeout: 5000, maximumAge: 300000 }
+                );
+            } else {
+                fetchWeather().catch(() => showToast('Could not reach the weather service'));
+            }
         };
 
         const notificationButton = document.querySelector('.notification');
@@ -877,7 +1827,7 @@
                 profileModal.hidden = true;
                 showToast('Profile updated');
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
             }
         });
         document.querySelector('#password-form').addEventListener('submit', async (event) => {
@@ -891,31 +1841,100 @@
                 event.currentTarget.reset();
                 showToast('Password updated successfully');
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
             }
         });
         document.querySelector('[data-action="logout"]').addEventListener('click', async (event) => { event.preventDefault(); await fetch('/api/logout', { method: 'POST' }); window.location.href = '/login'; });
 
         const modal = document.querySelector('#resident-modal');
-        document.querySelector('#add-resident').addEventListener('click', () => { delete modal.dataset.editingId; document.querySelector('#resident-modal-title').textContent = 'Register New Resident'; document.querySelector('#resident-form button[type="submit"]').textContent = 'Register Resident'; document.querySelector('#resident-form').reset(); modal.hidden = false; document.querySelector('#resident-form input').focus(); });
-        document.querySelector('.modal-close').addEventListener('click', () => { modal.hidden = true; });
-        document.querySelector('#resident-form').addEventListener('submit', (event) => {
+        document.querySelector('#add-resident').addEventListener('click', () => {
+            delete modal.dataset.editingId;
+            document.querySelector('#resident-modal-title').textContent = 'Register New Resident';
+            document.querySelector('#resident-form button[type="submit"]').textContent = 'Register Resident';
+            document.querySelector('#resident-form').reset();
+            modal.hidden = false;
+            document.querySelector('#resident-form input').focus();
+        });
+        document.querySelector('.resident-modal-close, .modal-close').addEventListener('click', () => { modal.hidden = true; });
+        const roleSelect = document.querySelector('#resident-form select[name="household_role"]');
+        const headCheck = document.querySelector('#resident-form input[name="is_head"]');
+        if (roleSelect && headCheck) {
+            roleSelect.addEventListener('change', () => {
+                if (roleSelect.value === 'Head') headCheck.checked = true;
+                else if (headCheck.checked && roleSelect.value !== 'Head') headCheck.checked = false;
+            });
+            headCheck.addEventListener('change', () => {
+                if (headCheck.checked) roleSelect.value = 'Head';
+                else if (roleSelect.value === 'Head') roleSelect.value = 'Member';
+            });
+        }
+        document.querySelector('#resident-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             const form = event.currentTarget;
             const formData = new FormData(form);
             const editingId = modal.dataset.editingId;
             const isEditing = Boolean(editingId);
-            fetch(isEditing ? `/api/residents/${encodeURIComponent(editingId)}` : '/api/residents', {
-                method: isEditing ? 'PATCH' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ full_name: formData.get('name'), address: formData.get('address'), household: formData.get('household'), email: formData.get('email'), phone: formData.get('phone'), age: formData.get('age'), gender: formData.get('gender') })
-            }).then(async (response) => {
+
+            const role = formData.get('household_role') || 'Member';
+            const isHead = form.elements.is_head ? (form.elements.is_head.checked || role === 'Head') : (role === 'Head');
+            const isPwd = form.elements.is_pwd ? form.elements.is_pwd.checked : false;
+            const isSoloParent = form.elements.is_solo_parent ? form.elements.is_solo_parent.checked : false;
+            const is4ps = form.elements.is_4ps ? form.elements.is_4ps.checked : false;
+            const age = Number(formData.get('age') || 0);
+
+            const payload = {
+                full_name: formData.get('name'),
+                address: formData.get('address'),
+                household: formData.get('household'),
+                household_role: isHead ? 'Head' : role,
+                is_head: isHead,
+                age: age,
+                gender: formData.get('gender'),
+                email: formData.get('email'),
+                phone: formData.get('phone'),
+                status: formData.get('status') || 'Pending',
+                is_pwd: isPwd,
+                is_solo_parent: isSoloParent,
+                is_4ps: is4ps
+            };
+
+            try {
+                const response = await fetch(isEditing ? `/api/residents/${encodeURIComponent(editingId)}` : '/api/residents', {
+                    method: isEditing ? 'PATCH' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Could not save resident');
                 const resident = result.data;
-                const row = [resident.resident_id, resident.full_name, resident.address, resident.household || 'UNASSIGNED', `${resident.age} / ${resident.gender}`, resident.status, resident.resident_since, resident.id];
-                if (isEditing) residentData[residentData.findIndex((item) => String(item[7]) === String(editingId))] = row;
-                else residentData.push(row);
+                const formattedResident = {
+                    id: resident.id,
+                    resident_id: resident.resident_id,
+                    full_name: resident.full_name,
+                    address: resident.address,
+                    household: resident.household || 'UNASSIGNED',
+                    household_role: resident.household_role || (resident.is_head ? 'Head' : 'Member'),
+                    is_head: Boolean(resident.is_head || resident.household_role === 'Head'),
+                    age: Number(resident.age || 0),
+                    gender: resident.gender,
+                    status: resident.status || 'Pending',
+                    resident_since: resident.resident_since,
+                    email: resident.email || '',
+                    phone: resident.phone || '',
+                    is_pwd: Boolean(resident.is_pwd),
+                    is_solo_parent: Boolean(resident.is_solo_parent),
+                    is_4ps: Boolean(resident.is_4ps),
+                    sector: resident.sector || ''
+                };
+
+                if (isEditing) {
+                    const idx = residentData.findIndex((item) => String(item.id) === String(editingId));
+                    if (idx !== -1) residentData[idx] = formattedResident;
+                } else {
+                    residentData.unshift(formattedResident);
+                }
+
+                renderDemographicCounts();
                 renderResidents();
                 modal.hidden = true;
                 form.reset();
@@ -923,11 +1942,43 @@
                 document.querySelector('#resident-modal-title').textContent = 'Register New Resident';
                 form.querySelector('button[type="submit"]').textContent = 'Register Resident';
                 await loadDashboard();
-                showToast(isEditing ? 'Resident profile updated in Supabase' : 'Resident profile saved to Supabase');
-            }).catch((error) => showToast(error.message || 'Could not save. Check your Supabase setup.'));
+                showToast(isEditing ? 'Resident profile updated' : 'Resident profile saved');
+                if (currentInspectingHousehold && formattedResident.household === currentInspectingHousehold) {
+                    openFamilyModal(currentInspectingHousehold);
+                }
+            } catch (error) {
+                showToast(error.message || 'Could not save resident profile.');
+            }
         });
         document.querySelector('#export-residents').addEventListener('click', () => {
-            const csv = ['Resident ID,Full Name,Address,Household,Age / Gender,Status,Resident Since', ...residentData.map((resident) => resident.join(','))].join('\n');
+            const header = 'Resident ID,Full Name,Address,Household,Role,Household Leader,Age,Gender,Sectors,Status,Resident Since';
+            const rows = residentData.map((r) => {
+                const age = Number(r.age || 0);
+                const ageGroup = age < 18 ? 'Minor (0-17)' : (age >= 60 ? 'Senior (60+)' : 'Adult (18-59)');
+                const sectors = [
+                    ageGroup,
+                    r.is_head ? 'Leader' : '',
+                    r.is_pwd ? 'PWD' : '',
+                    r.is_solo_parent ? 'Solo Parent' : '',
+                    r.is_4ps ? '4Ps' : ''
+                ].filter(Boolean).join('; ');
+
+                const escapeCsv = (str) => `"${String(str ?? '').replace(/"/g, '""')}"`;
+                return [
+                    escapeCsv(r.resident_id),
+                    escapeCsv(r.full_name),
+                    escapeCsv(r.address),
+                    escapeCsv(r.household),
+                    escapeCsv(r.household_role || 'Member'),
+                    escapeCsv(r.is_head ? 'Yes' : 'No'),
+                    escapeCsv(r.age),
+                    escapeCsv(r.gender),
+                    escapeCsv(sectors),
+                    escapeCsv(r.status),
+                    escapeCsv(r.resident_since)
+                ].join(',');
+            });
+            const csv = [header, ...rows].join('\n');
             const link = document.createElement('a');
             link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
             link.download = 'smartbarangay-residents.csv';
@@ -948,7 +1999,7 @@
                 showToast(response.ok ? 'Official registered successfully' : (result.error || 'Official registration failed'));
                 if (response.ok) { officialModal.hidden = true; event.currentTarget.reset(); await loadOfficials(); }
             } catch {
-                showToast('Could not reach the Supabase-backed API');
+                showToast('Could not reach the server API');
             }
         });
         document.querySelector('#official-search').addEventListener('input', renderOfficials);

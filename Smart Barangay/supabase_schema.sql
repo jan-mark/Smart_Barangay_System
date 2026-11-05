@@ -78,6 +78,12 @@ create table if not exists public.residents (
 );
 alter table public.residents add column if not exists email text;
 alter table public.residents add column if not exists phone text;
+alter table public.residents add column if not exists household_role text default 'Member';
+alter table public.residents add column if not exists is_head boolean default false;
+alter table public.residents add column if not exists is_pwd boolean default false;
+alter table public.residents add column if not exists is_solo_parent boolean default false;
+alter table public.residents add column if not exists is_4ps boolean default false;
+alter table public.residents add column if not exists sector text;
 
 alter table public.documents add column if not exists requester_id uuid references auth.users(id);
 alter table public.documents add column if not exists purpose text;
