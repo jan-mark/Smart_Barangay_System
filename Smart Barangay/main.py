@@ -41,7 +41,7 @@ app.config.update(
 
 @app.after_request
 def add_no_cache_headers(response):
-    if response.content_type.startswith("text/html"):
+    if response.content_type.startswith(("text/html", "text/css", "application/javascript")):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -66,7 +66,7 @@ CONCERN_STATUSES = {"Pending", "Open", "In Progress", "Escalated", "Resolved"}
 CONCERN_PRIORITIES = {"Low", "Medium", "High", "Critical"}
 ANNOUNCEMENT_CATEGORIES = {"General", "Assembly", "Health", "Emergency", "Livelihood", "Social Services"}
 ALERT_SEVERITIES = {"Open", "Advisory", "Warning", "Critical", "Escalated", "Resolved"}
-CIVIL_STATUSES = {"Single", "Married", "Widowed", "Separated", "Divorced"}
+CIVIL_STATUSES = {"Single", "Live-in", "Married", "Widowed", "Widow/Widower", "Separated", "Divorced"}
 
 
 def server_data_unavailable():
@@ -497,10 +497,101 @@ def weather():
         return jsonify({"data": fallback, "fallback": True})
 
 
+def _resolve_household_for_resident(
+    full_name: str,
+    raw_household: str | None,
+    is_head: bool,
+    current_id: int | None = None,
+) -> str:
+    cleaned_hh = (raw_household or "").strip()
+    if cleaned_hh and cleaned_hh != "UNASSIGNED":
+        return cleaned_hh
+
+    parts = [p for p in (full_name or "").strip().split() if p]
+    if len(parts) < 2 and not is_head:
+        return "UNASSIGNED"
+
+    surname = parts[-1].lower() if parts else ""
+    try:
+        all_residents = supabase_repository.list_residents()
+    except Exception:
+        all_residents = []
+
+    if not is_head and len(parts) >= 2:
+        for r in all_residents:
+            if current_id is not None and r.get("id") == current_id:
+                continue
+            r_hh = (r.get("household") or "").strip()
+            if not r_hh or r_hh == "UNASSIGNED":
+                continue
+            r_parts = [p for p in str(r.get("full_name") or "").strip().split() if p]
+            if r_parts and r_parts[-1].lower() == surname:
+                return r_hh
+
+    existing_hhs = {
+        str(r.get("household") or "").strip()
+        for r in all_residents
+        if r.get("household")
+    }
+    next_num = 100 + (current_id or (len(all_residents) + 1))
+    while f"HH-{next_num:04d}" in existing_hhs:
+        next_num += 1
+    return f"HH-{next_num:04d}"
+
+
+def _build_resident_sector_string(
+    *,
+    is_head: bool,
+    is_pwd: bool,
+    is_senior: bool,
+    is_lgbt: bool,
+    is_solo_parent: bool,
+    is_pregnant: bool,
+    is_young_parent: bool,
+    is_4ps: bool,
+    age: int,
+) -> str:
+    sectors: list[str] = []
+    if is_head:
+        sectors.append("Leader")
+    if is_pwd:
+        sectors.append("PWD")
+    if is_senior or age >= 60:
+        sectors.append("Senior Citizen")
+    if is_lgbt:
+        sectors.append("LGBT")
+    if is_solo_parent:
+        sectors.append("Solo Parent")
+    if is_pregnant:
+        sectors.append("Pregnant")
+    if is_young_parent:
+        sectors.append("Young Parent")
+    if is_4ps:
+        sectors.append("4Ps")
+    if age < 18:
+        sectors.append("Minor")
+    elif age < 60:
+        sectors.append("Adult")
+    return ", ".join(sectors)
+
+
 @app.post("/api/residents")
 @roles_required("admin", "barangay_official")
 def create_resident():
     payload = request.get_json(silent=True) or {}
+    if "sex" in payload and not payload.get("gender"):
+        payload["gender"] = payload["sex"]
+
+    date_of_birth = str(payload.get("date_of_birth") or "").strip() or None
+    if date_of_birth and not str(payload.get("age") or "").strip():
+        try:
+            dob = date.fromisoformat(date_of_birth)
+            today = manila_today()
+            calc_age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            payload["age"] = max(1, calc_age)
+        except ValueError:
+            pass
+
     required_fields = ("full_name", "address", "age", "gender")
     missing_fields = [field for field in required_fields if not str(payload.get(field, "")).strip()]
     if missing_fields:
@@ -508,38 +599,77 @@ def create_resident():
     try:
         age = int(payload["age"])
         gender = str(payload["gender"]).strip()
-        if age < 1 or age > 120:
-            return jsonify({"error": "Age must be between 1 and 120"}), 400
+        if age < 0 or age > 120:
+            return jsonify({"error": "Age must be between 0 and 120"}), 400
+        if age == 0:
+            age = 1
         if gender not in {"Female", "Male", "Other"}:
-            return jsonify({"error": "Choose a valid gender"}), 400
+            return jsonify({"error": "Choose a valid sex / gender"}), 400
         is_head = bool(payload.get("is_head", False))
-        household_role = str(payload.get("household_role", "Head" if is_head else "Member")).strip()
-        if household_role.lower() in ("head", "household leader", "leader"):
+        household_role = str(payload.get("household_role", "Head" if is_head else "Member")).strip() or ("Head" if is_head else "Member")
+        if household_role.lower() in ("head", "head of the family", "household head", "household leader", "leader"):
             is_head = True
             household_role = "Head"
         is_pwd = bool(payload.get("is_pwd", False))
+        is_senior = bool(payload.get("is_senior", False)) or (age >= 60)
+        is_lgbt = bool(payload.get("is_lgbt", False))
         is_solo_parent = bool(payload.get("is_solo_parent", False))
+        is_pregnant = bool(payload.get("is_pregnant", False))
+        is_young_parent = bool(payload.get("is_young_parent", False))
         is_4ps = bool(payload.get("is_4ps", False))
         sector = str(payload.get("sector", "")).strip() or None
         if not sector:
-            sectors = []
-            if is_head: sectors.append("Leader")
-            if is_pwd: sectors.append("PWD")
-            if is_solo_parent: sectors.append("Solo Parent")
-            if is_4ps: sectors.append("4Ps")
-            if age >= 60: sectors.append("Senior")
-            elif age < 18: sectors.append("Minor")
-            else: sectors.append("Adult")
-            sector = ", ".join(sectors)
+            sector = _build_resident_sector_string(
+                is_head=is_head,
+                is_pwd=is_pwd,
+                is_senior=is_senior,
+                is_lgbt=is_lgbt,
+                is_solo_parent=is_solo_parent,
+                is_pregnant=is_pregnant,
+                is_young_parent=is_young_parent,
+                is_4ps=is_4ps,
+                age=age,
+            )
+
+        full_name_clean = str(payload["full_name"]).strip()
+        raw_hh = str(payload.get("household", "")).strip()
+        resolved_hh = _resolve_household_for_resident(full_name_clean, raw_hh, is_head)
+        family_no = str(payload.get("family_no") or "").strip() or None
+        marital_status = str(payload.get("marital_status") or "").strip() or None
+        raw_years_living_in = payload.get("years_living_in")
+        years_living_in = None
+        if raw_years_living_in not in (None, ""):
+            try:
+                years_living_in = max(0, int(raw_years_living_in))
+            except (ValueError, TypeError):
+                years_living_in = None
+        family_planning = str(payload.get("family_planning") or "").strip() or None
+        educational_attainment = str(payload.get("educational_attainment") or "").strip() or None
+        residence_type = str(payload.get("residence_type") or "").strip() or None
+
+        req_status = str(payload.get("status", "Pending")).strip()
+        if req_status not in {"Verified", "Pending", "Inactive"}:
+            req_status = "Pending"
 
         resident = supabase_repository.add_resident({
-            "full_name": str(payload["full_name"]).strip(),
+            "full_name": full_name_clean,
             "address": str(payload["address"]).strip(),
-            "household": str(payload.get("household", "UNASSIGNED")).strip() or "UNASSIGNED",
+            "household": resolved_hh,
+            "family_no": family_no,
             "household_role": household_role,
+            "date_of_birth": date_of_birth,
+            "marital_status": marital_status,
+            "years_living_in": years_living_in,
+            "family_planning": family_planning,
+            "educational_attainment": educational_attainment,
+            "residence_type": residence_type,
             "is_head": is_head,
             "is_pwd": is_pwd,
+            "is_senior": is_senior,
+            "is_lgbt": is_lgbt,
             "is_solo_parent": is_solo_parent,
+            "is_pregnant": is_pregnant,
+            "is_young_parent": is_young_parent,
             "is_4ps": is_4ps,
             "sector": sector,
             "email": str(payload.get("email", "")).strip() or None,
@@ -547,7 +677,7 @@ def create_resident():
             "age": age,
             "gender": gender,
             "resident_since": manila_today().isoformat(),
-            "status": "Pending",
+            "status": req_status,
         })
         return jsonify({"data": resident}), 201
     except ValueError:
@@ -563,15 +693,50 @@ def create_resident():
 @roles_required("admin", "barangay_official")
 def update_resident(resident_id: int):
     payload = request.get_json(silent=True) or {}
+    if "sex" in payload and "gender" not in payload:
+        payload["gender"] = payload["sex"]
+    existing = supabase_repository.get_row("residents", resident_id) or {}
     updates: dict[str, object] = {}
-    for field in ("full_name", "address", "household", "email", "phone", "gender", "household_role", "sector"):
+    for field in (
+        "full_name",
+        "address",
+        "email",
+        "phone",
+        "gender",
+        "household_role",
+        "family_no",
+        "date_of_birth",
+        "marital_status",
+        "family_planning",
+        "educational_attainment",
+        "residence_type",
+        "sector",
+    ):
         if field in payload:
             value = str(payload[field] or "").strip()
             updates[field] = value or None
+    if "years_living_in" in payload:
+        raw_yli = payload.get("years_living_in")
+        if raw_yli in (None, ""):
+            updates["years_living_in"] = None
+        else:
+            try:
+                updates["years_living_in"] = max(0, int(raw_yli))
+            except (ValueError, TypeError):
+                updates["years_living_in"] = None
     if "age" in payload:
         try:
-            updates["age"] = int(payload["age"])
+            parsed_age = int(payload["age"])
+            updates["age"] = max(1, parsed_age)
         except (ValueError, TypeError):
+            pass
+    elif "date_of_birth" in updates and updates["date_of_birth"]:
+        try:
+            dob = date.fromisoformat(str(updates["date_of_birth"]))
+            today = manila_today()
+            calc_age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            updates["age"] = max(1, calc_age)
+        except ValueError:
             pass
     if "is_head" in payload:
         updates["is_head"] = bool(payload["is_head"])
@@ -580,14 +745,62 @@ def update_resident(resident_id: int):
     if "household_role" in payload:
         role_val = str(payload["household_role"]).strip()
         updates["household_role"] = role_val
-        if role_val.lower() in ("head", "household leader", "leader"):
+        if role_val.lower() in ("head", "head of the family", "household head", "household leader", "leader"):
             updates["is_head"] = True
-    if "is_pwd" in payload:
-        updates["is_pwd"] = bool(payload["is_pwd"])
-    if "is_solo_parent" in payload:
-        updates["is_solo_parent"] = bool(payload["is_solo_parent"])
-    if "is_4ps" in payload:
-        updates["is_4ps"] = bool(payload["is_4ps"])
+            updates["household_role"] = "Head"
+    for bool_col in ("is_pwd", "is_senior", "is_lgbt", "is_solo_parent", "is_pregnant", "is_young_parent", "is_4ps"):
+        if bool_col in payload:
+            updates[bool_col] = bool(payload[bool_col])
+
+    effective_name = str(updates.get("full_name") or existing.get("full_name") or "").strip()
+    effective_is_head = bool(updates.get("is_head", existing.get("is_head", False)))
+
+    if "household" in payload:
+        raw_hh = str(payload.get("household") or "").strip()
+        # Explicit unlink from family modal sends household="UNASSIGNED" without full_name
+        if raw_hh == "UNASSIGNED" and "full_name" not in payload:
+            updates["household"] = "UNASSIGNED"
+        else:
+            existing_hh = str(existing.get("household") or "").strip()
+            candidate_hh = raw_hh or (existing_hh if existing_hh != "UNASSIGNED" else "")
+            updates["household"] = _resolve_household_for_resident(
+                effective_name, candidate_hh, effective_is_head, current_id=resident_id
+            )
+    elif str(existing.get("household") or "UNASSIGNED") == "UNASSIGNED":
+        resolved_hh = _resolve_household_for_resident(
+            effective_name, "", effective_is_head, current_id=resident_id
+        )
+        if resolved_hh != "UNASSIGNED":
+            updates["household"] = resolved_hh
+
+    # Recompute the sector string whenever any boolean classification changes
+    sector_trigger_keys = (
+        "is_head",
+        "is_pwd",
+        "is_senior",
+        "is_lgbt",
+        "is_solo_parent",
+        "is_pregnant",
+        "is_young_parent",
+        "is_4ps",
+        "age",
+        "household_role",
+    )
+    if any(k in payload for k in sector_trigger_keys):
+        _age = int(updates.get("age") or existing.get("age") or 0)
+        _is_senior = bool(updates.get("is_senior", existing.get("is_senior", False))) or (_age >= 60)
+        updates["is_senior"] = _is_senior
+        updates["sector"] = _build_resident_sector_string(
+            is_head=bool(updates.get("is_head", existing.get("is_head", False))),
+            is_pwd=bool(updates.get("is_pwd", existing.get("is_pwd", False))),
+            is_senior=_is_senior,
+            is_lgbt=bool(updates.get("is_lgbt", existing.get("is_lgbt", False))),
+            is_solo_parent=bool(updates.get("is_solo_parent", existing.get("is_solo_parent", False))),
+            is_pregnant=bool(updates.get("is_pregnant", existing.get("is_pregnant", False))),
+            is_young_parent=bool(updates.get("is_young_parent", existing.get("is_young_parent", False))),
+            is_4ps=bool(updates.get("is_4ps", existing.get("is_4ps", False))),
+            age=_age,
+        )
     if "status" in payload:
         status = str(payload["status"]).strip()
         if status not in {"Verified", "Pending", "Inactive"}:
@@ -606,6 +819,17 @@ def update_resident(resident_id: int):
         return jsonify({"error": str(error), "configured": False}), 503
     except Exception as error:
         app.logger.exception("Could not update resident")
+        return jsonify({"error": str(error)}), 502
+
+
+@app.delete("/api/residents/<int:resident_id>")
+@roles_required("admin", "barangay_official")
+def delete_resident(resident_id: int):
+    try:
+        supabase_repository.delete_row("residents", resident_id)
+        return jsonify({"deleted": True, "id": resident_id})
+    except Exception as error:
+        app.logger.exception("Could not delete resident")
         return jsonify({"error": str(error)}), 502
 
 
@@ -665,10 +889,17 @@ def create_document():
         ):
             if value and len(value) > maximum:
                 return jsonify({"error": f"{label} must be {maximum} characters or fewer"}), 400
+        supporting_doc_type = str(payload.get("supporting_doc_type", "")).strip() or None
+        resolved_email = (
+            str(user.get("email") or "").strip()
+            if is_resident and user.get("email")
+            else supabase_repository._resolve_account_email(None, resident_name)
+        )
         data = {
             "document_type": document_type,
             "resident_name": resident_name,
             "requester_id": user["id"] if is_resident else None,
+            "resident_email": resolved_email,
             "purpose": purpose,
             "applicant_address": applicant_address,
             "applicant_contact": applicant_contact,
@@ -677,6 +908,7 @@ def create_document():
             "applicant_civil_status": applicant_civil_status,
             "business_name": business_name,
             "business_address": business_address,
+            "supporting_doc_type": supporting_doc_type,
             "date_requested": manila_today().isoformat(),
             "status": "Pending",
         }
@@ -692,18 +924,451 @@ def create_document():
         return jsonify({"error": str(error)}), 502
 
 
+def _resolve_resident_email(doc: dict) -> str:
+    fake_demo_emails = {
+        "juan.dela.cruz@gmail.com",
+        "ana.reyes@gmail.com",
+        "rosa.bautista@gmail.com",
+        "maria.santos@gmail.com",
+        "carlos.mendoza@gmail.com",
+        "liza.torres@gmail.com",
+        "pedro.villanueva@gmail.com",
+        "resident@gmail.com",
+    }
+    cur = str(doc.get("resident_email") or "").strip()
+    if cur and cur.lower() not in fake_demo_emails:
+        return cur
+    return supabase_repository._resolve_account_email(
+        doc.get("requester_id"),
+        doc.get("resident_name"),
+    )
+
+
+def _send_gmail_notification(to_email: str, subject: str, body: str, resident_name: str | None = None) -> dict:
+    import html as html_lib
+    import smtplib
+    from email.message import EmailMessage
+    from email.utils import formataddr, formatdate, make_msgid
+
+    smtp_user = os.getenv("SMTP_EMAIL", "").strip()
+    smtp_pass = os.getenv("SMTP_PASSWORD", "").replace(" ", "").strip()
+    clean_subject = subject.replace("—", "-").replace("–", "-")
+    clean_body = body.replace("•", "-").replace("—", "-")
+    recipients = [addr.strip() for addr in str(to_email or "").split(",") if addr.strip()]
+    delivery = "Resident Portal Notification (SMTP Not Configured)"
+    smtp_delivered = False
+    smtp_error = None
+    if smtp_user and smtp_pass and recipients:
+        try:
+            msg = EmailMessage()
+            msg["Subject"] = clean_subject
+            msg["From"] = formataddr(("SmartBarangay Official", smtp_user))
+            msg["To"] = ", ".join(recipients)
+            msg["Reply-To"] = smtp_user
+            msg["Date"] = formatdate(localtime=True)
+            domain = smtp_user.split("@")[1] if "@" in smtp_user else "smartbarangay.local"
+            msg["Message-ID"] = make_msgid(domain=domain)
+            msg.set_content(clean_body)
+
+            html_lines = "<br>".join(html_lib.escape(line) for line in clean_body.splitlines())
+            html_body = (
+                f"<div style='font-family:Segoe UI,Arial,sans-serif;max-width:600px;margin:0 auto;"
+                f"padding:20px;border:1px solid #e2e8f0;border-radius:10px;color:#0f172a;'>"
+                f"<h2 style='color:#0b2545;margin-top:0;'>SmartBarangay Official Notification</h2>"
+                f"<p style='font-size:14px;line-height:1.6;color:#334155;'>{html_lines}</p>"
+                f"<hr style='border:none;border-top:1px solid #e2e8f0;margin:16px 0;'>"
+                f"<small style='color:#64748b;'>Barangay Don Felipe Larrazabal, Ormoc City, Leyte</small>"
+                f"</div>"
+            )
+            msg.add_alternative(html_body, subtype="html")
+
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(smtp_user, smtp_pass)
+                refused = server.send_message(msg, from_addr=smtp_user, to_addrs=recipients)
+                if refused:
+                    raise RuntimeError(f"Recipient refused by server: {refused}")
+            delivery = f"Sent from {smtp_user} to {', '.join(recipients)}"
+            smtp_delivered = True
+            print(f"[SMTP DELIVERED] From {smtp_user} -> To {recipients} | Subject: {clean_subject}", flush=True)
+        except Exception as err:
+            smtp_error = str(err)
+            delivery = f"Portal Notification Only (SMTP Error: {smtp_error})"
+            print(f"[SMTP ERROR] {smtp_error}", flush=True)
+    return {
+        "from": smtp_user or "SmartBarangay System",
+        "to": ", ".join(recipients) if recipients else to_email,
+        "resident_name": resident_name or "Resident",
+        "subject": clean_subject,
+        "body": clean_body,
+        "sent_at": manila_now().isoformat(),
+        "delivery": delivery,
+        "smtp_delivered": smtp_delivered,
+        "smtp_configured": bool(smtp_user and smtp_pass),
+        "smtp_error": smtp_error,
+    }
+
+
+@app.get("/api/settings/smtp")
+@roles_required("admin", "barangay_official")
+def get_smtp_settings():
+    smtp_user = os.getenv("SMTP_EMAIL", "").strip()
+    smtp_pass = os.getenv("SMTP_PASSWORD", "").replace(" ", "").strip()
+    return jsonify({
+        "configured": bool(smtp_user and smtp_pass),
+        "smtp_email": smtp_user,
+    })
+
+
+@app.post("/api/settings/smtp")
+@roles_required("admin", "barangay_official")
+def save_smtp_settings():
+    import smtplib
+
+    payload = request.get_json(silent=True) or {}
+    smtp_email = str(payload.get("smtp_email") or "").strip()
+    smtp_password = str(payload.get("smtp_password") or "").replace(" ", "").strip()
+    if not smtp_email or not smtp_password:
+        return jsonify({"error": "Both Sender Gmail Address and 16-character Google App Password are required"}), 400
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as server:
+            server.starttls()
+            server.login(smtp_email, smtp_password)
+    except Exception as err:
+        return jsonify({
+            "error": f"Gmail SMTP login failed: {err}. Make sure you use a 16-character Google App Password (from myaccount.google.com/apppasswords), not your regular Gmail password."
+        }), 400
+
+    os.environ["SMTP_EMAIL"] = smtp_email
+    os.environ["SMTP_PASSWORD"] = smtp_password
+    env_file = os.path.join(os.path.dirname(__file__), ".env")
+    lines = []
+    if os.path.exists(env_file):
+        with open(env_file, "r", encoding="utf-8") as f:
+            lines = [
+                ln.rstrip("\r\n")
+                for ln in f.readlines()
+                if not ln.startswith("SMTP_EMAIL=") and not ln.startswith("SMTP_PASSWORD=")
+            ]
+    lines.append(f"SMTP_EMAIL={smtp_email}")
+    lines.append(f"SMTP_PASSWORD={smtp_password}")
+    with open(env_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+    return jsonify({"configured": True, "smtp_email": smtp_email})
+
+
+def _evaluate_receipt_auto_checks(
+    doc: dict,
+    receipt_ref: str,
+    receipt_amount: float,
+    receipt_date: str,
+    payment_method: str,
+    has_file: bool,
+) -> dict:
+    expected_ref = str(doc.get("tx_ref") or "").strip()
+    expected_amt = float(doc.get("amount_due") if doc.get("amount_due") is not None else 50.0)
+    ref_clean = (receipt_ref or "").strip()
+
+    ref_ok = len(ref_clean) >= 6
+    ref_exact_tx = bool(expected_ref and ref_clean.upper() == expected_ref.upper())
+    amt_ok = receipt_amount >= expected_amt and receipt_amount >= 0
+    date_ok = bool(receipt_date and len(receipt_date.strip()) >= 8)
+    file_ok = bool(has_file and payment_method)
+
+    checks = [
+        {
+            "key": "ref",
+            "label": "Transaction / Receipt Reference",
+            "passed": ref_ok,
+            "state": "green" if ref_ok else "red",
+            "detail": f"Ref #{ref_clean} ({'Matches TXN Ref' if ref_exact_tx else 'Valid Receipt Reference Format'})" if ref_ok else "Missing or invalid transaction reference number",
+        },
+        {
+            "key": "amount",
+            "label": "Payment Amount Match",
+            "passed": amt_ok,
+            "state": "green" if amt_ok else "red",
+            "detail": f"Submitted ₱{receipt_amount:.2f} matches required ₱{expected_amt:.2f}" if amt_ok else f"Submitted ₱{receipt_amount:.2f} is less than required ₱{expected_amt:.2f}",
+        },
+        {
+            "key": "date",
+            "label": "Payment Date Validity",
+            "passed": date_ok,
+            "state": "green" if date_ok else "red",
+            "detail": f"Payment date recorded: {receipt_date}" if date_ok else "Missing payment date on receipt",
+        },
+        {
+            "key": "proof",
+            "label": "Receipt Proof & Payment Method",
+            "passed": file_ok,
+            "state": "green" if file_ok else "yellow",
+            "detail": f"Uploaded receipt image/proof via {payment_method}" if file_ok else "Receipt attachment requires manual official inspection",
+        },
+    ]
+    passed_count = sum(1 for c in checks if c["passed"])
+    return {
+        "checks": checks,
+        "passed_count": passed_count,
+        "total": len(checks),
+        "all_passed": passed_count == len(checks),
+        "summary": f"{passed_count}/{len(checks)} Receipt Checks Passed",
+    }
+
+
+@app.post("/api/documents/<int:document_id>/send-payment-instructions")
+@roles_required("admin", "barangay_official")
+def send_document_payment_instructions(document_id: int):
+    payload = request.get_json(silent=True) or {}
+    try:
+        doc = supabase_repository.get_row("documents", document_id)
+        if not doc:
+            return jsonify({"error": "Document request not found"}), 404
+        official_name = current_user().get("full_name", current_user()["email"])
+        doc_type = doc.get("document_type", "Barangay Certificate")
+        default_amt = 0.0 if doc_type == "Certificate of Indigency" else (150.0 if doc_type == "Business Clearance" else 50.0)
+        try:
+            amount_due = float(payload.get("amount_due", doc.get("amount_due", default_amt)))
+        except (ValueError, TypeError):
+            amount_due = default_amt
+
+        tx_ref = doc.get("tx_ref") or f"TXN-SB-{manila_today().year}-{document_id:04d}"
+        resident_name = str(doc.get("resident_name") or "Resident").strip()
+        to_email = str(payload.get("resident_email") or _resolve_resident_email(doc)).strip()
+
+        subject = f"[SmartBarangay] Payment Instructions for {resident_name} — {doc_type} ({tx_ref})"
+        body = (
+            f"Dear {resident_name},\n\n"
+            f"Your document request for {doc_type} has passed initial verification by {official_name}.\n\n"
+            f"PAYMENT DETAILS & INSTRUCTIONS:\n"
+            f"• Applicant / Resident Name: {resident_name}\n"
+            f"• Transaction Reference No.: {tx_ref}\n"
+            f"• Document Requested: {doc_type}\n"
+            f"• Required Fee Amount: PHP {amount_due:.2f}\n"
+            f"• Accepted Payment Methods:\n"
+            f"   1. GCash: 0917-123-4567 (Brgy. Don Felipe Larrazabal Treasury)\n"
+            f"   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n"
+            f"   3. Over-the-Counter: Barangay Hall Treasurer's Office\n\n"
+            f"NEXT STEP:\n"
+            f"Once payment is completed, please log in to your SmartBarangay Resident Portal and upload your payment receipt / proof of payment referencing {tx_ref}.\n\n"
+            f"Thank you,\n"
+            f"Office of the Punong Barangay — Hon. Nenito S. Anonat\n"
+            f"Barangay Don Felipe Larrazabal, Ormoc City, Leyte"
+        )
+        email_entry = _send_gmail_notification(to_email, subject, body, resident_name=resident_name)
+        email_logs = list(doc.get("email_logs") or [])
+        email_logs.insert(0, email_entry)
+
+        tx_history = list(doc.get("transaction_history") or [])
+        tx_history.insert(0, {
+            "timestamp": manila_now().isoformat(),
+            "actor": official_name,
+            "event": "Payment Instructions Sent via Gmail",
+            "details": f"Sent payment instructions for {resident_name} (₱{amount_due:.2f}, Ref: {tx_ref}) to {to_email}",
+        })
+
+        updates: dict[str, object] = {
+            "status": "Processing",
+            "processor": official_name,
+            "tx_ref": tx_ref,
+            "amount_due": amount_due,
+            "resident_email": to_email,
+            "payment_status": "Awaiting Payment",
+            "verification_status": "Verified",
+            "checklist_summary": payload.get("checklist_summary") or "4/4 Verified",
+            "verified_by": official_name,
+            "verified_at": manila_now().isoformat(),
+            "action_performed": "Checklist Verified & Payment Email Sent",
+            "manual_checks": payload.get("manual_checks") or ["registration", "address_match", "completeness", "supporting_docs"],
+            "email_logs": email_logs,
+            "transaction_history": tx_history,
+        }
+        if payload.get("verification_remarks"):
+            updates["verification_remarks"] = str(payload["verification_remarks"]).strip()
+
+        updated = supabase_repository.update_row("documents", document_id, updates)
+        return jsonify({"data": updated, "email_sent": email_entry})
+    except Exception as error:
+        app.logger.exception("Could not send payment instructions")
+        return jsonify({"error": str(error)}), 502
+
+
+@app.post("/api/documents/<int:document_id>/receipt")
+@login_required
+def upload_document_receipt(document_id: int):
+    payload = request.get_json(silent=True) or {}
+    try:
+        doc = supabase_repository.get_row("documents", document_id)
+        if not doc:
+            return jsonify({"error": "Document request not found"}), 404
+        user = current_user()
+        payment_method = str(payload.get("payment_method") or "GCash").strip()
+        receipt_ref_no = str(payload.get("receipt_ref_no") or "").strip()
+        receipt_date = str(payload.get("receipt_date") or manila_today().isoformat()).strip()
+        receipt_filename = str(payload.get("receipt_filename") or "payment-receipt.png").strip()
+        receipt_file_url = str(payload.get("receipt_file_url") or "").strip()
+        try:
+            receipt_amount = float(payload.get("receipt_amount") or 0)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Enter a valid payment amount"}), 400
+        if not receipt_ref_no:
+            return jsonify({"error": "Transaction / Receipt Reference Number is required"}), 400
+
+        auto_checks = _evaluate_receipt_auto_checks(
+            doc=doc,
+            receipt_ref=receipt_ref_no,
+            receipt_amount=receipt_amount,
+            receipt_date=receipt_date,
+            payment_method=payment_method,
+            has_file=bool(receipt_file_url or receipt_filename),
+        )
+
+        tx_history = list(doc.get("transaction_history") or [])
+        tx_history.insert(0, {
+            "timestamp": manila_now().isoformat(),
+            "actor": user.get("full_name") or user.get("email") or doc.get("resident_name", "Resident"),
+            "event": "Payment Receipt Uploaded by Resident",
+            "details": f"Method: {payment_method} · Ref: {receipt_ref_no} · Amount: ₱{receipt_amount:.2f} · Auto-check: {auto_checks['summary']}",
+        })
+
+        updates: dict[str, object] = {
+            "payment_status": "Pending Verification",
+            "payment_method": payment_method,
+            "receipt_ref_no": receipt_ref_no,
+            "receipt_amount": receipt_amount,
+            "receipt_date": receipt_date,
+            "receipt_filename": receipt_filename,
+            "receipt_file_url": receipt_file_url,
+            "receipt_submitted_at": manila_now().isoformat(),
+            "receipt_auto_checks": auto_checks,
+            "action_performed": "Receipt Submitted — Pending Official Verification",
+            "transaction_history": tx_history,
+        }
+        updated = supabase_repository.update_row("documents", document_id, updates)
+        return jsonify({"data": updated, "auto_checks": auto_checks})
+    except Exception as error:
+        app.logger.exception("Could not upload payment receipt")
+        return jsonify({"error": str(error)}), 502
+
+
 @app.patch("/api/documents/<int:document_id>")
 @roles_required("admin", "barangay_official")
 def update_document(document_id):
     payload = request.get_json(silent=True) or {}
     status = payload.get("status")
-    if status not in DOCUMENT_STATUSES:
+    if status and status not in DOCUMENT_STATUSES:
         return jsonify({"error": "Invalid document status"}), 400
-    updates = {"status": status, "processor": current_user().get("full_name", current_user()["email"])}
+    official_name = current_user().get("full_name", current_user()["email"])
+    doc = supabase_repository.get_row("documents", document_id) or {}
+    updates: dict[str, object] = {"processor": official_name}
+    if status:
+        updates["status"] = status
     if "scheduled_date" in payload:
         updates["scheduled_date"] = payload["scheduled_date"] or None
     if "scheduled_time" in payload:
         updates["scheduled_time"] = payload["scheduled_time"] or None
+    if "amount_paid" in payload and payload["amount_paid"] not in (None, ""):
+        try:
+            updates["amount_paid"] = float(payload["amount_paid"])
+        except (ValueError, TypeError):
+            pass
+    for meta_field in (
+        "tx_ref",
+        "amount_due",
+        "resident_email",
+        "payment_status",
+        "payment_method",
+        "receipt_ref_no",
+        "receipt_amount",
+        "receipt_date",
+        "supporting_doc_type",
+        "verification_status",
+        "checklist_summary",
+        "action_performed",
+        "verification_remarks",
+        "manual_checks",
+    ):
+        if meta_field in payload:
+            updates[meta_field] = payload[meta_field]
+    updates["verified_by"] = official_name
+    updates["verified_at"] = manila_now().isoformat()
+
+    tx_history = list(doc.get("transaction_history") or [])
+    email_logs = list(doc.get("email_logs") or [])
+    to_email = str(updates.get("resident_email") or doc.get("resident_email") or _resolve_resident_email(doc)).strip()
+    tx_ref = str(updates.get("tx_ref") or doc.get("tx_ref") or f"TXN-SB-{manila_today().year}-{document_id:04d}")
+    updates.setdefault("tx_ref", tx_ref)
+    updates.setdefault("resident_email", to_email)
+
+    resident_name = str(doc.get("resident_name") or "Resident").strip()
+    if status == "Approved" or payload.get("payment_status") == "Verified":
+        updates["payment_status"] = "Verified"
+        updates["status"] = "Approved"
+        paid_val = updates.get("amount_paid", doc.get("receipt_amount", doc.get("amount_due", 50.0)))
+        try:
+            paid_float = float(paid_val or 0.0)
+        except (ValueError, TypeError):
+            paid_float = 50.0
+        updates["amount_paid"] = paid_float
+
+        subject = f"[SmartBarangay] Payment Verified for {resident_name} — {doc.get('document_type', 'Certificate')} Approved ({tx_ref})"
+        body = (
+            f"Dear {resident_name},\n\n"
+            f"We are pleased to inform you that your payment has been verified by {official_name}.\n\n"
+            f"PAYMENT CONFIRMATION SUMMARY:\n"
+            f"• Applicant / Resident Name: {resident_name}\n"
+            f"• Transaction Reference: {tx_ref}\n"
+            f"• Receipt Reference: {doc.get('receipt_ref_no') or 'Verified'}\n"
+            f"• Amount Verified: PHP {paid_float:.2f}\n"
+            f"• Payment Verification Status: VERIFIED\n"
+            f"• Document Status: APPROVED & READY FOR DOWNLOAD\n\n"
+            f"You may now log in to your SmartBarangay Resident Portal and click 'Download PDF' to get your official {doc.get('document_type', 'Barangay Certificate')}.\n\n"
+            f"Thank you,\n"
+            f"Office of the Punong Barangay — Hon. Nenito S. Anonat\n"
+            f"Barangay Don Felipe Larrazabal, Ormoc City, Leyte"
+        )
+        email_entry = _send_gmail_notification(to_email, subject, body, resident_name=resident_name)
+        email_logs.insert(0, email_entry)
+        tx_history.insert(0, {
+            "timestamp": manila_now().isoformat(),
+            "actor": official_name,
+            "event": "Payment Verified & Confirmation Gmail Sent",
+            "details": f"Verified ₱{paid_float:.2f} for {resident_name} (Ref: {doc.get('receipt_ref_no') or tx_ref}). Sent confirmation email to {to_email}.",
+        })
+        updates["email_logs"] = email_logs
+        updates["transaction_history"] = tx_history
+    elif payload.get("payment_status") == "Rejected":
+        updates["payment_status"] = "Rejected"
+        reason = str(payload.get("verification_remarks") or "Submitted payment receipt could not be validated.").strip()
+        subject = f"[SmartBarangay] Payment Receipt Update for {resident_name} — {doc.get('document_type', 'Certificate')} ({tx_ref})"
+        body = (
+            f"Dear {resident_name},\n\n"
+            f"Your uploaded payment receipt for {doc.get('document_type', 'your document request')} ({tx_ref}) could not be verified.\n"
+            f"Reason / Official Remarks: {reason}\n\n"
+            f"Please log in to the SmartBarangay Resident Portal and upload a valid proof of payment.\n\n"
+            f"Office of the Punong Barangay — Hon. Nenito S. Anonat"
+        )
+        email_entry = _send_gmail_notification(to_email, subject, body, resident_name=resident_name)
+        email_logs.insert(0, email_entry)
+        tx_history.insert(0, {
+            "timestamp": manila_now().isoformat(),
+            "actor": official_name,
+            "event": "Payment Receipt Rejected",
+            "details": f"Rejected receipt for {resident_name}: {reason}",
+        })
+        updates["email_logs"] = email_logs
+        updates["transaction_history"] = tx_history
+    elif payload.get("action_performed"):
+        tx_history.insert(0, {
+            "timestamp": manila_now().isoformat(),
+            "actor": official_name,
+            "event": str(payload["action_performed"]),
+            "details": str(payload.get("verification_remarks") or "Updated verification record"),
+        })
+        updates["transaction_history"] = tx_history
+
     try:
         return jsonify({"data": supabase_repository.update_row("documents", document_id, updates)})
     except RepositoryConfigurationError as error:
@@ -1030,14 +1695,22 @@ def _certificate_pdf(document: dict) -> bytes:
 
 
 @app.get("/api/documents/<int:document_id>/certificate.pdf")
-@roles_required("admin", "barangay_official")
+@login_required
 def download_certificate(document_id: int):
     try:
+        user = current_user()
+        if not user:
+            return jsonify({"error": "Authentication required"}), 401
         document = supabase_repository.get_row("documents", document_id)
         if not document:
             return jsonify({"error": "Document request not found"}), 404
+        if user.get("role") == "resident":
+            owns_by_id = str(document.get("requester_id") or "") == str(user.get("id") or "")
+            owns_by_name = str(document.get("resident_name") or "").strip().lower() == str(user.get("full_name") or "").strip().lower()
+            if not (owns_by_id or owns_by_name):
+                return jsonify({"error": "Forbidden"}), 403
         if document.get("status") not in {"Approved", "Resolved"}:
-            return jsonify({"error": "The certificate can only be downloaded after the request is approved"}), 409
+            return jsonify({"error": "The certificate can only be downloaded after payment is verified and approved"}), 409
         pdf_bytes = _certificate_pdf(document)
         request_id = re.sub(r"[^A-Za-z0-9_-]+", "-", str(document.get("request_id") or document_id))
         document_slug = re.sub(r"[^A-Za-z0-9_-]+", "-", str(document.get("document_type") or "certificate").lower())
@@ -1107,8 +1780,9 @@ def create_concern():
 @app.patch("/api/concerns/<int:concern_id>")
 @roles_required("admin", "barangay_official")
 def update_concern(concern_id):
-    status = (request.get_json(silent=True) or {}).get("status")
-    if status not in CONCERN_STATUSES:
+    payload = request.get_json(silent=True) or {}
+    status = payload.get("status")
+    if status and status not in CONCERN_STATUSES:
         return jsonify({"error": "Invalid concern status"}), 400
     try:
         user = current_user()
@@ -1118,11 +1792,60 @@ def update_concern(concern_id):
         categories = current_department_categories(user)
         if categories and concern.get("category") not in categories:
             return jsonify({"error": "This concern is outside your assigned department"}), 403
-        return jsonify({"data": supabase_repository.update_row("concerns", concern_id, {"status": status})})
+        updates: dict[str, object] = {}
+        if status:
+            updates["status"] = status
+        if "assigned_to" in payload:
+            updates["assigned_to"] = str(payload.get("assigned_to") or "").strip() or None
+        if "official_feedback" in payload:
+            fb = str(payload.get("official_feedback") or "").strip()
+            updates["official_feedback"] = fb or None
+            if fb:
+                updates["feedback_by"] = user.get("full_name") or user.get("email") or "Barangay Official"
+                updates["feedback_at"] = manila_now().isoformat()
+        if "appointment_date" in payload:
+            appt_date = str(payload.get("appointment_date") or "").strip()
+            updates["appointment_date"] = appt_date or None
+            updates["appointment_time"] = str(payload.get("appointment_time") or "").strip() or None
+            updates["appointment_notes"] = str(payload.get("appointment_notes") or "").strip() or None
+            if appt_date:
+                # If official proposes a new date, set status to Proposed unless specified
+                updates["appointment_status"] = str(payload.get("appointment_status") or "Proposed").strip()
+            else:
+                updates["appointment_status"] = None
+        if "resolution_remarks" in payload:
+            updates["resolution_remarks"] = str(payload.get("resolution_remarks") or "").strip() or None
+        updates["updated_at"] = manila_now().isoformat()
+        return jsonify({"data": supabase_repository.update_row("concerns", concern_id, updates)})
     except RepositoryConfigurationError as error:
         return jsonify({"error": str(error), "configured": False}), 503
     except Exception as error:
         app.logger.exception("Could not update concern")
+        return jsonify({"error": str(error)}), 502
+
+
+@app.patch("/api/concerns/<int:concern_id>/appointment")
+@login_required
+def respond_concern_appointment(concern_id: int):
+    payload = request.get_json(silent=True) or {}
+    decision = str(payload.get("appointment_status") or "").strip()
+    if decision not in {"Confirmed", "Reschedule Requested"}:
+        return jsonify({"error": "Choose Confirmed or Reschedule Requested"}), 400
+    try:
+        concern = supabase_repository.get_row("concerns", concern_id)
+        if not concern:
+            return jsonify({"error": "Concern not found"}), 404
+        updates: dict[str, object] = {
+            "appointment_status": decision,
+            "updated_at": manila_now().isoformat(),
+        }
+        if decision == "Reschedule Requested":
+            updates["reschedule_note"] = str(payload.get("reschedule_note") or "").strip() or "Resident requested a different schedule"
+        else:
+            updates["reschedule_note"] = None
+        return jsonify({"data": supabase_repository.update_row("concerns", concern_id, updates)})
+    except Exception as error:
+        app.logger.exception("Could not update concern appointment")
         return jsonify({"error": str(error)}), 502
 
 

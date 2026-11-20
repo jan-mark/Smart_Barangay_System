@@ -78,10 +78,21 @@ create table if not exists public.residents (
 );
 alter table public.residents add column if not exists email text;
 alter table public.residents add column if not exists phone text;
+alter table public.residents add column if not exists family_no text;
 alter table public.residents add column if not exists household_role text default 'Member';
+alter table public.residents add column if not exists date_of_birth date;
+alter table public.residents add column if not exists marital_status text;
+alter table public.residents add column if not exists years_living_in integer;
+alter table public.residents add column if not exists family_planning text;
+alter table public.residents add column if not exists educational_attainment text;
+alter table public.residents add column if not exists residence_type text;
 alter table public.residents add column if not exists is_head boolean default false;
 alter table public.residents add column if not exists is_pwd boolean default false;
+alter table public.residents add column if not exists is_senior boolean default false;
+alter table public.residents add column if not exists is_lgbt boolean default false;
 alter table public.residents add column if not exists is_solo_parent boolean default false;
+alter table public.residents add column if not exists is_pregnant boolean default false;
+alter table public.residents add column if not exists is_young_parent boolean default false;
 alter table public.residents add column if not exists is_4ps boolean default false;
 alter table public.residents add column if not exists sector text;
 

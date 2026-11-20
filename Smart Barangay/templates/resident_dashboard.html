@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -70,6 +70,10 @@
                         <div class="portal-card-heading"><h2>My Document Requests</h2><button class="text-button" type="button" data-view="resident-documents">View all</button></div>
                         <div id="my-documents" class="portal-list"></div>
                     </section>
+                    <section class="resident-portal-card">
+                        <div class="portal-card-heading"><h2>Concern Responses &amp; Appointment Notifications</h2><button class="text-button" type="button" data-view="resident-concerns">View my concerns</button></div>
+                        <div id="resident-concern-notifications" class="portal-list"></div>
+                    </section>
                     <section class="resident-portal-card updates-card">
                         <div class="portal-card-heading"><h2>Latest Announcements</h2><button class="text-button" type="button" data-view="resident-announcements">View all</button></div>
                         <div id="resident-announcements-preview" class="portal-list"></div>
@@ -96,7 +100,8 @@
                                 <label id="resident-req-birthdate-field" style="display: none;" hidden><span class="label-text">Date of birth</span><input name="date_of_birth" type="date"></label>
                                 <label id="resident-req-birthplace-field" style="display: none;" hidden><span class="label-text">Place of birth</span><input name="place_of_birth" placeholder="Municipality / Province"></label>
                                 <label id="resident-req-civilstatus-field" style="display: none;" hidden><span class="label-text">Civil status</span><select name="civil_status"><option value="">Choose civil status</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></label>
-                                <label id="resident-req-purpose-field" style="grid-column: span 2;"><span class="label-text">Purpose / Reason</span><input name="purpose" list="resident-purpose-suggestions" placeholder="Reason for the request" required><datalist id="resident-purpose-suggestions"></datalist></label>
+                                <label id="resident-req-purpose-field"><span class="label-text">Purpose / Reason</span><input name="purpose" list="resident-purpose-suggestions" placeholder="Reason for the request" required><datalist id="resident-purpose-suggestions"></datalist></label>
+                                <label id="resident-req-supporting-field"><span class="label-text">Supporting Document / Valid ID</span><select name="supporting_doc_type" required><option value="Valid Government ID">Valid Government ID</option><option value="Community Tax Certificate (Cedula)">Community Tax Certificate (Cedula)</option><option value="Barangay Purok Endorsement">Barangay Purok Endorsement</option><option value="DTI / Business Permit Copy">DTI / Business Permit Copy</option><option value="Social Welfare / Indigency Referral">Social Welfare / Indigency Referral</option></select></label>
                             </div>
                             <div class="business-request-fields" id="resident-business-fields" hidden>
                                 <p class="form-section-label">Business details</p>
@@ -216,6 +221,46 @@
         </div>
     </div>
 
+    <div class="modal" id="resident-receipt-modal" hidden>
+        <div class="modal-card" style="max-width: 500px; width: 95%;">
+            <div class="modal-heading">
+                <div><h2>Upload Payment Receipt</h2><p id="resident-receipt-subtitle">Submit your proof of payment for official verification.</p></div>
+                <button type="button" class="modal-close resident-receipt-close" aria-label="Close payment modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="resident-receipt-form">
+                <input type="hidden" name="document_id" id="receipt-doc-id">
+                <div id="receipt-instructions-summary" style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #1E3A8A; margin-bottom: 10px;"></div>
+                <label>Payment Method
+                    <select name="payment_method" id="receipt-method-input" required>
+                        <option value="GCash">GCash (0917-555-0199 — Brgy. Don Felipe Larrazabal)</option>
+                        <option value="Maya">Maya (0918-555-0199 — Brgy. Don Felipe Larrazabal)</option>
+                        <option value="Bank Transfer">Bank Transfer / LandBank</option>
+                        <option value="Over-the-Counter">Over-the-Counter (Barangay Treasurer's Office)</option>
+                    </select>
+                </label>
+                <label>Transaction / Receipt Reference Number
+                    <input type="text" name="receipt_ref_no" id="receipt-ref-input" required placeholder="Enter TXN-SB reference or GCash/Maya Ref No.">
+                </label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <label>Payment Amount (₱)
+                        <input type="number" name="receipt_amount" id="receipt-amount-input" min="1" step="0.01" required placeholder="50.00">
+                    </label>
+                    <label>Payment Date
+                        <input type="date" name="receipt_date" id="receipt-date-input" required>
+                    </label>
+                </div>
+                <label>Upload Receipt Image / Proof of Payment
+                    <input type="file" id="receipt-file-input" accept="image/png,image/jpeg,image/webp,application/pdf" required>
+                </label>
+                <small style="display: block; color: #64748B; font-size: 11.5px; margin-bottom: 10px;">Note: Uploaded receipts are automatically checked for reference number, amount, and date, then reviewed by an authorized barangay official before final approval.</small>
+                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                    <button class="outline-button resident-receipt-close" type="button">Cancel</button>
+                    <button class="primary-button" type="submit" id="receipt-submit-btn">Submit Receipt for Verification</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="toast" role="status" aria-live="polite"></div>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="{{ url_for('static', filename='live-clock.js') }}"></script>
@@ -290,22 +335,126 @@
             if (documentRequestForm) documentRequestForm.full_name.value = user.full_name || '';
         };
 
+        let latestResidentDocuments = [];
+        const residentReceiptModal = document.querySelector('#resident-receipt-modal');
+        const residentReceiptForm = document.querySelector('#resident-receipt-form');
+
         const renderLists = (documents, concerns, announcements) => {
+            latestResidentDocuments = documents;
             document.querySelector('#home-doc-count').textContent = documents.length;
             document.querySelector('#home-approved-count').textContent = documents.filter((item) => item.status === 'Approved').length;
             document.querySelector('#home-pending-count').textContent = documents.filter((item) => ['Pending', 'Processing', 'In Progress'].includes(item.status)).length;
             document.querySelector('#home-concern-count').textContent = concerns.length;
 
             const documentsHtml = documents.length
-                ? documents.map((item) => `<div class="portal-row"><strong>${escapeHtml(item.document_type)}</strong><span class="status ${String(item.status || '').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status || 'Pending')}</span><small>${escapeHtml(item.request_id || '')} Â· Requested ${escapeHtml(smartBarangayTime.formatDate(item.date_requested))}${item.scheduled_date ? ` Â· Pickup ${escapeHtml(smartBarangayTime.formatDate(item.scheduled_date))}` : ''}</small></div>`).join('')
+                ? documents.map((item) => {
+                    const isReady = ['Approved', 'Resolved'].includes(item.status);
+                    const isRejected = item.status === 'Rejected';
+                    const needsInfo = item.verification_status === 'Needs Info';
+                    const payStatus = item.payment_status || (isReady ? 'Verified' : '');
+                    const defaultAmt = item.amount_due ?? (String(item.document_type || '').toLowerCase().includes('business') ? 150 : 50);
+                    const statusLabel = isReady
+                        ? '✓ Payment Verified & Approved'
+                        : (isRejected
+                            ? 'Rejected'
+                            : (payStatus === 'Pending Verification' && item.receipt_submitted_at
+                                ? '🧾 Payment: Pending Verification'
+                                : (payStatus === 'Rejected'
+                                    ? '✕ Receipt Rejected — Re-upload'
+                                    : (payStatus === 'Awaiting Payment'
+                                        ? '✉ Awaiting Payment Receipt'
+                                        : (needsInfo ? '⚠ Needs Additional Info' : 'Pending Verification')))));
+                    const statusClass = isReady ? 'approved' : (isRejected || payStatus === 'Rejected' ? 'rejected' : 'pending');
+                    const remarksHtml = item.verification_remarks
+                        ? `<div style="margin-top: 6px; padding: 6px 10px; background: #FFFBEB; border-left: 3px solid #D97706; border-radius: 4px; font-size: 12px; color: #92400E;"><strong>Official Verification Remarks:</strong> ${escapeHtml(item.verification_remarks)}</div>`
+                        : '';
+
+                    let paymentBoxHtml = '';
+                    if (item.tx_ref || payStatus) {
+                        const latestEmail = Array.isArray(item.email_logs) && item.email_logs.length > 0 ? item.email_logs[0] : null;
+                        paymentBoxHtml = `
+                            <div style="margin-top: 8px; padding: 10px 12px; background: ${isReady ? '#ECFDF5' : '#EFF6FF'}; border: 1px solid ${isReady ? '#A7F3D0' : '#BFDBFE'}; border-radius: 8px; font-size: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <div>
+                                        <strong style="color: ${isReady ? '#065F46' : '#1E3A8A'};">Payment Ref: <span style="font-family: monospace;">${escapeHtml(item.tx_ref || 'TXN-SB-2026')}</span> · Required Fee: ₱${Number(defaultAmt).toFixed(2)}</strong>
+                                        ${latestEmail ? `<small style="display:block;color:#475569;margin-top:2px;">✉ Gmail Notification (${escapeHtml(latestEmail.to)}): <b>${escapeHtml(latestEmail.subject)}</b></small>` : ''}
+                                        ${item.receipt_submitted_at ? `<small style="display:block;color:#0F172A;margin-top:2px;">🧾 Submitted Receipt: <b>${escapeHtml(item.payment_method || 'Paid')}</b> · Ref <code>${escapeHtml(item.receipt_ref_no || '')}</code> · ₱${Number(item.receipt_amount || 0).toFixed(2)} on ${escapeHtml(item.receipt_date || '')}</small>` : `<small style="display:block;color:#1E40AF;margin-top:2px;">Payment Methods: GCash (0917-555-0199), Maya (0918-555-0199), or Barangay Treasurer's Office</small>`}
+                                    </div>
+                                    <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #fff; color: ${isReady ? '#059669' : (payStatus === 'Rejected' ? '#DC2626' : '#1D4ED8')}; border: 1px solid currentColor;">${escapeHtml(payStatus || (isReady ? 'Verified' : 'Awaiting Payment'))}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const canUploadReceipt = !isReady && !isRejected && (item.tx_ref || payStatus === 'Awaiting Payment' || payStatus === 'Rejected' || payStatus === 'Pending Verification');
+                    const actionButtonsHtml = `
+                        ${canUploadReceipt ? `<button class="primary-button open-receipt-upload-btn" data-id="${escapeHtml(item.id)}" type="button" style="padding: 6px 12px; font-size: 12px; background: #1D4ED8;">${item.receipt_submitted_at ? 'Update Receipt' : 'Upload Payment Receipt'}</button>` : ''}
+                        ${isReady ? `<button class="primary-button resident-download-pdf" data-id="${escapeHtml(item.id)}" type="button" style="padding: 6px 12px; font-size: 12px;">Download PDF</button>` : ''}
+                    `;
+
+                    return `<div class="portal-row"><div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;"><div><strong>${escapeHtml(item.document_type)}</strong><small style="display: block; margin-top: 2px;">Requested ${escapeHtml(smartBarangayTime.formatDate(item.date_requested))} · ${isReady ? 'Payment verified & ready for digital download' : (needsInfo ? 'Action required — see official remarks below' : (item.receipt_submitted_at ? 'Receipt uploaded — awaiting official verification' : 'Under automated & official verification'))}</small></div><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="status ${statusClass}">${escapeHtml(statusLabel)}</span>${actionButtonsHtml}</div></div>${paymentBoxHtml}${remarksHtml}</div>`;
+                }).join('')
                 : '<div class="empty-state">No document requests yet.</div>';
             document.querySelector('#my-documents').innerHTML = documents.slice(0, 4).length ? documentsHtml : '<div class="empty-state">No document requests yet.</div>';
             document.querySelector('#documents-list').innerHTML = documentsHtml;
 
             const concernsHtml = concerns.length
-                ? concerns.map((item) => `<div class="portal-row"><strong>${escapeHtml(item.title)}</strong><span class="status ${String(item.status || '').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status || 'Open')}</span><small>${escapeHtml(item.concern_id || '')} Â· ${escapeHtml(smartBarangayTime.formatDate(item.submitted_at))}</small>${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}</div>`).join('')
+                ? concerns.map((item) => {
+                    const apptStatus = item.appointment_status || 'Proposed';
+                    const apptColor = apptStatus === 'Confirmed' ? '#059669' : (apptStatus === 'Reschedule Requested' ? '#D97706' : '#1D4ED8');
+                    const assignedHtml = item.assigned_to
+                        ? `<div style="margin-top: 6px; font-size: 12px; color: #334155;"><strong>Assigned Personnel:</strong> ${escapeHtml(item.assigned_to)}</div>`
+                        : '';
+                    const feedbackHtml = item.official_feedback
+                        ? `<div style="margin-top: 8px; padding: 10px 12px; background: #F8FAFC; border-left: 3px solid #0B2545; border-radius: 6px; font-size: 12.5px;">
+                            <strong style="color: #0B2545; display: block;">Official Feedback${item.feedback_by ? ` (${escapeHtml(item.feedback_by)})` : ''}:</strong>
+                            <span style="color: #334155;">${escapeHtml(item.official_feedback)}</span>
+                           </div>`
+                        : '';
+                    const apptHtml = item.appointment_date
+                        ? `<div style="margin-top: 8px; padding: 10px 12px; background: #EFF6FF; border-left: 3px solid ${apptColor}; border-radius: 6px; font-size: 12.5px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                                <div>
+                                    <strong style="color: #1E3A8A; display: block;">Scheduled Appointment: ${escapeHtml(smartBarangayTime.formatDate(item.appointment_date))}${item.appointment_time ? ` at ${escapeHtml(item.appointment_time)}` : ''}</strong>
+                                    ${item.appointment_notes ? `<small style="color: #475569; display: block;">Location/Note: ${escapeHtml(item.appointment_notes)}</small>` : ''}
+                                    ${item.reschedule_note ? `<small style="color: #B45309; display: block; font-weight: 600;">Your Reschedule Note: ${escapeHtml(item.reschedule_note)}</small>` : ''}
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                    <span style="padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fff; color: ${apptColor}; border: 1px solid ${apptColor};">${escapeHtml(apptStatus)}</span>
+                                    ${apptStatus !== 'Confirmed' ? `<button class="primary-button resident-appt-btn" data-id="${escapeHtml(item.id)}" data-decision="Confirmed" type="button" style="padding: 4px 10px; font-size: 11px; background: #059669;">✓ Confirm Schedule</button>` : ''}
+                                    <button class="outline-button resident-appt-btn" data-id="${escapeHtml(item.id)}" data-decision="Reschedule Requested" type="button" style="padding: 4px 10px; font-size: 11px;">Request Reschedule</button>
+                                </div>
+                            </div>
+                           </div>`
+                        : '';
+                    const resolutionHtml = item.resolution_remarks
+                        ? `<div style="margin-top: 8px; padding: 10px 12px; background: #ECFDF5; border-left: 3px solid #10B981; border-radius: 6px; font-size: 12.5px;">
+                            <strong style="color: #065F46; display: block;">Resolution Remarks (Action Taken):</strong>
+                            <span style="color: #047857;">${escapeHtml(item.resolution_remarks)}</span>
+                           </div>`
+                        : '';
+                    return `<div class="portal-row"><div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;"><strong>${escapeHtml(item.title)}</strong><span class="status ${String(item.status || '').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status || 'Open')}</span></div><small>${escapeHtml(item.category || 'General')} · Submitted ${escapeHtml(smartBarangayTime.formatDate(item.submitted_at))}</small>${item.description ? `<p style="margin-top: 4px;">${escapeHtml(item.description)}</p>` : ''}${assignedHtml}${feedbackHtml}${apptHtml}${resolutionHtml}</div>`;
+                }).join('')
                 : '<div class="empty-state">No concern reports yet.</div>';
             document.querySelector('#concerns-list').innerHTML = concernsHtml;
+
+            const concernNotifications = concerns.filter((c) => c.official_feedback || c.appointment_date || c.resolution_remarks || c.assigned_to);
+            const notifEl = document.querySelector('#resident-concern-notifications');
+            if (notifEl) {
+                notifEl.innerHTML = concernNotifications.length
+                    ? concernNotifications.map((c) => `
+                        <div class="portal-row" style="cursor: pointer;" onclick="document.querySelector('[data-view=\\'resident-concerns\\']').click()">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong>${escapeHtml(c.title)}</strong>
+                                <span class="status ${String(c.status || 'Open').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(c.status || 'Open')}</span>
+                            </div>
+                            ${c.official_feedback ? `<small style="display: block; color: #0B2545; margin-top: 4px;">💬 <b>Official Reply:</b> ${escapeHtml(c.official_feedback)}</small>` : ''}
+                            ${c.appointment_date ? `<small style="display: block; color: #1D4ED8; margin-top: 4px;">📅 <b>Appointment:</b> ${escapeHtml(smartBarangayTime.formatDate(c.appointment_date))}${c.appointment_time ? ` at ${escapeHtml(c.appointment_time)}` : ''} (${escapeHtml(c.appointment_status || 'Proposed')})</small>` : ''}
+                            ${c.resolution_remarks ? `<small style="display: block; color: #059669; margin-top: 4px;">✅ <b>Resolution:</b> ${escapeHtml(c.resolution_remarks)}</small>` : ''}
+                        </div>
+                    `).join('')
+                    : '<div class="empty-state">No new official responses or appointment notifications yet.</div>';
+            }
 
             const activeAnnouncements = announcements.filter((item) => item.status !== 'Expired');
             const renderAnnouncement = (item) => `<article class="resident-announcement"><span class="tag">${escapeHtml(item.category || 'General')}</span><span class="status approved">${escapeHtml(item.status || 'Active')}</span><h3>${escapeHtml(item.title || 'Announcement')}</h3><p>${escapeHtml(item.summary || item.description || '')}</p><small>${escapeHtml(smartBarangayTime.formatDateTime(item.created_at || item.date || item.published_at))}</small></article>`;
@@ -315,6 +464,137 @@
             document.querySelector('#resident-announcements-preview').innerHTML = activeAnnouncements.length ? activeAnnouncements.slice(0, 3).map(renderAnnouncement).join('') : announcementsHtml;
             document.querySelector('#announcements-list').innerHTML = announcementsHtml;
         };
+
+        document.querySelectorAll('.resident-receipt-close').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (residentReceiptModal) residentReceiptModal.hidden = true;
+            });
+        });
+
+        if (residentReceiptForm) {
+            residentReceiptForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const docId = document.querySelector('#receipt-doc-id').value;
+                const paymentMethod = document.querySelector('#receipt-method-input').value;
+                const receiptRefNo = document.querySelector('#receipt-ref-input').value.trim();
+                const receiptAmount = document.querySelector('#receipt-amount-input').value.trim();
+                const receiptDate = document.querySelector('#receipt-date-input').value;
+                const fileInput = document.querySelector('#receipt-file-input');
+                const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+
+                let fileDataUrl = '';
+                let fileName = '';
+                if (file) {
+                    fileName = file.name;
+                    fileDataUrl = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(String(reader.result || ''));
+                        reader.onerror = () => resolve('');
+                        reader.readAsDataURL(file);
+                    });
+                }
+
+                const submitBtn = document.querySelector('#receipt-submit-btn');
+                try {
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Uploading & Validating...';
+                    }
+                    const resp = await fetch(`/api/documents/${encodeURIComponent(docId)}/receipt`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            payment_method: paymentMethod,
+                            receipt_ref_no: receiptRefNo,
+                            receipt_amount: Number(receiptAmount),
+                            receipt_date: receiptDate,
+                            receipt_filename: fileName,
+                            receipt_file_url: fileDataUrl
+                        })
+                    });
+                    const res = await resp.json();
+                    if (!resp.ok) throw new Error(res.error || 'Could not upload payment receipt');
+                    if (residentReceiptModal) residentReceiptModal.hidden = true;
+                    residentReceiptForm.reset();
+                    showToast('Payment receipt uploaded! Barangay officials have been notified for verification.');
+                    await loadData();
+                } catch (err) {
+                    showToast(err.message || 'Could not upload payment receipt');
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Submit Receipt for Verification';
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('click', async (event) => {
+            const receiptBtn = event.target.closest('.open-receipt-upload-btn');
+            if (receiptBtn) {
+                const docId = receiptBtn.dataset.id;
+                const docItem = latestResidentDocuments.find((d) => String(d.id) === String(docId)) || {};
+                const reqAmt = docItem.amount_due ?? (String(docItem.document_type || '').toLowerCase().includes('business') ? 150 : 50);
+                document.querySelector('#receipt-doc-id').value = docId;
+                document.querySelector('#receipt-ref-input').value = docItem.receipt_ref_no || docItem.tx_ref || '';
+                document.querySelector('#receipt-amount-input').value = Number(docItem.receipt_amount || reqAmt).toFixed(2);
+                document.querySelector('#receipt-date-input').value = docItem.receipt_date || new Date().toISOString().slice(0, 10);
+                const summaryBox = document.querySelector('#receipt-instructions-summary');
+                if (summaryBox) {
+                    summaryBox.innerHTML = `
+                        <strong>Document:</strong> ${escapeHtml(docItem.document_type || 'Certificate')}<br>
+                        <strong>Transaction Reference:</strong> <code>${escapeHtml(docItem.tx_ref || 'TXN-SB-2026')}</code><br>
+                        <strong>Required Amount:</strong> ₱${Number(reqAmt).toFixed(2)}
+                    `;
+                }
+                if (residentReceiptModal) residentReceiptModal.hidden = false;
+                return;
+            }
+            const apptBtn = event.target.closest('.resident-appt-btn');
+            if (apptBtn) {
+                const concernId = apptBtn.dataset.id;
+                const decision = apptBtn.dataset.decision;
+                let rescheduleNote = '';
+                if (decision === 'Reschedule Requested') {
+                    const input = prompt('Please enter your preferred date/time or reason for rescheduling:');
+                    if (input === null) return;
+                    rescheduleNote = input.trim() || 'Requested another appointment schedule';
+                }
+                try {
+                    const resp = await fetch(`/api/concerns/${encodeURIComponent(concernId)}/appointment`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ appointment_status: decision, reschedule_note: rescheduleNote })
+                    });
+                    const res = await resp.json();
+                    if (!resp.ok) throw new Error(res.error || 'Could not update appointment');
+                    showToast(decision === 'Confirmed' ? 'Appointment schedule confirmed!' : 'Reschedule request sent to barangay officials');
+                    await loadData();
+                } catch (err) {
+                    showToast(err.message || 'Could not update appointment');
+                }
+                return;
+            }
+            const button = event.target.closest('.resident-download-pdf');
+            if (!button || button.disabled) return;
+            try {
+                const response = await fetch(`/api/documents/${encodeURIComponent(button.dataset.id)}/certificate.pdf`);
+                if (!response.ok) {
+                    const result = await response.json();
+                    throw new Error(result.error || 'Certificate could not be generated');
+                }
+                const blob = await response.blob();
+                const downloadUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = `smartbarangay-certificate-${button.dataset.id}.pdf`;
+                link.click();
+                URL.revokeObjectURL(downloadUrl);
+                showToast('Certificate PDF downloaded!');
+            } catch (error) {
+                showToast(error.message || 'Could not download certificate');
+            }
+        });
 
         const loadData = async () => {
             let responses;
@@ -335,7 +615,8 @@
             const announcements = responses[2].ok ? (await responses[2].json()).data || [] : [];
             renderLists(documents, concerns, announcements);
             const active = announcements.filter((item) => item.status !== 'Expired');
-            document.querySelector('#resident-notification-count').textContent = active.length;
+            const concernUpdatesCount = concerns.filter((c) => c.official_feedback || c.appointment_date || c.resolution_remarks).length;
+            document.querySelector('#resident-notification-count').textContent = active.length + concernUpdatesCount;
         };
 
         const openModal = (type) => {
@@ -450,6 +731,7 @@
                         place_of_birth: form.get('place_of_birth'),
                         civil_status: form.get('civil_status'),
                         purpose: form.get('purpose'),
+                        supporting_doc_type: form.get('supporting_doc_type'),
                         business_name: form.get('business_name'),
                         business_address: form.get('business_address'),
                     })

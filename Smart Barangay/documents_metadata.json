@@ -1,0 +1,59 @@
+{
+  "2": {
+    "amount_paid": 100.0
+  },
+  "6": {
+    "tx_ref": "TXN-SB-2026-0006",
+    "amount_due": 0.0,
+    "resident_email": "johnmarktangil@gmail.com",
+    "payment_status": "Awaiting Payment",
+    "email_logs": [
+      {
+        "from": "johnmark.manidlangan@evsu.edu.ph",
+        "to": "johnmarktangil@gmail.com",
+        "resident_name": "Juan dela Cruz",
+        "subject": "[SmartBarangay] Payment Instructions for Juan dela Cruz \u2014 Certificate of Indigency (TXN-SB-2026-0006)",
+        "body": "Dear Juan dela Cruz,\n\nYour document request for Certificate of Indigency has passed initial verification by HON. NENITO S. ANONAT.\n\nPAYMENT DETAILS & INSTRUCTIONS:\n\u2022 Applicant / Resident Name: Juan dela Cruz\n\u2022 Transaction Reference No.: TXN-SB-2026-0006\n\u2022 Document Requested: Certificate of Indigency\n\u2022 Required Fee Amount: PHP 0.00\n\u2022 Accepted Payment Methods:\n   1. GCash: 0917-123-4567 (Brgy. Don Felipe Larrazabal Treasury)\n   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n   3. Over-the-Counter: Barangay Hall Treasurer's Office\n\nNEXT STEP:\nOnce payment is completed, please log in to your SmartBarangay Resident Portal and upload your payment receipt / proof of payment referencing TXN-SB-2026-0006.\n\nThank you,\nOffice of the Punong Barangay \u2014 Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
+        "sent_at": "2026-11-18T21:37:20.189461+08:00",
+        "delivery": "Sent from johnmark.manidlangan@evsu.edu.ph to johnmarktangil@gmail.com",
+        "smtp_delivered": true,
+        "smtp_configured": true,
+        "smtp_error": null
+      },
+      {
+        "from": "johnmark.manidlangan@evsu.edu.ph",
+        "to": "johnmarktangil@gmail.com",
+        "resident_name": "Juan dela Cruz",
+        "subject": "[SmartBarangay] Payment Instructions for Juan dela Cruz \u2014 Certificate of Indigency (TXN-SB-2026-0006)",
+        "body": "Dear Juan dela Cruz,\n\nYour document request for Certificate of Indigency has passed initial verification by HON. NENITO S. ANONAT.\n\nPAYMENT DETAILS & INSTRUCTIONS:\n\u2022 Applicant / Resident Name: Juan dela Cruz\n\u2022 Transaction Reference No.: TXN-SB-2026-0006\n\u2022 Document Requested: Certificate of Indigency\n\u2022 Required Fee Amount: PHP 0.00\n\u2022 Accepted Payment Methods:\n   1. GCash: 0917-123-4567 (Brgy. Don Felipe Larrazabal Treasury)\n   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n   3. Over-the-Counter: Barangay Hall Treasurer's Office\n\nNEXT STEP:\nOnce payment is completed, please log in to your SmartBarangay Resident Portal and upload your payment receipt / proof of payment referencing TXN-SB-2026-0006.\n\nThank you,\nOffice of the Punong Barangay \u2014 Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
+        "sent_at": "2026-11-18T21:20:32.815398+08:00",
+        "delivery": "Sent from johnmark.manidlangan@evsu.edu.ph to johnmarktangil@gmail.com",
+        "smtp_delivered": true,
+        "smtp_configured": true,
+        "smtp_error": null
+      }
+    ],
+    "transaction_history": [
+      {
+        "timestamp": "2026-11-18T21:37:20.189568+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Payment Instructions Sent via Gmail",
+        "details": "Sent payment instructions for Juan dela Cruz (\u20b10.00, Ref: TXN-SB-2026-0006) to johnmarktangil@gmail.com"
+      },
+      {
+        "timestamp": "2026-11-18T21:20:32.815523+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Payment Instructions Sent via Gmail",
+        "details": "Sent payment instructions for Juan dela Cruz (\u20b10.00, Ref: TXN-SB-2026-0006) to johnmarktangil@gmail.com"
+      }
+    ],
+    "verification_status": "Verified",
+    "checklist_summary": "4/4 Verified",
+    "verified_by": "HON. NENITO S. ANONAT",
+    "verified_at": "2026-11-18T21:37:20.189585+08:00",
+    "action_performed": "Checklist Verified & Payment Email Sent",
+    "manual_checks": [
+      "completeness"
+    ]
+  }
+}
