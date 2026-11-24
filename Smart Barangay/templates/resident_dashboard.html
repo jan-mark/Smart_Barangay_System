@@ -97,6 +97,7 @@
                                 <label id="resident-req-name-field"><span class="label-text">Full legal name</span><input name="full_name" required autocomplete="name"></label>
                                 <label id="resident-req-address-field"><span class="label-text">Complete address</span><input name="address" required autocomplete="street-address" placeholder="House/Lot, Purok, Barangay, City"></label>
                                 <label id="resident-req-contact-field"><span class="label-text">Contact number</span><input name="contact_number" required autocomplete="tel" placeholder="e.g. 09171234567"></label>
+                                <label id="resident-req-email-field"><span class="label-text">Email address</span><input name="resident_email" type="email" required autocomplete="email" placeholder="e.g. yourname@gmail.com"></label>
                                 <label id="resident-req-birthdate-field" style="display: none;" hidden><span class="label-text">Date of birth</span><input name="date_of_birth" type="date"></label>
                                 <label id="resident-req-birthplace-field" style="display: none;" hidden><span class="label-text">Place of birth</span><input name="place_of_birth" placeholder="Municipality / Province"></label>
                                 <label id="resident-req-civilstatus-field" style="display: none;" hidden><span class="label-text">Civil status</span><select name="civil_status"><option value="">Choose civil status</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Divorced</option></select></label>
@@ -332,7 +333,12 @@
                 residentProfileForm.position.value = user.position || '';
                 residentProfileForm.phone.value = user.phone || '';
             }
-            if (documentRequestForm) documentRequestForm.full_name.value = user.full_name || '';
+            if (documentRequestForm) {
+                documentRequestForm.full_name.value = user.full_name || '';
+                if (documentRequestForm.resident_email && !documentRequestForm.resident_email.value) {
+                    documentRequestForm.resident_email.value = user.email || '';
+                }
+            }
         };
 
         let latestResidentDocuments = [];
@@ -727,6 +733,7 @@
                         full_name: form.get('full_name'),
                         address: form.get('address'),
                         contact_number: form.get('contact_number'),
+                        resident_email: form.get('resident_email'),
                         date_of_birth: form.get('date_of_birth'),
                         place_of_birth: form.get('place_of_birth'),
                         civil_status: form.get('civil_status'),

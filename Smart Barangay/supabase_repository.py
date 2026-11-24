@@ -1,11 +1,13 @@
 import json
 import os
+import threading
 from collections import Counter
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
+from offline_sync_store import OfflineSyncStore
 from time_utils import manila_month_key, manila_today
 
 env_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -47,58 +49,59 @@ class SupabaseRepository:
             self.client = create_client(self.url, self.key)
 
         self.using_service_role = self._is_server_key(self.key)
-        self._init_demo_data()
+        self.offline_store = OfflineSyncStore()
+        self._is_online: bool = True
+        self._sync_in_progress: bool = False
+        self._sync_lock = threading.Lock()
+        self._init_local_storage()
 
-    def _init_demo_data(self) -> None:
-        self._demo_users: dict[str, Any] = {}
-        self._demo_residents = [
-            {"id": 1, "resident_id": "RES-001", "full_name": "Maria Santos", "address": "Purok 3, Blk 4 Lot 2", "household": "HH-0042", "family_no": "FAM-001", "household_role": "Head", "is_head": True, "age": 34, "date_of_birth": "1992-05-14", "gender": "Female", "marital_status": "Separated", "family_planning": "Pills", "educational_attainment": "Tertiary", "residence_type": "Concrete", "phone": "09171234567", "is_pwd": False, "is_senior": False, "is_lgbt": False, "is_solo_parent": True, "is_pregnant": False, "is_young_parent": False, "is_4ps": False, "sector": "Leader, Solo Parent, Adult", "status": "Verified", "resident_since": "2018-03-12", "created_at": "2018-03-12T08:00:00Z"},
-            {"id": 2, "resident_id": "RES-002", "full_name": "Juan dela Cruz", "address": "Purok 1, Blk 2 Lot 8", "household": "HH-0015", "family_no": "FAM-002", "household_role": "Head", "is_head": True, "age": 52, "date_of_birth": "1974-08-20", "gender": "Male", "marital_status": "Married", "family_planning": "Natural", "educational_attainment": "Secondary", "residence_type": "Semi-Concrete", "phone": "09172345678", "is_pwd": False, "is_senior": False, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": True, "sector": "Leader, 4Ps, Adult", "status": "Verified", "resident_since": "2010-07-22", "created_at": "2010-07-22T08:00:00Z"},
-            {"id": 3, "resident_id": "RES-003", "full_name": "Ana Reyes", "address": "Purok 5, Blk 7 Lot 1", "household": "HH-0078", "family_no": "FAM-003", "household_role": "Head", "is_head": True, "age": 27, "date_of_birth": "1999-11-03", "gender": "Female", "marital_status": "Live-in", "years_living_in": 4, "family_planning": "Implant", "educational_attainment": "Vocational/ALS", "residence_type": "Light Materials", "phone": "09173456789", "is_pwd": True, "is_senior": False, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": False, "sector": "Leader, PWD, Adult", "status": "Pending", "resident_since": "2024-01-05", "created_at": "2024-01-05T08:00:00Z"},
-            {"id": 4, "resident_id": "RES-004", "full_name": "Carlos Mendoza", "address": "Purok 2, Blk 3 Lot 5", "household": "HH-0031", "family_no": "FAM-004", "household_role": "Head", "is_head": True, "age": 45, "date_of_birth": "1981-02-17", "gender": "Male", "marital_status": "Married", "family_planning": "Condom", "educational_attainment": "Tertiary", "residence_type": "Concrete", "phone": "09174567890", "is_pwd": False, "is_senior": False, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": False, "sector": "Leader, Adult", "status": "Verified", "resident_since": "2015-11-18", "created_at": "2015-11-18T08:00:00Z"},
-            {"id": 5, "resident_id": "RES-005", "full_name": "Liza Torres", "address": "Purok 4, Blk 6 Lot 3", "household": "HH-0063", "family_no": "FAM-005", "household_role": "Head", "is_head": True, "age": 65, "date_of_birth": "1961-04-30", "gender": "Female", "marital_status": "Widow/Widower", "family_planning": "None", "educational_attainment": "Elementary", "residence_type": "Semi-Concrete", "phone": "09175678901", "is_pwd": False, "is_senior": True, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": False, "sector": "Leader, Senior Citizen", "status": "Verified", "resident_since": "2005-04-30", "created_at": "2005-04-30T08:00:00Z"},
-            {"id": 6, "resident_id": "RES-006", "full_name": "Pedro Villanueva", "address": "Purok 1, Blk 1 Lot 12", "household": "HH-0008", "family_no": "FAM-006", "household_role": "Head", "is_head": True, "age": 38, "date_of_birth": "1988-09-14", "gender": "Male", "marital_status": "Married", "family_planning": "Natural", "educational_attainment": "Secondary", "residence_type": "Concrete", "phone": "09176789012", "is_pwd": False, "is_senior": False, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": False, "sector": "Leader, Adult", "status": "Verified", "resident_since": "2019-09-14", "created_at": "2019-09-14T08:00:00Z"},
-            {"id": 7, "resident_id": "RES-007", "full_name": "Rosa Bautista", "address": "Purok 6, Blk 9 Lot 4", "household": "HH-0091", "family_no": "FAM-007", "household_role": "Head", "is_head": True, "age": 19, "date_of_birth": "2007-06-01", "gender": "Female", "marital_status": "Live-in", "years_living_in": 2, "family_planning": "Injectable", "educational_attainment": "Senior High", "residence_type": "Light Materials", "phone": "09177890123", "is_pwd": False, "is_senior": False, "is_lgbt": False, "is_solo_parent": True, "is_pregnant": False, "is_young_parent": True, "is_4ps": True, "sector": "Leader, Solo Parent, Young Parent, 4Ps, Adult", "status": "Pending", "resident_since": "2025-06-01", "created_at": "2025-06-01T08:00:00Z"},
-            {"id": 8, "resident_id": "RES-008", "full_name": "Joshua Santos", "address": "Purok 3, Blk 4 Lot 2", "household": "HH-0042", "family_no": "FAM-001", "household_role": "Son", "is_head": False, "age": 9, "date_of_birth": "2017-03-10", "gender": "Male", "marital_status": "Single", "family_planning": "None", "educational_attainment": "Elementary", "residence_type": "Concrete", "phone": "", "is_pwd": False, "is_senior": False, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": False, "sector": "Minor", "status": "Verified", "resident_since": "2018-03-12", "created_at": "2018-03-12T08:00:00Z"},
-            {"id": 9, "resident_id": "RES-009", "full_name": "Clara Santos", "address": "Purok 3, Blk 4 Lot 2", "household": "HH-0042", "family_no": "FAM-001", "household_role": "Grandparent", "is_head": False, "age": 68, "date_of_birth": "1958-01-22", "gender": "Female", "marital_status": "Widow/Widower", "family_planning": "None", "educational_attainment": "Elementary", "residence_type": "Concrete", "phone": "", "is_pwd": False, "is_senior": True, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": False, "sector": "Senior Citizen", "status": "Verified", "resident_since": "2018-03-12", "created_at": "2018-03-12T08:00:00Z"},
-            {"id": 10, "resident_id": "RES-010", "full_name": "Elena dela Cruz", "address": "Purok 1, Blk 2 Lot 8", "household": "HH-0015", "family_no": "FAM-002", "household_role": "Wife", "is_head": False, "age": 49, "date_of_birth": "1977-07-12", "gender": "Female", "marital_status": "Married", "family_planning": "BTL", "educational_attainment": "Secondary", "residence_type": "Semi-Concrete", "phone": "09178901234", "is_pwd": True, "is_senior": False, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": True, "sector": "PWD, 4Ps, Adult", "status": "Verified", "resident_since": "2010-07-22", "created_at": "2010-07-22T08:00:00Z"},
-            {"id": 11, "resident_id": "RES-011", "full_name": "Miguel dela Cruz", "address": "Purok 1, Blk 2 Lot 8", "household": "HH-0015", "family_no": "FAM-002", "household_role": "Son", "is_head": False, "age": 14, "date_of_birth": "2012-10-05", "gender": "Male", "marital_status": "Single", "family_planning": "None", "educational_attainment": "Secondary", "residence_type": "Semi-Concrete", "phone": "", "is_pwd": False, "is_senior": False, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": True, "sector": "4Ps, Minor", "status": "Verified", "resident_since": "2010-07-22", "created_at": "2010-07-22T08:00:00Z"},
-            {"id": 12, "resident_id": "RES-012", "full_name": "Baby Bea Bautista", "address": "Purok 6, Blk 9 Lot 4", "household": "HH-0091", "family_no": "FAM-007", "household_role": "Daughter", "is_head": False, "age": 2, "date_of_birth": "2024-04-18", "gender": "Female", "marital_status": "Single", "family_planning": "None", "educational_attainment": "Pre-school", "residence_type": "Light Materials", "phone": "", "is_pwd": False, "is_senior": False, "is_lgbt": False, "is_solo_parent": False, "is_pregnant": False, "is_young_parent": False, "is_4ps": True, "sector": "4Ps, Minor", "status": "Verified", "resident_since": "2025-06-01", "created_at": "2025-06-01T08:00:00Z"},
-        ]
-        self._demo_officials = [
-            {"id": "off-001", "email": "health@brgy.gov.ph", "full_name": "Dr. Maria Santos", "department": "Health & Sanitation", "position": "Health Officer", "phone": "0917-111-2222", "created_at": "2024-01-01T00:00:00Z"},
-            {"id": "off-002", "email": "peace@brgy.gov.ph", "full_name": "Officer Ramon Cruz", "department": "Peace & Order", "position": "Chief Tanod", "phone": "0917-222-3333", "created_at": "2024-01-01T00:00:00Z"},
-            {"id": "off-003", "email": "infra@brgy.gov.ph", "full_name": "Engr. Roberto Diaz", "department": "Infrastructure", "position": "Public Works Officer", "phone": "0917-333-4444", "created_at": "2024-01-01T00:00:00Z"},
-            {"id": "off-004", "email": "social@brgy.gov.ph", "full_name": "Elena Morales", "department": "Social Services", "position": "Welfare Officer", "phone": "0917-444-5555", "created_at": "2024-01-01T00:00:00Z"},
-            {"id": "off-005", "email": "drrmc@brgy.gov.ph", "full_name": "Gabriel Navarro", "department": "DRRMC", "position": "Disaster Coordinator", "phone": "0917-555-6666", "created_at": "2024-01-01T00:00:00Z"},
-        ]
-        self._demo_data = {
-            "documents": [
-                {"id": 1, "request_id": "DOC-0001", "resident_name": "Maria Santos", "document_type": "Barangay Clearance", "date_requested": "2026-09-04", "status": "Approved", "processor": "Admin Flores", "purpose": "Employment", "applicant_address": "Purok 3, Blk 4 Lot 2", "applicant_contact": "09171234567", "created_at": "2026-09-04T08:00:00Z"},
-                {"id": 2, "request_id": "DOC-0002", "resident_name": "Pedro Villanueva", "document_type": "Certificate of Indigency", "date_requested": "2026-09-05", "status": "Processing", "processor": "Admin Flores", "purpose": "Financial Assistance", "applicant_address": "Purok 1, Blk 1 Lot 12", "applicant_contact": "09172345678", "created_at": "2026-09-05T08:00:00Z"},
-                {"id": 3, "request_id": "DOC-0003", "resident_name": "Ana Reyes", "document_type": "Certificate of Residency", "date_requested": "2026-09-05", "status": "Pending", "processor": None, "purpose": "Bank Account", "applicant_address": "Purok 5, Blk 7 Lot 1", "applicant_contact": "09173456789", "created_at": "2026-09-05T09:00:00Z"},
-                {"id": 4, "request_id": "DOC-0004", "resident_name": "Carlos Mendoza", "document_type": "Business Clearance", "date_requested": "2026-09-06", "status": "Approved", "processor": "Admin Cruz", "purpose": "Sari-sari Store Permit", "applicant_address": "Purok 2, Blk 3 Lot 5", "business_name": "Mendoza Store", "applicant_contact": "09174567890", "created_at": "2026-09-06T08:00:00Z"},
-                {"id": 5, "request_id": "DOC-0005", "resident_name": "Liza Torres", "document_type": "Barangay Clearance", "date_requested": "2026-09-07", "status": "Rejected", "processor": "Admin Flores", "purpose": "Travel Requirement", "applicant_address": "Purok 4, Blk 6 Lot 3", "applicant_contact": "09175678901", "created_at": "2026-09-07T08:00:00Z"},
-                {"id": 6, "request_id": "DOC-0006", "resident_name": "Juan dela Cruz", "document_type": "Certificate of Indigency", "date_requested": "2026-09-07", "status": "Processing", "processor": "Admin Cruz", "purpose": "Medical Assistance", "applicant_address": "Purok 1, Blk 2 Lot 8", "applicant_contact": "09176789012", "created_at": "2026-09-07T10:00:00Z"},
-                {"id": 7, "request_id": "DOC-0007", "resident_name": "Rosa Bautista", "document_type": "Certificate of Residency", "date_requested": "2026-09-08", "status": "Pending", "processor": None, "purpose": "School Enrollment", "applicant_address": "Purok 6, Blk 9 Lot 4", "applicant_contact": "09177890123", "created_at": "2026-09-08T08:00:00Z"}
-            ],
-            "concerns": [
-                {"id": 1, "concern_id": "CON-001", "category": "Infrastructure", "priority": "High", "title": "Pothole on main road near Purok 2", "description": "Large pothole causing traffic slowdown and safety risk.", "submitted_by": "Juan dela Cruz", "submitted_at": "2026-09-01", "status": "Resolved", "created_at": "2026-09-01T08:00:00Z"},
-                {"id": 2, "concern_id": "CON-002", "category": "Peace & Order", "priority": "Medium", "title": "Noise disturbance at nighttime", "description": "Loud karaoke past 10 PM along Purok 3.", "submitted_by": "Maria Santos", "submitted_at": "2026-09-02", "status": "Open", "created_at": "2026-09-02T08:00:00Z"},
-                {"id": 3, "concern_id": "CON-003", "category": "Health & Sanitation", "priority": "High", "title": "Garbage not collected in Purok 5", "description": "Uncollected trash bags attracting pests.", "submitted_by": "Ana Reyes", "submitted_at": "2026-09-03", "status": "Open", "created_at": "2026-09-03T08:00:00Z"},
-                {"id": 4, "concern_id": "CON-004", "category": "Infrastructure", "priority": "Medium", "title": "Street light malfunction at Blk 3", "description": "Flickering street lamp makes corner dark.", "submitted_by": "Carlos Mendoza", "submitted_at": "2026-09-04", "status": "In Progress", "created_at": "2026-09-04T08:00:00Z"},
-                {"id": 5, "concern_id": "CON-005", "category": "Social Services", "priority": "Critical", "title": "Request for emergency food assistance", "description": "Senior citizen household needs relief pack.", "submitted_by": "Pedro Villanueva", "submitted_at": "2026-09-05", "status": "Escalated", "created_at": "2026-09-05T08:00:00Z"},
-                {"id": 6, "concern_id": "CON-006", "category": "Health & Sanitation", "priority": "High", "title": "Stagnant water breeding mosquitoes", "description": "Clogged canal near Purok 4 school path.", "submitted_by": "Liza Torres", "submitted_at": "2026-09-06", "status": "Open", "created_at": "2026-09-06T08:00:00Z"}
-            ],
-            "announcements": [
-                {"id": 1, "category": "Assembly", "status": "Active", "title": "Barangay General Assembly — September 15, 2026", "description": "All residents are invited to attend the bi-annual assembly at the Barangay Gymnasium.", "author": "Kap. Ramirez", "published_at": "2026-09-08", "audience": "All Residents", "created_at": "2026-09-08T08:00:00Z"},
-                {"id": 2, "category": "Health", "status": "Active", "title": "Free Medical & Dental Mission — September 12, 2026", "description": "Free consultations, vitamins, and dental checkups at the Barangay Health Center from 8:00 AM to 3:00 PM.", "author": "Health Officer", "published_at": "2026-09-07", "audience": "All Residents", "created_at": "2026-09-07T08:00:00Z"},
-                {"id": 3, "category": "Emergency", "status": "Active", "title": "Typhoon Preparedness Advisory — Signal #1", "description": "PAGASA advisory for Eastern Visayas. Clear gutters and prepare emergency kits.", "author": "DRRMC", "published_at": "2026-09-06", "audience": "All Residents", "created_at": "2026-09-06T08:00:00Z"}
-            ],
-            "weather_alerts": [
-                {"id": 1, "alert_type": "ACTIVE ADVISORY", "title": "Typhoon Weather Advisory - Signal #1", "description": "Moderate to heavy rains expected across Ormoc City. Evacuation centers on standby.", "severity": "Warning", "author": "DRRMC Ormoc", "issued_at": "2026-09-08T06:00:00Z", "created_at": "2026-09-08T06:00:00Z"}
-            ]
-        }
+    @staticmethod
+    def _is_network_error(error: Exception) -> bool:
+        msg = f"{type(error).__name__}: {error}".lower()
+        markers = (
+            "connecterror",
+            "connecttimeout",
+            "readtimeout",
+            "timeoutexception",
+            "remoteprotocolerror",
+            "networkerror",
+            "connectionerror",
+            "nameresolutionerror",
+            "getaddrinfo",
+            "temporary failure in name resolution",
+            "nodename nor servname",
+            "failed to establish a new connection",
+            "network is unreachable",
+            "winerror 10051",
+            "winerror 10060",
+            "winerror 10061",
+            "winerror 11001",
+            "errno 11001",
+            "eof occurred in violation of protocol",
+            "connection reset",
+            "connection aborted",
+            "server disconnected",
+            "ssl",
+            "502 bad gateway",
+            "503 service unavailable",
+            "504 gateway timeout",
+        )
+        return any(m in msg for m in markers)
+
+    def _mark_online(self) -> None:
+        self._is_online = True
+        if not self._sync_in_progress:
+            cur = self.offline_store.get_meta("last_sync_status", "online")
+            if cur == "offline":
+                self.offline_store.set_meta("last_sync_status", "online")
+
+    def _mark_offline(self, reason: str | None = None) -> None:
+        self._is_online = False
+        self.offline_store.set_meta("last_sync_status", "offline")
+        if reason:
+            self.offline_store.set_meta("last_sync_error", str(reason)[:300])
+
+    def _init_local_storage(self) -> None:
         self._meta_path = os.path.join(os.path.dirname(__file__), "residents_metadata.json")
         self._resident_meta: dict[str, dict[str, Any]] = self._load_resident_meta()
         self._doc_meta_path = os.path.join(os.path.dirname(__file__), "documents_metadata.json")
@@ -179,6 +182,7 @@ class SupabaseRepository:
         if row_id is None:
             return
         doc_cols = (
+            "status",
             "tx_ref",
             "amount_due",
             "amount_paid",
@@ -215,36 +219,71 @@ class SupabaseRepository:
     def _resolve_account_email(self, requester_id: Any, resident_name: str | None) -> str:
         import time
 
-        smtp_sender = (os.getenv("SMTP_EMAIL") or "").strip().lower()
         now = time.time()
         cache = getattr(self, "_account_email_cache", None)
         if not cache or (now - cache.get("ts", 0)) > 30:
             id_map: dict[str, str] = {}
             name_map: dict[str, str] = {}
-            resident_emails: list[str] = []
-            for u in getattr(self, "_demo_users", {}).values():
-                em = str(u.get("email") or "").strip()
-                if em:
-                    if u.get("id"):
-                        id_map[str(u["id"])] = em
-                    if u.get("full_name"):
-                        name_map[str(u["full_name"]).strip().lower()] = em
-                    if u.get("role") == "resident" and em.lower() != smtp_sender:
-                        resident_emails.append(em)
+            # Also seed from locally cached residents so email resolution still works offline
+            for r in self.offline_store.list_cached("residents"):
+                rem = str(r.get("email") or "").strip()
+                if rem:
+                    if r.get("id") is not None:
+                        id_map[str(r["id"])] = rem
+                    rname = str(r.get("full_name") or r.get("name") or "").strip().lower()
+                    if rname:
+                        name_map[rname] = rem
             if self.client:
-                prof_names: dict[str, str] = {}
-                prof_roles: dict[str, str] = {}
+                # 1. Check residents table (populated by mobile app / barangay registry)
                 try:
-                    pr = self.client.table("profiles").select("id,full_name,role").execute()
+                    rr = self.client.table("residents").select("id,full_name,name,email").execute()
+                    for r in (rr.data or []):
+                        rem = str(r.get("email") or "").strip()
+                        if rem:
+                            rid = str(r.get("id") or "")
+                            rname = str(r.get("full_name") or r.get("name") or "").strip().lower()
+                            if rid:
+                                id_map[rid] = rem
+                            if rname:
+                                name_map[rname] = rem
+                except Exception:
+                    try:
+                        rr = self.client.table("residents").select("id,full_name,email").execute()
+                        for r in (rr.data or []):
+                            rem = str(r.get("email") or "").strip()
+                            if rem:
+                                rid = str(r.get("id") or "")
+                                rname = str(r.get("full_name") or "").strip().lower()
+                                if rid:
+                                    id_map[rid] = rem
+                                if rname:
+                                    name_map[rname] = rem
+                    except Exception:
+                        pass
+                # 2. Check profiles + auth.users (for mobile app resident accounts)
+                prof_names: dict[str, str] = {}
+                try:
+                    pr = self.client.table("profiles").select("id,full_name,email").execute()
                     for p in (pr.data or []):
                         pid = str(p.get("id") or "")
-                        if pid:
-                            if p.get("full_name"):
-                                prof_names[pid] = str(p["full_name"]).strip().lower()
-                            if p.get("role"):
-                                prof_roles[pid] = str(p["role"]).strip().lower()
+                        pname = str(p.get("full_name") or "").strip().lower()
+                        pem = str(p.get("email") or "").strip()
+                        if pid and pname:
+                            prof_names[pid] = pname
+                        if pem:
+                            if pid:
+                                id_map[pid] = pem
+                            if pname:
+                                name_map[pname] = pem
                 except Exception:
-                    pass
+                    try:
+                        pr = self.client.table("profiles").select("id,full_name").execute()
+                        for p in (pr.data or []):
+                            pid = str(p.get("id") or "")
+                            if pid and p.get("full_name"):
+                                prof_names[pid] = str(p["full_name"]).strip().lower()
+                    except Exception:
+                        pass
                 try:
                     if self.using_service_role:
                         users_resp = self.client.auth.admin.list_users()
@@ -256,16 +295,12 @@ class SupabaseRepository:
                                 id_map[uid] = uem
                                 if uid in prof_names:
                                     name_map[prof_names[uid]] = uem
-                                if prof_roles.get(uid) == "resident" and uem.lower() != smtp_sender:
-                                    resident_emails.append(uem)
                 except Exception:
                     pass
-            fallback_resident = resident_emails[0] if resident_emails else "johnmarktangil@gmail.com"
             cache = {
                 "ts": now,
                 "id_map": id_map,
                 "name_map": name_map,
-                "fallback_resident": fallback_resident,
             }
             self._account_email_cache = cache
 
@@ -274,7 +309,7 @@ class SupabaseRepository:
         clean_name = str(resident_name or "").strip().lower()
         if clean_name and clean_name in cache["name_map"]:
             return cache["name_map"][clean_name]
-        return cache.get("fallback_resident") or "johnmarktangil@gmail.com"
+        return ""
 
     def _apply_doc_meta(self, row: dict[str, Any]) -> dict[str, Any]:
         enriched = dict(row)
@@ -282,6 +317,8 @@ class SupabaseRepository:
         meta = self._doc_meta.get(key, {})
         for k, v in meta.items():
             enriched[k] = v
+        if enriched.get("verification_status") == "Rejected" and enriched.get("status") not in ("Approved", "Resolved"):
+            enriched["status"] = "Rejected"
         fake_demo_emails = {
             "juan.dela.cruz@gmail.com",
             "ana.reyes@gmail.com",
@@ -292,10 +329,18 @@ class SupabaseRepository:
             "pedro.villanueva@gmail.com",
             "resident@gmail.com",
         }
-        cur_email = str(enriched.get("resident_email") or "").strip().lower()
-        if not cur_email or cur_email in fake_demo_emails:
+        # Prioritize any email column sent by the Resident Mobile App on the document request row itself
+        row_email = ""
+        for email_key in ("resident_email", "email", "applicant_email", "requester_email", "contact_email"):
+            candidate = str(enriched.get(email_key) or "").strip()
+            if candidate and candidate.lower() not in fake_demo_emails:
+                row_email = candidate
+                break
+        if row_email:
+            enriched["resident_email"] = row_email
+        else:
             enriched["resident_email"] = self._resolve_account_email(
-                enriched.get("requester_id"),
+                enriched.get("requester_id") or enriched.get("resident_id"),
                 enriched.get("resident_name"),
             )
         return enriched
@@ -322,13 +367,6 @@ class SupabaseRepository:
 
     def _load_resident_meta(self) -> dict[str, dict[str, Any]]:
         meta: dict[str, dict[str, Any]] = {}
-        for r in self._demo_residents:
-            if r.get("id") and r["id"] <= 7:
-                meta[str(r["id"])] = {
-                    col: r.get(col)
-                    for col in self._RESIDENT_META_COLS
-                    if col in r
-                }
         if os.path.exists(self._meta_path):
             try:
                 with open(self._meta_path, "r", encoding="utf-8") as f:
@@ -336,9 +374,7 @@ class SupabaseRepository:
                 if isinstance(saved, dict):
                     for k, v in saved.items():
                         if isinstance(v, dict):
-                            cur = dict(meta.get(k, {}))
-                            cur.update(v)
-                            meta[k] = cur
+                            meta[k] = dict(v)
             except Exception:
                 pass
         return meta
@@ -434,6 +470,7 @@ class SupabaseRepository:
                 .order("resident_id")
                 .execute()
             )
+            self._mark_online()
             rows = response.data or []
             enriched = [self._apply_resident_meta(r) for r in rows]
             seen: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -464,43 +501,56 @@ class SupabaseRepository:
                     except Exception:
                         pass
                 enriched = [r for r in enriched if r.get("id") not in dup_set]
-            return enriched
-        except Exception:
-            return [self._apply_resident_meta(r) for r in self._demo_residents]
+            # Snapshot real synchronized records into SQLite (protecting pending local edits)
+            self.offline_store.save_table_snapshot("residents", enriched)
+            # Return merged view from SQLite so any still-pending offline edits/inserts stay visible
+            return [self._apply_resident_meta(r) for r in self.offline_store.list_cached("residents")]
+        except Exception as err:
+            self._mark_offline(str(err))
+            return [self._apply_resident_meta(r) for r in self.offline_store.list_cached("residents")]
 
     def list_officials(self) -> list[dict[str, Any]]:
-        fields = "full_name,department,position,created_at"
+        fields = "id,email,full_name,department,position,role,created_at"
         try:
             client = self._require_client()
             response = (
                 client.table("profiles")
                 .select(fields)
-                .eq("role", "barangay_official")
+                .in_("role", ["barangay_official", "admin"])
                 .order("created_at")
                 .execute()
             )
-            return response.data or []
-        except Exception:
-            try:
-                client = self._require_client()
-                response = (
-                    client.table("profiles")
-                    .select("full_name,department,created_at")
-                    .eq("role", "barangay_official")
-                    .order("created_at")
-                    .execute()
-                )
-                return response.data or []
-            except Exception:
-                return [
-                    {
-                        "full_name": o.get("full_name"),
-                        "department": o.get("department"),
-                        "position": o.get("position"),
-                        "created_at": o.get("created_at"),
-                    }
-                    for o in self._demo_officials
-                ]
+            self._mark_online()
+            rows = response.data or []
+            # Show all registered officials & Barangay Secretary (exclude the Super Admin / Barangay Captain account itself)
+            result = []
+            for row in rows:
+                r = str(row.get("role") or "").strip().lower()
+                pos = str(row.get("position") or "").strip().lower()
+                if r == "barangay_official" or (r == "admin" and "secretary" in pos):
+                    result.append(row)
+            self.offline_store.save_table_snapshot("officials", result)
+            return self.offline_store.list_cached("officials")
+        except Exception as err:
+            if not self._is_network_error(err):
+                try:
+                    client = self._require_client()
+                    response = (
+                        client.table("profiles")
+                        .select("full_name,department,created_at")
+                        .eq("role", "barangay_official")
+                        .order("created_at")
+                        .execute()
+                    )
+                    self._mark_online()
+                    rows = response.data or []
+                    self.offline_store.save_table_snapshot("officials", rows)
+                    return self.offline_store.list_cached("officials")
+                except Exception as inner_err:
+                    self._mark_offline(str(inner_err))
+            else:
+                self._mark_offline(str(err))
+            return self.offline_store.list_cached("officials")
 
     def sign_in(
         self,
@@ -508,15 +558,23 @@ class SupabaseRepository:
         password: str
     ) -> dict[str, Any]:
         email_clean = email.strip().lower()
-
-        client = self._require_client()
-
-        response = client.auth.sign_in_with_password(
-            {
-                "email": email_clean,
-                "password": password
-            }
-        )
+        try:
+            client = self._require_client()
+            response = client.auth.sign_in_with_password(
+                {
+                    "email": email_clean,
+                    "password": password
+                }
+            )
+            self._mark_online()
+        except Exception as auth_err:
+            if self._is_network_error(auth_err):
+                self._mark_offline(str(auth_err))
+                cached_user = self.offline_store.verify_offline_login(email_clean, password)
+                if cached_user:
+                    return cached_user
+                raise ValueError("Offline login unavailable for this account. Please connect to the internet for first-time sign-in.")
+            raise
 
         if not response.user:
             raise ValueError("Invalid credentials")
@@ -555,22 +613,29 @@ class SupabaseRepository:
                 "User profile is not configured"
             )
 
-        role = (
-            "barangay_official"
-            if profile.data.get("role") == "official"
-            else profile.data.get("role")
-        )
+        raw_role = str(profile.data.get("role") or "").strip().lower()
+        position_val = str(profile.data.get("position") or "").strip()
+        if raw_role == "official":
+            role = "barangay_official"
+        elif raw_role == "super_admin":
+            role = "super_admin"
+        elif raw_role == "admin":
+            # Barangay Secretary is Admin; Barangay Captain (or legacy admin account) is Super Admin
+            role = "admin" if "secretary" in position_val.lower() else "super_admin"
+        else:
+            role = raw_role
 
         if role not in {
+            "super_admin",
             "admin",
             "barangay_official",
-            "resident"
+            "resident",
         }:
             raise ValueError(
                 "User profile has an invalid role"
             )
 
-        return {
+        user_profile = {
             "id": user_id,
             "email": response.user.email,
             "role": role,
@@ -590,6 +655,9 @@ class SupabaseRepository:
                 "avatar_url"
             ),
         }
+        if role in {"super_admin", "admin", "barangay_official"}:
+            self.offline_store.cache_official_credentials(email_clean, password, user_profile)
+        return user_profile
 
     def register_account(
         self,
@@ -600,24 +668,22 @@ class SupabaseRepository:
         department: str | None = None,
         position: str | None = None,
         phone: str | None = None,
+        _from_sync: bool = False,
     ) -> dict[str, Any]:
-
+        if len(password) < 8:
+            raise ValueError(
+                "Password must contain at least 8 characters"
+            )
+        clean_email = email.strip().lower()
         try:
             client = self._require_server()
-
-            if len(password) < 8:
-                raise ValueError(
-                    "Password must contain at least 8 characters"
-                )
-
             created = client.auth.admin.create_user(
                 {
-                    "email": email,
+                    "email": clean_email,
                     "password": password,
                     "email_confirm": True
                 }
             )
-
             if not created.user:
                 raise RuntimeError(
                     "Supabase did not create the account"
@@ -631,7 +697,7 @@ class SupabaseRepository:
                     .insert(
                         {
                             "id": user_id,
-                            "email": email,
+                            "email": clean_email,
                             "full_name": full_name,
                             "role": role,
                             "department": department,
@@ -641,50 +707,52 @@ class SupabaseRepository:
                     )
                     .execute()
                 )
-
             except Exception:
                 client.auth.admin.delete_user(user_id)
                 raise
 
             if not profile.data:
                 client.auth.admin.delete_user(user_id)
-
                 raise RuntimeError(
                     "Could not create the account role profile"
                 )
 
-            return profile.data[0]
-        except Exception:
-            if len(password) < 8:
-                raise ValueError(
-                    "Password must contain at least 8 characters"
-                )
-            new_id = f"demo-user-{len(self._demo_users) + 1}"
-            user_data = {
-                "id": new_id,
-                "email": email.strip().lower(),
+            self._mark_online()
+            created_profile = profile.data[0]
+            self.offline_store.upsert_cached_row("officials", created_profile, is_local_only=False)
+            self.offline_store.cache_official_credentials(clean_email, password, {
+                **created_profile,
+                "email": clean_email,
                 "role": role,
+            })
+            return created_profile
+        except Exception as err:
+            if _from_sync or not self._is_network_error(err):
+                raise
+            self._mark_offline(str(err))
+            local_id = self.offline_store.next_local_temp_id()
+            local_record = {
+                "id": local_id,
+                "email": clean_email,
                 "full_name": full_name.strip(),
+                "role": role,
                 "department": department,
                 "position": position,
                 "phone": phone,
-                "avatar_url": None,
-                "passwords": {password, "password123"}
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }
-            self._demo_users[email.strip().lower()] = user_data
-            if role == "barangay_official":
-                self._demo_officials.append({
-                    "id": new_id,
-                    "email": email,
-                    "full_name": full_name,
-                    "department": department,
-                    "position": position,
-                    "phone": phone,
-                    "created_at": manila_today().isoformat()
-                })
-            res = dict(user_data)
-            res.pop("passwords", None)
-            return res
+            payload = {
+                "email": clean_email,
+                "password": password,
+                "full_name": full_name.strip(),
+                "role": role,
+                "department": department,
+                "position": position,
+                "phone": phone,
+            }
+            stored = self.offline_store.enqueue_insert("officials", local_record, payload)
+            self.offline_store.cache_official_credentials(clean_email, password, stored)
+            return stored
 
     def update_profile(
         self,
@@ -693,26 +761,21 @@ class SupabaseRepository:
     ) -> dict[str, Any]:
         try:
             client = self._require_server()
-
             response = (
                 client.table("profiles")
                 .update(data)
                 .eq("id", user_id)
                 .execute()
             )
-
+            self._mark_online()
             if not response.data:
                 raise RuntimeError("Profile not found")
-
             return response.data[0]
-        except Exception:
-            for u in self._demo_users.values():
-                if u.get("id") == user_id:
-                    u.update(data)
-                    res = dict(u)
-                    res.pop("passwords", None)
-                    return res
-            return data
+        except Exception as err:
+            if not self._is_network_error(err):
+                raise
+            self._mark_offline(str(err))
+            return self.offline_store.enqueue_update("profiles", user_id, data, base_snapshot={"id": user_id})
 
     def update_password(
         self,
@@ -723,20 +786,38 @@ class SupabaseRepository:
             raise ValueError(
                 "Password must contain at least 8 characters"
             )
-        try:
-            client = self._require_server()
+        client = self._require_server()
+        client.auth.admin.update_user_by_id(
+            user_id,
+            {
+                "password": password
+            }
+        )
+        self._mark_online()
 
-            client.auth.admin.update_user_by_id(
-                user_id,
-                {
-                    "password": password
-                }
-            )
-        except Exception:
-            for u in self._demo_users.values():
-                if u.get("id") == user_id:
-                    u.setdefault("passwords", set()).add(password)
-                    return
+    def _apply_table_meta(self, table_name: str, row: dict[str, Any]) -> dict[str, Any]:
+        if table_name == "residents":
+            return self._apply_resident_meta(row)
+        if table_name == "documents":
+            return self._apply_doc_meta(row)
+        if table_name == "concerns":
+            return self._apply_concern_meta(row)
+        return dict(row)
+
+    def _migrate_local_meta_id(self, table_name: str, local_id: Any, remote_id: Any) -> None:
+        old_key = str(local_id)
+        new_key = str(remote_id)
+        if old_key == new_key:
+            return
+        if table_name == "residents" and old_key in self._resident_meta:
+            self._resident_meta[new_key] = {**self._resident_meta.get(new_key, {}), **self._resident_meta.pop(old_key)}
+            self._save_resident_meta()
+        elif table_name == "documents" and old_key in self._doc_meta:
+            self._doc_meta[new_key] = {**self._doc_meta.get(new_key, {}), **self._doc_meta.pop(old_key)}
+            self._save_doc_meta()
+        elif table_name == "concerns" and old_key in self._concern_meta:
+            self._concern_meta[new_key] = {**self._concern_meta.get(new_key, {}), **self._concern_meta.pop(old_key)}
+            self._save_concern_meta()
 
     def list_table(
         self,
@@ -760,17 +841,10 @@ class SupabaseRepository:
                     if table_name == "documents"
                     else "reporter_id"
                 )
-
-                query = query.eq(
-                    owner_column,
-                    user_id
-                )
+                query = query.eq(owner_column, user_id)
 
             if categories and table_name == "concerns":
-                query = query.in_(
-                    "category",
-                    sorted(categories)
-                )
+                query = query.in_("category", sorted(categories))
 
             rows = (
                 query
@@ -779,26 +853,31 @@ class SupabaseRepository:
                 .data
                 or []
             )
-            if table_name == "documents":
-                return [self._apply_doc_meta(r) for r in rows]
-            if table_name == "concerns":
-                return [self._apply_concern_meta(r) for r in rows]
-            return rows
-        except Exception:
-            items = list(self._demo_data.get(table_name, []))
+            self._mark_online()
+            enriched = [self._apply_table_meta(table_name, r) for r in rows]
+            if not own_only and not categories:
+                self.offline_store.save_table_snapshot(table_name, enriched)
+                cached_merged = self.offline_store.list_cached(table_name)
+                return [self._apply_table_meta(table_name, r) for r in cached_merged]
+            return enriched
+        except Exception as err:
+            self._mark_offline(str(err))
+            items = self.offline_store.list_cached(table_name)
+            if own_only and user_id:
+                owner_column = "requester_id" if table_name == "documents" else "reporter_id"
+                items = [it for it in items if str(it.get(owner_column) or "") == str(user_id)]
             if categories and table_name == "concerns":
                 items = [it for it in items if it.get("category") in categories]
-            if table_name == "documents":
-                return [self._apply_doc_meta(r) for r in items]
-            if table_name == "concerns":
-                return [self._apply_concern_meta(r) for r in items]
-            return items
+            return [self._apply_table_meta(table_name, r) for r in items]
 
     def get_row(
         self,
         table_name: str,
         row_id: int
     ) -> dict[str, Any] | None:
+        if OfflineSyncStore.is_local_temp_id(row_id):
+            cached = self.offline_store.get_cached_row(table_name, row_id)
+            return self._apply_table_meta(table_name, cached) if cached else None
         try:
             client = self._require_client()
             response = (
@@ -807,93 +886,83 @@ class SupabaseRepository:
                 .eq("id", row_id)
                 .execute()
             )
+            self._mark_online()
             if not response.data:
                 return None
-            row = response.data[0]
-            if table_name == "residents":
-                return self._apply_resident_meta(row)
-            if table_name == "documents":
-                return self._apply_doc_meta(row)
-            if table_name == "concerns":
-                return self._apply_concern_meta(row)
+            row = self._apply_table_meta(table_name, response.data[0])
+            self.offline_store.upsert_cached_row(table_name, row, is_local_only=False)
             return row
-        except Exception:
-            source = self._demo_residents if table_name == "residents" else self._demo_data.get(table_name, [])
-            for row in source:
-                if row.get("id") == row_id:
-                    if table_name == "residents":
-                        return self._apply_resident_meta(row)
-                    if table_name == "documents":
-                        return self._apply_doc_meta(row)
-                    if table_name == "concerns":
-                        return self._apply_concern_meta(row)
-                    return row
-            return None
+        except Exception as err:
+            self._mark_offline(str(err))
+            cached = self.offline_store.get_cached_row(table_name, row_id)
+            return self._apply_table_meta(table_name, cached) if cached else None
+
+    def _supabase_insert_only(self, table_name: str, data: dict[str, Any]) -> dict[str, Any]:
+        client = self._require_server()
+        payload = {k: v for k, v in data.items() if not str(k).startswith("_")}
+        try:
+            response = client.table(table_name).insert(payload).execute()
+        except Exception as insert_err:
+            err_text = str(insert_err)
+            optional_cols = set(self._RESIDENT_META_COLS) | {
+                "supporting_doc_type",
+                "resident_email",
+            }
+            if any(col in err_text for col in optional_cols):
+                clean_data = {k: v for k, v in payload.items() if k not in optional_cols}
+                response = client.table(table_name).insert(clean_data).execute()
+            else:
+                raise insert_err
+        if not response.data:
+            raise RuntimeError(f"Could not create {table_name} record")
+        self._mark_online()
+        created_row = response.data[0]
+        if table_name == "residents":
+            self._update_resident_meta(created_row.get("id"), payload)
+        elif table_name == "documents":
+            self._update_doc_meta(created_row.get("id"), payload)
+        elif table_name == "concerns":
+            self._update_concern_meta(created_row.get("id"), payload)
+        enriched = self._apply_table_meta(table_name, created_row)
+        self.offline_store.upsert_cached_row(table_name, enriched, is_local_only=False)
+        return enriched
 
     def insert_row(
         self,
         table_name: str,
-        data: dict[str, Any]
+        data: dict[str, Any],
+        _from_sync: bool = False,
     ) -> dict[str, Any]:
         try:
-            client = self._require_server()
-            try:
-                response = (
-                    client.table(table_name)
-                    .insert(data)
-                    .execute()
-                )
-            except Exception as insert_err:
-                err_text = str(insert_err)
-                optional_cols = set(self._RESIDENT_META_COLS) | {
-                    "supporting_doc_type",
-                    "resident_email",
-                }
-                if any(col in err_text for col in optional_cols):
-                    clean_data = {k: v for k, v in data.items() if k not in optional_cols}
-                    response = client.table(table_name).insert(clean_data).execute()
-                else:
-                    raise insert_err
-            if not response.data:
-                raise RuntimeError(
-                    f"Could not create {table_name} record"
-                )
-            created_row = response.data[0]
-            if table_name == "residents":
-                self._update_resident_meta(created_row.get("id"), data)
-                return self._apply_resident_meta(created_row)
+            return self._supabase_insert_only(table_name, data)
+        except Exception as err:
+            if _from_sync or not self._is_network_error(err):
+                raise
+            self._mark_offline(str(err))
+            local_id = self.offline_store.next_local_temp_id()
+            record = {k: v for k, v in data.items() if not str(k).startswith("_")}
+            record["id"] = local_id
             if table_name == "documents":
-                self._update_doc_meta(created_row.get("id"), data)
-                return self._apply_doc_meta(created_row)
-            return created_row
-        except Exception:
-            table_list = self._demo_residents if table_name == "residents" else self._demo_data.setdefault(table_name, [])
-            new_id = len(table_list) + 1
-            record = dict(data)
-            record["id"] = new_id
-            if table_name == "documents":
-                record.setdefault("request_id", f"DOC-{new_id:04d}")
+                record.setdefault("request_id", f"DOC-OFF-{local_id % 10000:04d}")
+                self._update_doc_meta(local_id, record)
             elif table_name == "concerns":
-                record.setdefault("concern_id", f"CON-{new_id:03d}")
+                record.setdefault("concern_id", f"CON-OFF-{local_id % 1000:03d}")
+                self._update_concern_meta(local_id, record)
             elif table_name == "residents":
-                record.setdefault("resident_id", f"RES-{new_id:03d}")
-                self._update_resident_meta(new_id, data)
-            record.setdefault("created_at", manila_today().isoformat() + "T08:00:00Z")
-            table_list.insert(0, record)
-            return self._apply_resident_meta(record) if table_name == "residents" else record
+                record.setdefault("resident_id", f"RES-OFF-{local_id % 1000:03d}")
+                self._update_resident_meta(local_id, record)
+            record.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+            stored = self.offline_store.enqueue_insert(table_name, record, data)
+            return self._apply_table_meta(table_name, stored)
 
-    def update_row(
-        self,
-        table_name: str,
-        row_id: int,
-        data: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _supabase_update_only(self, table_name: str, row_id: int, data: dict[str, Any]) -> dict[str, Any]:
+        payload = {k: v for k, v in data.items() if not str(k).startswith("_")}
         if table_name == "residents":
-            self._update_resident_meta(row_id, data)
+            self._update_resident_meta(row_id, payload)
         elif table_name == "documents":
-            self._update_doc_meta(row_id, data)
+            self._update_doc_meta(row_id, payload)
         elif table_name == "concerns":
-            self._update_concern_meta(row_id, data)
+            self._update_concern_meta(row_id, payload)
         optional_cols = set(self._RESIDENT_META_COLS) | {
             "tx_ref",
             "amount_due",
@@ -930,138 +999,425 @@ class SupabaseRepository:
             "resolution_remarks",
             "updated_at",
         }
+        client = self._require_server()
         try:
-            client = self._require_server()
-            try:
-                response = (
-                    client.table(table_name)
-                    .update(data)
-                    .eq("id", row_id)
-                    .execute()
-                )
-            except Exception as update_err:
-                err_text = str(update_err)
-                if any(col in err_text for col in optional_cols):
-                    clean_data = {k: v for k, v in data.items() if k not in optional_cols}
-                    if clean_data:
-                        response = (
-                            client.table(table_name)
-                            .update(clean_data)
-                            .eq("id", row_id)
-                            .execute()
-                        )
-                    else:
-                        response = (
-                            client.table(table_name)
-                            .select("*")
-                            .eq("id", row_id)
-                            .execute()
-                        )
+            response = (
+                client.table(table_name)
+                .update(payload)
+                .eq("id", row_id)
+                .execute()
+            )
+        except Exception as update_err:
+            err_text = str(update_err)
+            if any(col in err_text for col in optional_cols):
+                clean_data = {k: v for k, v in payload.items() if k not in optional_cols}
+                if clean_data:
+                    response = (
+                        client.table(table_name)
+                        .update(clean_data)
+                        .eq("id", row_id)
+                        .execute()
+                    )
                 else:
-                    raise update_err
-            if not response.data:
-                raise RuntimeError("Record not found")
-            updated_row = response.data[0]
-            if table_name == "residents":
-                return self._apply_resident_meta(updated_row)
-            if table_name == "documents":
-                return self._apply_doc_meta(updated_row)
-            if table_name == "concerns":
-                return self._apply_concern_meta(updated_row)
-            return updated_row
-        except Exception:
-            table_list = self._demo_residents if table_name == "residents" else self._demo_data.get(table_name, [])
-            for row in table_list:
-                if row.get("id") == row_id:
-                    row.update(data)
-                    if table_name == "residents":
-                        return self._apply_resident_meta(row)
-                    if table_name == "documents":
-                        return self._apply_doc_meta(row)
-                    if table_name == "concerns":
-                        return self._apply_concern_meta(row)
-                    return row
-            fallback = dict(data)
-            fallback["id"] = row_id
-            if table_name == "residents":
-                return self._apply_resident_meta(fallback)
-            if table_name == "documents":
-                return self._apply_doc_meta(fallback)
-            if table_name == "concerns":
-                return self._apply_concern_meta(fallback)
-            return fallback
+                    response = (
+                        client.table(table_name)
+                        .select("*")
+                        .eq("id", row_id)
+                        .execute()
+                    )
+            else:
+                raise update_err
+        if not response.data:
+            raise RuntimeError("Record not found")
+        self._mark_online()
+        enriched = self._apply_table_meta(table_name, response.data[0])
+        self.offline_store.upsert_cached_row(table_name, enriched, is_local_only=False)
+        return enriched
+
+    def update_row(
+        self,
+        table_name: str,
+        row_id: int,
+        data: dict[str, Any],
+        _from_sync: bool = False,
+    ) -> dict[str, Any]:
+        if table_name == "residents":
+            self._update_resident_meta(row_id, data)
+        elif table_name == "documents":
+            self._update_doc_meta(row_id, data)
+        elif table_name == "concerns":
+            self._update_concern_meta(row_id, data)
+
+        # Offline-created record not yet synced to Supabase: update locally and coalesce into its queued INSERT
+        if OfflineSyncStore.is_local_temp_id(row_id) and not _from_sync:
+            merged = self.offline_store.enqueue_update(table_name, row_id, data)
+            return self._apply_table_meta(table_name, merged)
+
+        try:
+            return self._supabase_update_only(table_name, row_id, data)
+        except Exception as err:
+            if _from_sync or not self._is_network_error(err):
+                raise
+            self._mark_offline(str(err))
+            existing = self.offline_store.get_cached_row(table_name, row_id)
+            merged = self.offline_store.enqueue_update(table_name, row_id, data, base_snapshot=existing)
+            return self._apply_table_meta(table_name, merged)
 
     def delete_row(
         self,
         table_name: str,
-        row_id: int
+        row_id: int,
+        _from_sync: bool = False,
     ) -> None:
         if table_name == "residents":
             key = str(row_id)
             if key in self._resident_meta:
                 del self._resident_meta[key]
                 self._save_resident_meta()
+        if OfflineSyncStore.is_local_temp_id(row_id) and not _from_sync:
+            self.offline_store.enqueue_delete(table_name, row_id)
+            return
         try:
             client = self._require_server()
             client.table(table_name).delete().eq("id", row_id).execute()
-        except Exception:
-            pass
-        if table_name == "residents":
-            self._demo_residents = [r for r in self._demo_residents if r.get("id") != row_id]
-        elif table_name in self._demo_data:
-            self._demo_data[table_name] = [r for r in self._demo_data[table_name] if r.get("id") != row_id]
+            self._mark_online()
+            self.offline_store.delete_cached_row(table_name, row_id)
+        except Exception as err:
+            if _from_sync or not self._is_network_error(err):
+                raise
+            self._mark_offline(str(err))
+            self.offline_store.enqueue_delete(table_name, row_id)
 
     def create_concern(
         self,
         data: dict[str, Any],
         enforce_limits: bool = True
     ) -> dict[str, Any]:
-
-        client = self._require_server()
-
         today = manila_today().isoformat()
-
-        if enforce_limits:
-            existing = (
-                client.table("concerns")
-                .select("id,title")
-                .eq(
-                    "reporter_id",
-                    data["reporter_id"]
+        if enforce_limits and data.get("reporter_id"):
+            try:
+                client = self._require_server()
+                existing = (
+                    client.table("concerns")
+                    .select("id,title")
+                    .eq("reporter_id", data["reporter_id"])
+                    .eq("submitted_at", today)
+                    .execute()
+                    .data
+                    or []
                 )
-                .eq(
-                    "submitted_at",
-                    today
-                )
-                .execute()
-                .data
-                or []
-            )
+                self._mark_online()
+                if len(existing) >= 3:
+                    raise RepositoryRateLimitError("Daily concern limit reached (3 reports)")
+                if any(
+                    str(row.get("title", "")).strip().casefold() == str(data["title"]).strip().casefold()
+                    for row in existing
+                ):
+                    raise RepositoryConflictError("A similar concern was already reported today")
+            except (RepositoryRateLimitError, RepositoryConflictError):
+                raise
+            except Exception as err:
+                if not self._is_network_error(err):
+                    raise
+                self._mark_offline(str(err))
 
-            if len(existing) >= 3:
-                raise RepositoryRateLimitError(
-                    "Daily concern limit reached (3 reports)"
-                )
+        return self.insert_row("concerns", data)
 
-            if any(
-                str(row.get("title", ""))
-                .strip()
-                .casefold()
-                ==
-                str(data["title"])
-                .strip()
-                .casefold()
-                for row in existing
-            ):
-                raise RepositoryConflictError(
-                    "A similar concern was already "
-                    "reported today"
-                )
+    # ------------------------------------------------------------------
+    # Connectivity & Automatic Synchronization Engine
+    # ------------------------------------------------------------------
+    def check_connectivity(self) -> bool:
+        if not self.client:
+            self._mark_offline("Supabase client not configured")
+            return False
+        try:
+            self.client.table("residents").select("id").limit(1).execute()
+            self._mark_online()
+            return True
+        except Exception as err:
+            if self._is_network_error(err):
+                self._mark_offline(str(err))
+                return False
+            # Non-network error (e.g., empty table or schema warning) still means central server is reachable
+            self._mark_online()
+            return True
 
-        return self.insert_row(
-            "concerns",
-            data
-        )
+    def get_sync_status(self, probe: bool = False) -> dict[str, Any]:
+        if probe and not self._sync_in_progress:
+            self.check_connectivity()
+        summary = self.offline_store.get_queue_summary()
+        if self._sync_in_progress:
+            state = "syncing"
+        elif not self._is_online:
+            state = "offline"
+        elif summary["failed_count"] > 0:
+            state = "sync_failed"
+        else:
+            state = "online"
+        return {
+            "status": state,
+            "online": self._is_online,
+            "syncing": self._sync_in_progress,
+            **summary,
+        }
+
+    def _find_remote_duplicate(self, table_name: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+        """Prevent creating duplicate records when replaying queued offline inserts."""
+        try:
+            client = self._require_server()
+            if table_name == "residents":
+                name = str(payload.get("full_name") or "").strip().lower()
+                if not name:
+                    return None
+                dob = str(payload.get("date_of_birth") or "").strip()
+                hh = str(payload.get("household") or "").strip().lower()
+                rows = client.table("residents").select("*").execute().data or []
+                for r in rows:
+                    r_name = str(r.get("full_name") or "").strip().lower()
+                    if r_name != name:
+                        continue
+                    r_dob = str(r.get("date_of_birth") or "").strip()
+                    r_hh = str(r.get("household") or "").strip().lower()
+                    if (dob and r_dob == dob) or (hh and r_hh == hh) or (not dob and not hh):
+                        return r
+            elif table_name == "documents":
+                rname = str(payload.get("resident_name") or "").strip().lower()
+                dtype = str(payload.get("document_type") or "").strip().lower()
+                dreq = str(payload.get("date_requested") or "").strip()[:10]
+                purpose = str(payload.get("purpose") or "").strip().lower()
+                rows = client.table("documents").select("*").eq("document_type", payload.get("document_type")).execute().data or []
+                for r in rows:
+                    if (
+                        str(r.get("resident_name") or "").strip().lower() == rname
+                        and str(r.get("document_type") or "").strip().lower() == dtype
+                        and str(r.get("date_requested") or "").strip()[:10] == dreq
+                        and str(r.get("purpose") or "").strip().lower() == purpose
+                    ):
+                        return r
+            elif table_name == "concerns":
+                title = str(payload.get("title") or "").strip().lower()
+                sub_by = str(payload.get("submitted_by") or "").strip().lower()
+                sub_at = str(payload.get("submitted_at") or "").strip()[:10]
+                rows = client.table("concerns").select("*").execute().data or []
+                for r in rows:
+                    if (
+                        str(r.get("title") or "").strip().lower() == title
+                        and str(r.get("submitted_by") or "").strip().lower() == sub_by
+                        and str(r.get("submitted_at") or "").strip()[:10] == sub_at
+                    ):
+                        return r
+            elif table_name == "announcements":
+                title = str(payload.get("title") or "").strip().lower()
+                pub_at = str(payload.get("published_at") or "").strip()[:10]
+                rows = client.table("announcements").select("*").execute().data or []
+                for r in rows:
+                    if (
+                        str(r.get("title") or "").strip().lower() == title
+                        and str(r.get("published_at") or "").strip()[:10] == pub_at
+                    ):
+                        return r
+            elif table_name == "weather_alerts":
+                title = str(payload.get("title") or "").strip().lower()
+                issued = str(payload.get("issued_at") or "").strip()[:16]
+                rows = client.table("weather_alerts").select("*").execute().data or []
+                for r in rows:
+                    if (
+                        str(r.get("title") or "").strip().lower() == title
+                        and str(r.get("issued_at") or "").strip()[:16] == issued
+                    ):
+                        return r
+            elif table_name == "officials":
+                em = str(payload.get("email") or "").strip().lower()
+                if not em:
+                    return None
+                rows = client.table("profiles").select("*").eq("email", em).execute().data or []
+                if rows:
+                    return rows[0]
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _merge_non_conflicting_update(
+        local_updates: dict[str, Any],
+        base_snapshot: dict[str, Any] | None,
+        remote_row: dict[str, Any] | None,
+        op_updated_at: str | None,
+    ) -> tuple[dict[str, Any], int]:
+        """Field-level merge that prevents overwriting newer central edits on conflicting fields."""
+        if not remote_row or not base_snapshot:
+            return dict(local_updates), 0
+        remote_ts = str(remote_row.get("updated_at") or "")
+        op_ts = str(op_updated_at or "")
+        remote_is_newer = bool(remote_ts and op_ts and remote_ts > op_ts)
+        safe_updates: dict[str, Any] = {}
+        conflicts_resolved = 0
+        for field, local_val in local_updates.items():
+            if str(field).startswith("_"):
+                continue
+            base_val = base_snapshot.get(field)
+            remote_val = remote_row.get(field)
+            if remote_val == local_val:
+                continue
+            # If central DB changed this exact field independently AND is newer, preserve central value
+            if remote_val != base_val and remote_is_newer:
+                conflicts_resolved += 1
+                continue
+            safe_updates[field] = local_val
+        return safe_updates, conflicts_resolved
+
+    def sync_now(self) -> dict[str, Any]:
+        """Push pending offline changes (deduplicated & conflict-safe) and pull latest central records."""
+        if not self._sync_lock.acquire(blocking=False):
+            return self.get_sync_status(probe=False)
+        self._sync_in_progress = True
+        self.offline_store.set_meta("last_sync_status", "syncing")
+        pushed = 0
+        skipped_duplicates = 0
+        conflicts_resolved = 0
+        failed = 0
+        pulled_counts: dict[str, int] = {}
+        try:
+            if not self.check_connectivity():
+                return {
+                    **self.get_sync_status(probe=False),
+                    "pushed": 0,
+                    "skipped_duplicates": 0,
+                    "conflicts_resolved": 0,
+                    "failed": 0,
+                    "pulled_counts": {},
+                }
+
+            pending_ops = self.offline_store.list_pending_ops(include_failed=True)
+            for op in pending_ops:
+                op_id = op["op_id"]
+                table = op["table_name"]
+                action = op["action"]
+                row_id = op.get("row_id")
+                payload = op.get("payload") or {}
+                client_uid = op.get("client_uid")
+
+                try:
+                    if action == "insert":
+                        already_remote_id = self.offline_store.lookup_synced_remote_id(client_uid)
+                        if already_remote_id:
+                            self.offline_store.mark_op_synced(op_id)
+                            skipped_duplicates += 1
+                            continue
+                        existing_dup = self._find_remote_duplicate(table, payload)
+                        if existing_dup and existing_dup.get("id") is not None:
+                            remote_id = existing_dup["id"]
+                            self._migrate_local_meta_id(table, row_id, remote_id)
+                            self.offline_store.record_synced_id(client_uid, table, row_id, remote_id)
+                            self.offline_store.upsert_cached_row(
+                                table, self._apply_table_meta(table, existing_dup), is_local_only=False
+                            )
+                            self.offline_store.mark_op_synced(op_id)
+                            skipped_duplicates += 1
+                            continue
+
+                        if table == "officials":
+                            created = self.register_account(
+                                email=str(payload["email"]),
+                                password=str(payload["password"]),
+                                full_name=str(payload["full_name"]),
+                                role=str(payload.get("role") or "barangay_official"),
+                                department=payload.get("department"),
+                                position=payload.get("position"),
+                                phone=payload.get("phone"),
+                                _from_sync=True,
+                            )
+                        else:
+                            created = self._supabase_insert_only(table, payload)
+
+                        remote_id = created.get("id")
+                        if remote_id is not None:
+                            self._migrate_local_meta_id(table, row_id, remote_id)
+                            self.offline_store.record_synced_id(client_uid, table, row_id, remote_id)
+                        self.offline_store.mark_op_synced(op_id)
+                        pushed += 1
+
+                    elif action == "update":
+                        if table == "profiles":
+                            self.update_profile(str(row_id), payload)
+                            self.offline_store.mark_op_synced(op_id)
+                            pushed += 1
+                            continue
+                        target_id = int(row_id)
+                        remote_row = None
+                        try:
+                            client = self._require_server()
+                            resp = client.table(table).select("*").eq("id", target_id).execute()
+                            remote_row = resp.data[0] if resp.data else None
+                        except Exception:
+                            remote_row = None
+
+                        merged_payload, c_count = self._merge_non_conflicting_update(
+                            payload,
+                            op.get("base_snapshot"),
+                            remote_row,
+                            op.get("updated_at"),
+                        )
+                        conflicts_resolved += c_count
+                        if merged_payload:
+                            self._supabase_update_only(table, target_id, merged_payload)
+                        self.offline_store.mark_op_synced(op_id)
+                        pushed += 1
+
+                    elif action == "delete":
+                        target_id = int(row_id)
+                        self.delete_row(table, target_id, _from_sync=True)
+                        self.offline_store.mark_op_synced(op_id)
+                        pushed += 1
+
+                except Exception as op_err:
+                    if self._is_network_error(op_err):
+                        self._mark_offline(str(op_err))
+                        # Abort cleanly without marking ops as permanently failed; they stay pending
+                        return {
+                            **self.get_sync_status(probe=False),
+                            "pushed": pushed,
+                            "skipped_duplicates": skipped_duplicates,
+                            "conflicts_resolved": conflicts_resolved,
+                            "failed": failed,
+                            "pulled_counts": pulled_counts,
+                        }
+                    self.offline_store.mark_op_failed(op_id, str(op_err))
+                    failed += 1
+
+            # Phase 2: Pull latest snapshots from Supabase into SQLite cache (protecting any failed/pending rows)
+            try:
+                pulled_counts["residents"] = len(self.list_residents())
+                pulled_counts["documents"] = len(self.list_table("documents", "date_requested"))
+                pulled_counts["concerns"] = len(self.list_table("concerns", "submitted_at"))
+                pulled_counts["announcements"] = len(self.list_table("announcements", "published_at"))
+                pulled_counts["weather_alerts"] = len(self.list_table("weather_alerts", "issued_at"))
+                pulled_counts["officials"] = len(self.list_officials())
+            except Exception as pull_err:
+                if self._is_network_error(pull_err):
+                    self._mark_offline(str(pull_err))
+
+            now_iso = datetime.now(timezone.utc).isoformat()
+            if self._is_online:
+                self.offline_store.set_meta("last_synced_at", now_iso)
+                if failed > 0:
+                    self.offline_store.set_meta("last_sync_status", "sync_failed")
+                    self.offline_store.set_meta("last_sync_error", f"{failed} change(s) failed to synchronize")
+                else:
+                    self.offline_store.set_meta("last_sync_status", "online")
+                    self.offline_store.set_meta("last_sync_error", "")
+
+            return {
+                **self.get_sync_status(probe=False),
+                "pushed": pushed,
+                "skipped_duplicates": skipped_duplicates,
+                "conflicts_resolved": conflicts_resolved,
+                "failed": failed,
+                "pulled_counts": pulled_counts,
+            }
+        finally:
+            self._sync_in_progress = False
+            self._sync_lock.release()
 
     def can_create_document(
         self,

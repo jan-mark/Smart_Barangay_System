@@ -48,10 +48,10 @@ def add_no_cache_headers(response):
     return response
 
 ROLE_ACCESS = {
-    "admin": {"Dashboard", "Manage Officials", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports", "Settings"},
+    "super_admin": {"Dashboard", "Manage Officials", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports", "Settings"},
+    "admin": {"Dashboard", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports", "Settings"},
     "barangay_official": {"Dashboard", "Residents", "Documents", "Concerns", "Announcements"},
     "official": {"Dashboard", "Residents", "Documents", "Concerns", "Announcements"},
-    "resident": {"Dashboard", "Documents", "Concerns", "Announcements", "Weather & Alerts"},
 }
 DEPARTMENT_CATEGORIES = {
     "Health & Sanitation": {"Health & Sanitation"},
@@ -87,8 +87,15 @@ def current_department_categories(user: dict | None) -> set[str] | None:
     
 def current_user() -> dict | None:
     user = session.get("user")
-    if user and user.get("role") == "official":
+    if not user:
+        return None
+    raw_role = str(user.get("role") or "").strip().lower()
+    pos = str(user.get("position") or "").strip().lower()
+    if raw_role == "official":
         user = {**user, "role": "barangay_official"}
+        session["user"] = user
+    elif raw_role == "admin" and "secretary" not in pos:
+        user = {**user, "role": "super_admin"}
         session["user"] = user
     return user
 
@@ -105,13 +112,17 @@ def login_required(view):
 
 
 def roles_required(*roles):
+    allowed = set(roles)
+    if "admin" in allowed:
+        allowed.add("super_admin")
+
     def decorator(view):
         @wraps(view)
         def wrapped(*args, **kwargs):
             user = current_user()
             if not user:
                 return jsonify({"error": "Authentication required"}), 401
-            if user.get("role") not in roles:
+            if user.get("role") not in allowed:
                 return jsonify({"error": "You do not have permission for this action"}), 403
             return view(*args, **kwargs)
         return wrapped
@@ -130,6 +141,34 @@ def health():
     ), 200 if ready else 503
 
 
+@app.get("/sw.js")
+def service_worker():
+    sw_path = os.path.join(app.static_folder or "public/static", "sw.js")
+    if not os.path.exists(sw_path):
+        return "", 404
+    with open(sw_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    resp = make_response(content)
+    resp.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.get("/api/sync/status")
+@login_required
+def sync_status():
+    probe = str(request.args.get("probe", "0")).strip().lower() in ("1", "true", "yes")
+    return jsonify({"data": supabase_repository.get_sync_status(probe=probe)})
+
+
+@app.post("/api/sync/run")
+@login_required
+def sync_run():
+    result = supabase_repository.sync_now()
+    return jsonify({"data": result})
+
+
 @app.get("/login")
 def login():
     if current_user():
@@ -146,11 +185,20 @@ def login_api():
         return jsonify({"error": "Email and password are required"}), 400
     try:
         user = supabase_repository.sign_in(email, password)
+        if user.get("role") not in {"super_admin", "admin", "barangay_official"}:
+            return jsonify({
+                "error": "This web portal is for authorized Barangay Officials only. Residents should use the SmartBarangay Mobile App."
+            }), 403
         session["user"] = user
         session.permanent = True
         return jsonify({"data": user})
     except RepositoryConfigurationError as error:
         return jsonify({"error": str(error), "configured": False}), 503
+    except ValueError as error:
+        msg = str(error)
+        if "offline" in msg.lower():
+            return jsonify({"error": msg}), 503
+        return jsonify({"error": "Invalid email or password"}), 401
     except Exception:
         app.logger.exception("Login failed")
         return jsonify({"error": "Invalid email or password"}), 401
@@ -220,8 +268,9 @@ def update_password():
 @login_required
 def home():
     user = current_user()
-    if user.get("role") == "resident":
-        return render_template("resident_dashboard.html")
+    if user.get("role") not in {"super_admin", "admin", "barangay_official"}:
+        session.clear()
+        return redirect(url_for("login"))
     return render_template(
         "dashboard.html",
         dashboard_role=user.get("role"),
@@ -245,7 +294,7 @@ def residents():
 
 
 @app.get("/api/officials")
-@roles_required("admin")
+@roles_required("super_admin")
 def officials():
     if not supabase_repository.server_configured:
         return server_data_unavailable()
@@ -401,6 +450,81 @@ def create_weather_alert():
         return jsonify({"error": str(error)}), 502
 
 
+@app.post("/api/weather/auto-alert")
+@roles_required("admin", "barangay_official")
+def auto_weather_early_warning():
+    if not supabase_repository.server_configured:
+        return server_data_unavailable()
+    payload = request.get_json(silent=True) or {}
+    title = str(payload.get("title") or "").strip()
+    description = str(payload.get("description") or "").strip()
+    severity = str(payload.get("severity") or "Advisory").strip()
+    alert_type = str(payload.get("alert_type") or "ADVANCE EARLY WARNING").strip()
+    if not title or not description:
+        return jsonify({"error": "Title and description are required"}), 400
+    if severity not in ALERT_SEVERITIES:
+        severity = "Advisory"
+
+    now_dt = manila_now()
+    cutoff_dt = now_dt - timedelta(hours=6)
+    try:
+        existing = supabase_repository.list_table("weather_alerts") or []
+        for row in existing:
+            raw_ts = str(row.get("issued_at") or row.get("created_at") or "")
+            same_alert = (
+                str(row.get("title") or "").strip().lower() == title.lower()
+                or (
+                    str(row.get("alert_type") or "").strip().upper() == alert_type.upper()
+                    and str(row.get("severity") or "").strip().lower() == severity.lower()
+                )
+            )
+            if not same_alert:
+                continue
+            try:
+                parsed = now_dt.fromisoformat(raw_ts.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=now_dt.tzinfo)
+                if parsed >= cutoff_dt:
+                    return jsonify({"data": {"created": False, "deduplicated": True, "existing": row}}), 200
+            except Exception:
+                continue
+
+        alert_row = supabase_repository.insert_row(
+            "weather_alerts",
+            {
+                "alert_type": alert_type,
+                "title": title,
+                "description": description,
+                "severity": severity,
+                "author": "SmartBarangay Advance Early-Warning (Verify PAGASA)",
+                "issued_at": now_dt.isoformat(),
+            },
+        )
+        announcement_row = None
+        try:
+            announcement_row = supabase_repository.insert_row(
+                "announcements",
+                {
+                    "category": "Emergency",
+                    "title": title,
+                    "description": description,
+                    "audience": "All Residents & Barangay Officials",
+                    "author": "SmartBarangay Advance Early-Warning",
+                    "published_at": manila_today().isoformat(),
+                    "status": "Active",
+                },
+            )
+        except Exception:
+            announcement_row = None
+
+        return jsonify({"data": {"created": True, "alert": alert_row, "announcement": announcement_row}}), 201
+    except RepositoryConfigurationError as error:
+        return jsonify({"error": str(error), "configured": False}), 503
+    except Exception as error:
+        app.logger.exception("Could not record automated advance weather alert")
+        return jsonify({"error": str(error)}), 502
+
+
 @app.get("/api/reports/<report_name>")
 @roles_required("admin", "barangay_official")
 def download_report(report_name: str):
@@ -479,9 +603,11 @@ def weather():
     params = {
         "latitude": latitude,
         "longitude": longitude,
-        "current": "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,visibility,weather_code",
-        "hourly": "precipitation_probability,precipitation",
-        "timezone": "auto",
+        "current": "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,rain,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,visibility,cloud_cover,is_day",
+        "hourly": "temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m,uv_index",
+        "daily": "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,sunrise,sunset",
+        "forecast_days": 7,
+        "timezone": "Asia/Manila",
     }
     try:
         with httpx.Client(timeout=6.0) as client:
@@ -489,12 +615,490 @@ def weather():
             resp.raise_for_status()
             weather_data = resp.json()
             is_default = (abs(latitude - default_lat) < 0.01 and abs(longitude - default_lon) < 0.01)
-            weather_data["location"] = "Barangay Don Felipe Larrazabal, Ormoc City" if is_default else "Detected Location"
+            weather_data["location"] = "Barangay Don Felipe Larrazabal, Ormoc City, Leyte" if is_default else "Detected Location"
+            weather_data["source"] = "Open-Meteo Live Weather Telemetry (Verify PAGASA)"
+            weather_data["source_url"] = "https://bagong.pagasa.dost.gov.ph/weather"
+            weather_data["fetched_at"] = manila_now().isoformat()
+            try:
+                supabase_repository.offline_store.set_meta("last_weather_json", json.dumps(weather_data, default=str))
+            except Exception:
+                pass
             return jsonify({"data": weather_data})
     except Exception as error:
+        cached_raw = supabase_repository.offline_store.get_meta("last_weather_json")
+        if cached_raw:
+            try:
+                cached_wx = json.loads(cached_raw)
+                cached_wx["source"] = "Offline Cached Telemetry (Last synchronized weather)"
+                cached_wx["offline_cached"] = True
+                return jsonify({"data": cached_wx, "offline_cached": True})
+            except Exception:
+                pass
         fallback = dict(DEFAULT_BARANGAY_WEATHER)
+        fallback["fetched_at"] = manila_now().isoformat()
+        fallback["source"] = "Fallback Telemetry (Live feed unavailable)"
         fallback["error_note"] = str(error)
         return jsonify({"data": fallback, "fallback": True})
+
+
+@app.post("/api/weather/ai-assistant")
+@login_required
+def weather_ai_assistant():
+    payload = request.get_json(silent=True) or {}
+    question = str(payload.get("message") or "").strip()
+    language = str(payload.get("language") or "auto").strip().lower()
+    weather_ctx = payload.get("weather") or {}
+    advisory_ctx = payload.get("advisory") or {}
+    history = payload.get("history") or []
+
+    if not question:
+        return jsonify({"error": "Please enter a question"}), 400
+
+    low_q = question.lower()
+    if any(w in low_q for w in ("unsa", "pasabot", "kusog", "buhaton", "karon", "ugma", "diri", "salamat", "palihug", "kanus-a", "linog", "kilat", "dalugdog", "pwede", "muulan", "mag-ulan", "mag ulan", "unya", "init", "tugnaw", "bahaan", "laba", "byahe", "dagat", "pila")):
+        language = "cebuano"
+    elif any(w in low_q for w in ("ano", "ibig sabihin", "gawin", "ligtas", "babala", "ngayon", "bukas", "paano", "kailan", "lindol", "kidlat", "kulog", "uulan", "mamaya", "mainit", "malamig", "klase", "biyahe", "maglaba")):
+        language = "filipino"
+    elif any(w in low_q for w in ("what", "when", "will", "should", "how", "is it", "can i", "forecast", "tomorrow", "today", "tonight", "heat index", "humidity", "visibility", "typhoon", "rainfall", "umbrella", "safe")):
+        language = "english"
+    elif language not in ("cebuano", "filipino", "english"):
+        language = "english"
+
+    def _num(val, default=0.0):
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return default
+
+    temp_f = _num(weather_ctx.get("temperature_2m"), 0.0)
+    feels_f = _num(weather_ctx.get("apparent_temperature"), temp_f)
+    rain_24h = _num(weather_ctx.get("rainfall_24h", weather_ctx.get("precipitation", 0)), 0.0)
+    wind_f = _num(weather_ctx.get("wind_speed_10m"), 0.0)
+    gust_f = _num(weather_ctx.get("wind_gusts_10m"), wind_f)
+    wind_deg = _num(weather_ctx.get("wind_direction_10m"), 0.0)
+    hum_f = _num(weather_ctx.get("relative_humidity_2m"), 0.0)
+    vis_km = weather_ctx.get("visibility_km", "N/A")
+    cloud_f = _num(weather_ctx.get("cloud_cover"), 0.0)
+    uv_now = _num(weather_ctx.get("uv_index"), 0.0)
+    cond = str(weather_ctx.get("condition") or "Current weather")
+    next6 = weather_ctx.get("next6") or []
+    hourly24 = weather_ctx.get("hourly24") or next6
+    daily7 = weather_ctx.get("daily7") or []
+    adv_source = advisory_ctx.get("source") or "Open-Meteo / PAGASA"
+    updated_at = weather_ctx.get("fetched_at") or manila_now().isoformat()
+
+    compass_dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+    wind_dir_label = compass_dirs[int(((wind_deg + 22.5) % 360) // 45)]
+
+    def _heat_category(hi_c: float, lang: str) -> str:
+        if hi_c >= 52:
+            return {"cebuano": "Extreme Danger (grabe ka peligro sa heat stroke)", "filipino": "Extreme Danger (napakataas na panganib ng heat stroke)"}.get(lang, "Extreme Danger (heat stroke imminent)")
+        if hi_c >= 42:
+            return {"cebuano": "Danger (posible ang heat cramps ug heat exhaustion)", "filipino": "Danger (posible ang heat cramps at heat exhaustion)"}.get(lang, "Danger (heat cramps/exhaustion likely)")
+        if hi_c >= 33:
+            return {"cebuano": "Extreme Caution (pag-inom kanunay og tubig)", "filipino": "Extreme Caution (uminom palagi ng tubig)"}.get(lang, "Extreme Caution (stay hydrated & limit midday sun)")
+        if hi_c >= 27:
+            return {"cebuano": "Caution (medyo init kon magdugay sa gawas)", "filipino": "Caution (bahagyang mainit sa labas)"}.get(lang, "Caution (fatigue possible with prolonged exposure)")
+        return {"cebuano": "Komportable / Normal", "filipino": "Komportable / Normal"}.get(lang, "Comfortable / Normal")
+
+    system_instruction = (
+        "You are the SmartBarangay AI Weather Assistant for Barangay Don Felipe Larrazabal, Ormoc City, Leyte, Philippines. "
+        f"Respond naturally, accurately, and thoroughly in {language.title()} to ANY question the user asks—whether about specific times, "
+        "tomorrow/weekly forecasts, heat index, UV, rain/flooding, typhoons, travel, laundry, farming, fishing, class suspensions (DepEd DO 37), "
+        "safety preparedness, or general weather science. "
+        "Ground all local answers in the LIVE telemetry provided below and cite exact numbers when helpful. "
+        "Strict responsibility rules: NEVER fabricate official PAGASA, PHIVOLCS, DENR-MGB, or NDRRMC warnings; never claim AI can predict exact earthquakes or landslides; "
+        "always remind users to verify formal warnings directly on official government portals when relevant. "
+        "Keep responses clear, structured, and easy to read (3–6 concise sentences or short bullet points).\n\n"
+        f"LIVE TELEMETRY (Barangay Don Felipe Larrazabal, Ormoc City, Leyte | Updated {updated_at}):\n"
+        f"- Current: {temp_f:.1f}°C (Feels like / Heat Index: {feels_f:.1f}°C), Condition: {cond}, Humidity: {hum_f:.0f}%, "
+        f"Wind: {wind_f:.1f} km/h (gusts {gust_f:.1f} km/h from {wind_dir_label}), Cloud cover: {cloud_f:.0f}%, Visibility: {vis_km} km, UV: {uv_now:.1f}, 24h Rainfall: {rain_24h:.1f} mm.\n"
+        f"- Next 24h Hourly Forecast: {json.dumps(hourly24[:16])}\n"
+        f"- 7-Day Daily Forecast: {json.dumps(daily7[:7])}\n"
+    )
+
+    answer = ""
+    ai_provider = None
+
+    # 1. Try Gemini API if configured
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if gemini_key and not answer:
+        chat_turns = []
+        for h in history[-6:]:
+            r = "model" if h.get("role") == "bot" else "user"
+            txt = str(h.get("text") or "").strip()
+            if txt:
+                chat_turns.append({"role": r, "parts": [{"text": txt}]})
+        chat_turns.append({"role": "user", "parts": [{"text": question}]})
+        for model_name in ("gemini-2.5-flash", "gemini-2.0-flash"):
+            try:
+                with httpx.Client(timeout=8.0) as client:
+                    g_resp = client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent",
+                        params={"key": gemini_key},
+                        json={
+                            "system_instruction": {"parts": [{"text": system_instruction}]},
+                            "contents": chat_turns,
+                            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 450},
+                        },
+                    )
+                    if g_resp.is_success:
+                        g_json = g_resp.json()
+                        cand = (g_json.get("candidates") or [{}])[0]
+                        parts = (cand.get("content") or {}).get("parts") or [{}]
+                        answer = (parts[0].get("text") or "").strip()
+                        if answer:
+                            ai_provider = f"Gemini AI + Open-Meteo / PAGASA"
+                            break
+            except Exception:
+                continue
+
+    # 2. Try Groq or OpenAI if configured
+    if not answer:
+        for env_key, base_url, model_id, label in (
+            ("GROQ_API_KEY", "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile", "Groq AI + Open-Meteo / PAGASA"),
+            ("OPENAI_API_KEY", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini", "OpenAI + Open-Meteo / PAGASA"),
+        ):
+            api_key = os.getenv(env_key, "").strip()
+            if not api_key:
+                continue
+            try:
+                msgs = [{"role": "system", "content": system_instruction}]
+                for h in history[-6:]:
+                    r = "assistant" if h.get("role") == "bot" else "user"
+                    txt = str(h.get("text") or "").strip()
+                    if txt:
+                        msgs.append({"role": r, "content": txt})
+                msgs.append({"role": "user", "content": question})
+                with httpx.Client(timeout=8.0) as client:
+                    o_resp = client.post(
+                        base_url,
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={"model": model_id, "messages": msgs, "temperature": 0.4, "max_tokens": 450},
+                    )
+                    if o_resp.is_success:
+                        o_json = o_resp.json()
+                        answer = (((o_json.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+                        if answer:
+                            ai_provider = label
+                            break
+            except Exception:
+                continue
+
+    # 3. Deep Data-Driven Local Intelligence Engine (accurate live hourly/daily reasoning even without external LLM key)
+    if not answer:
+        peak_rain_hr = max(hourly24[:12], key=lambda h: (_num(h.get("rain"), 0), _num(h.get("prob"), 0)), default=None)
+        max_prob_12h = max((_num(h.get("prob"), 0) for h in hourly24[:12]), default=0)
+        total_rain_12h = sum(_num(h.get("rain"), 0) for h in hourly24[:12])
+        today_daily = daily7[0] if len(daily7) > 0 else {}
+        tomorrow_daily = daily7[1] if len(daily7) > 1 else {}
+
+        # Check specific clock time in question (e.g., "3pm", "alas 4", "15:00")
+        time_match = re.search(r"\b(?:alas\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|sa\s+buntag|sa\s+hapon|sa\s+gabii|ng\s+umaga|ng\s+hapon|ng\s+gabi)?\b", low_q)
+        matched_hour_entry = None
+        if time_match and any(k in low_q for k in ("am", "pm", "alas", ":", "hapon", "gabii", "gabi", "buntag", "umaga", "time", "oras")):
+            hr_num = int(time_match.group(1))
+            meridiem = (time_match.group(3) or "").strip()
+            if 1 <= hr_num <= 23:
+                if meridiem in ("pm", "sa hapon", "sa gabii", "ng hapon", "ng gabi") and hr_num < 12:
+                    hr_num += 12
+                elif meridiem in ("am", "sa buntag", "ng umaga") and hr_num == 12:
+                    hr_num = 0
+                for h in hourly24:
+                    iso = str(h.get("iso") or "")
+                    if len(iso) >= 13 and iso[11:13].isdigit() and int(iso[11:13]) == hr_num:
+                        matched_hour_entry = h
+                        break
+
+        if matched_hour_entry:
+            hl = matched_hour_entry.get("label", "")
+            ht = matched_hour_entry.get("temp", f"{temp_f:.1f}°C")
+            hp = int(_num(matched_hour_entry.get("prob"), 0))
+            hr = _num(matched_hour_entry.get("rain"), 0)
+            hw = _num(matched_hour_entry.get("wind"), wind_f)
+            if language == "cebuano":
+                answer = (
+                    f"Sa alas {hl} sa Barangay Don Felipe Larrazabal:\n"
+                    f"• Temperatura: {ht} · Tsansa sa ulan: {hp}% ({hr:.1f} mm) · Hangin: {hw:.1f} km/h.\n"
+                    f"{'Posible ang ulan anang orasa—pagdala og payong o raincoat.' if hp >= 50 or hr >= 0.5 else 'Ubos ang tsansa sa ulan anang orasa, pero bantayi gihapon ang kalit nga pagbag-o sa panahon.'}"
+                )
+            elif language == "filipino":
+                answer = (
+                    f"Pagdating ng {hl} sa Barangay Don Felipe Larrazabal:\n"
+                    f"• Temperatura: {ht} · Tsansa ng ulan: {hp}% ({hr:.1f} mm) · Hangin: {hw:.1f} km/h.\n"
+                    f"{'May mataas na tsansang umulan sa oras na iyan—magdala ng payong o kapote.' if hp >= 50 or hr >= 0.5 else 'Mababa ang tsansa ng ulan sa oras na iyan, ngunit manatiling handa sa biglaang pagbabago ng panahon.'}"
+                )
+            else:
+                answer = (
+                    f"Forecast for {hl} in Barangay Don Felipe Larrazabal:\n"
+                    f"• Temperature: {ht} · Rain chance: {hp}% ({hr:.1f} mm) · Wind: {hw:.1f} km/h.\n"
+                    f"{'Rain is likely around that hour—bring an umbrella or rain gear.' if hp >= 50 or hr >= 0.5 else 'Rain risk is relatively low at that hour, though brief local showers can still form.'}"
+                )
+        elif any(k in low_q for k in ("tomorrow", "ugma", "bukas", "next week", "7 day", "7-day", "semana", "weekend", "sabado", "dominggo", "linggo")):
+            if any(k in low_q for k in ("7 day", "7-day", "week", "semana", "weekend", "sabado", "dominggo", "linggo")) and len(daily7) >= 3:
+                lines = [
+                    f"• {d.get('day')}: {d.get('min')}–{d.get('max')}°C, rain {d.get('prob')}% ({d.get('rain')} mm), wind {d.get('wind')} km/h"
+                    for d in daily7[:5]
+                ]
+                header = {"cebuano": "5-Day Outlook sa Ormoc City:", "filipino": "5-Day Outlook sa Ormoc City:"}.get(language, "5-Day Weather Outlook for Ormoc City:")
+                answer = header + "\n" + "\n".join(lines)
+            elif tomorrow_daily:
+                if language == "cebuano":
+                    answer = (
+                        f"Forecast ugma ({tomorrow_daily.get('day')}) sa Barangay Don Felipe Larrazabal:\n"
+                        f"• Temperatura: {tomorrow_daily.get('min')}°C hangtod {tomorrow_daily.get('max')}°C (Heat Index: {tomorrow_daily.get('feels_max')}°C)\n"
+                        f"• Tsansa sa ulan: {tomorrow_daily.get('prob')}% ({tomorrow_daily.get('rain')} mm) · Max Hangin: {tomorrow_daily.get('wind')} km/h · UV: {tomorrow_daily.get('uv')}."
+                    )
+                elif language == "filipino":
+                    answer = (
+                        f"Forecast bukas ({tomorrow_daily.get('day')}) sa Barangay Don Felipe Larrazabal:\n"
+                        f"• Temperatura: {tomorrow_daily.get('min')}°C hanggang {tomorrow_daily.get('max')}°C (Heat Index: {tomorrow_daily.get('feels_max')}°C)\n"
+                        f"• Tsansa ng ulan: {tomorrow_daily.get('prob')}% ({tomorrow_daily.get('rain')} mm) · Max Hangin: {tomorrow_daily.get('wind')} km/h · UV: {tomorrow_daily.get('uv')}."
+                    )
+                else:
+                    answer = (
+                        f"Tomorrow's outlook ({tomorrow_daily.get('day')}) for Barangay Don Felipe Larrazabal:\n"
+                        f"• Temperature: {tomorrow_daily.get('min')}°C to {tomorrow_daily.get('max')}°C (Peak Heat Index: {tomorrow_daily.get('feels_max')}°C)\n"
+                        f"• Rain chance: {tomorrow_daily.get('prob')}% ({tomorrow_daily.get('rain')} mm) · Max Wind: {tomorrow_daily.get('wind')} km/h · Max UV: {tomorrow_daily.get('uv')}."
+                    )
+            else:
+                answer = f"Current reading: {temp_f:.1f}°C ({cond}), 24h rain {rain_24h:.1f} mm."
+        elif any(k in low_q for k in ("laba", "laundry", "sampay", "dry clothes", "manglaba", "maglaba")):
+            good_dry = max_prob_12h < 50 and total_rain_12h < 1.0
+            peak_txt = f"{peak_rain_hr.get('label')} ({int(_num(peak_rain_hr.get('prob')))}%)" if peak_rain_hr else "later"
+            if language == "cebuano":
+                answer = (
+                    f"{'Oo, maayo pa maglaba ug magbulad karon!' if good_dry else 'Pag-amping sa pagbulad sa gawas karon.'} "
+                    f"Karon {temp_f:.1f}°C ({cond}), humidity {hum_f:.0f}%, ug ang kinatas-ang tsansa sa ulan sa sunod 12 ka oras kay {int(max_prob_12h)}% (bandang {peak_txt}). "
+                    f"{' dali ra mauga ang sinina.' if good_dry else 'Mas maayo nga adunay silong o bantayan ang sinina inig ' + peak_txt + '.'}"
+                )
+            elif language == "filipino":
+                answer = (
+                    f"{'Oo, maganda ang panahon para maglaba at magsampay ngayon!' if good_dry else 'Mag-ingat sa pagsasampay sa labas ngayon.'} "
+                    f"Kasalukuyang {temp_f:.1f}°C ({cond}), humidity {hum_f:.0f}%, at pinakamataas na tsansa ng ulan sa susunod na 12 oras ay {int(max_prob_12h)}% (bandang {peak_txt})."
+                )
+            else:
+                answer = (
+                    f"{'Yes, conditions are good for doing laundry and line-drying right now.' if good_dry else 'Caution with outdoor drying today.'} "
+                    f"It is currently {temp_f:.1f}°C ({cond}) with {hum_f:.0f}% humidity, and peak rain probability over the next 12 hours is {int(max_prob_12h)}% around {peak_txt}."
+                )
+        elif any(k in low_q for k in ("byahe", "biyahe", "travel", "motor", "drive", "commute", "boat", "dagat", "fishing", "fish", "pangisda", "lakaw", "jog", "outdoor", "picnic")):
+            is_sea = any(k in low_q for k in ("boat", "dagat", "fishing", "fish", "pangisda", "sea"))
+            wind_risk = gust_f >= 35 or wind_f >= 25
+            rain_risk = max_prob_12h >= 65 or total_rain_12h >= 5.0
+            if language == "cebuano":
+                if is_sea:
+                    answer = f"Para sa paglawig/pangisda: Hangin karon {wind_f:.1f} km/h (gusts {gust_f:.1f} km/h gikan sa {wind_dir_label}), visibility {vis_km} km, max tsansa sa ulan {int(max_prob_12h)}%. {'Medyo kusog ang hangin—susiha una ang PAGASA Gale Warning ug PCG advisory sa Ormoc Bay.' if wind_risk else 'Kasarangan ang hangin karon, pero susiha gihapon ang opisyal nga Coast Guard/PAGASA marine advisory sa dili pa molawig.'}"
+                else:
+                    answer = f"Para sa byahe/gawas sa balay: {temp_f:.1f}°C ({cond}), visibility {vis_km} km, hangin {wind_f:.1f} km/h, pinakataas nga tsansa sa ulan {int(max_prob_12h)}%. {'Pagdala og raincoat/payong ug paghinay sa danlog nga dalan.' if rain_risk else 'Maayo ang kahimtang sa dalan karon; pagdala lang og tubig kon init.'}"
+            elif language == "filipino":
+                if is_sea:
+                    answer = f"Para sa paglalayag/pangingisda: Hangin ngayon {wind_f:.1f} km/h (gusts {gust_f:.1f} km/h mula {wind_dir_label}), visibility {vis_km} km. {'Malakas ang bugso ng hangin—suriin muna ang PAGASA Gale Warning at PCG advisory.' if wind_risk else 'Katamtaman ang hangin ngayon, ngunit tiyakin pa rin ang abiso ng Coast Guard at PAGASA bago pumalaot.'}"
+                else:
+                    answer = f"Para sa biyahe/paglabas: {temp_f:.1f}°C ({cond}), visibility {vis_km} km, hangin {wind_f:.1f} km/h, max tsansa ng ulan {int(max_prob_12h)}%. {'Magdala ng kapote/payong at mag-ingat sa madulas na kalsada.' if rain_risk else 'Maayos ang panahon para bumiyahe ngayon; uminom ng tubig kung mainit.'}"
+            else:
+                if is_sea:
+                    answer = f"Marine/fishing outlook: Surface wind is {wind_f:.1f} km/h (gusts {gust_f:.1f} km/h from {wind_dir_label}), visibility {vis_km} km, 12h peak rain chance {int(max_prob_12h)}%. {'Winds are gusty—verify PAGASA Gale Warnings and Philippine Coast Guard advisories before heading out.' if wind_risk else 'Winds are moderate right now, though small craft should always check PCG & PAGASA marine bulletins first.'}"
+                else:
+                    answer = f"Travel/outdoor outlook: Currently {temp_f:.1f}°C ({cond}), visibility {vis_km} km, wind {wind_f:.1f} km/h, peak 12h rain chance {int(max_prob_12h)}%. {'Carry rain gear and allow extra travel time for wet roads.' if rain_risk else 'Generally favorable conditions—stay hydrated if outdoors during midday heat.'}"
+        elif any(k in low_q for k in ("klase", "class", "school", "suspend", "suspension", "deped", "eskwela")):
+            if language == "cebuano":
+                answer = (
+                    f"Base sa DepEd Order No. 37, s. 2022: Awtomatiko ang suspension sa klase kon adunay opisyal nga PAGASA Tropical Cyclone Wind Signal (#1: Kindergarten; #2: K–Grade 10; #3+: tanang lebel) o Orange/Red Rainfall Warning, o kon ideklara sa LGU Ormoc City tungod sa taas nga Heat Index (≥42°C). "
+                    f"Karon sa Ormoc City: {temp_f:.1f}°C (Heat Index {feels_f:.1f}°C), hangin {wind_f:.1f} km/h. Bantayi ang opisyal nga anunsyo sa Ormoc City LGU ug DepEd."
+                )
+            elif language == "filipino":
+                answer = (
+                    f"Batay sa DepEd Order No. 37, s. 2022: Awtomatiko ang class suspension kapag may opisyal na PAGASA Wind Signal (#1: Kinder; #2: K–Grade 10; #3+: lahat ng antas) o Orange/Red Rainfall Warning, o kapag idineklara ng LGU Ormoc City dahil sa mataas na Heat Index (≥42°C). "
+                    f"Ngayon: {temp_f:.1f}°C (Heat Index {feels_f:.1f}°C), hangin {wind_f:.1f} km/h. Laging sundin ang opisyal na abiso ng LGU at DepEd."
+                )
+            else:
+                answer = (
+                    f"Under DepEd Order No. 37, s. 2022, automatic class suspensions follow official PAGASA Wind Signals (TCWS #1: Kindergarten; #2: K–Grade 10; #3+: all levels) or Orange/Red Rainfall Warnings, while heat-related shifts/suspensions (typically ≥42°C Heat Index) are decided by Ormoc City LGU/DepEd. "
+                    f"Current reading: {temp_f:.1f}°C (Heat Index {feels_f:.1f}°C), wind {wind_f:.1f} km/h. Always confirm with official Ormoc City LGU announcements."
+                )
+        elif any(k in low_q for k in ("heat", "init", "hot", "feels like", "uv", "sun", "tugnaw", "cold", "temp", "pila ka degrees", "sunrise", "sunset")):
+            hi_cat = _heat_category(feels_f, language)
+            sr = str(today_daily.get("sunrise") or "")[-5:] or "—"
+            ss = str(today_daily.get("sunset") or "")[-5:] or "—"
+            if language == "cebuano":
+                answer = (
+                    f"Temperatura ug Heat Index karon sa Barangay Don Felipe Larrazabal:\n"
+                    f"• Aktwal nga temperatura: {temp_f:.1f}°C · Gibati nga kainit (Heat Index): {feels_f:.1f}°C — {hi_cat}\n"
+                    f"• UV Index: {uv_now:.1f} · Humidity: {hum_f:.0f}% · Sunrise: {sr} / Sunset: {ss}.\n"
+                    f"{'Likayi ang dugay nga pagpainit gikan alas 10 AM hangtod 3 PM ug pag-inom og daghang tubig.' if feels_f >= 33 else 'Kasarangan ang temperatura karon.'}"
+                )
+            elif language == "filipino":
+                answer = (
+                    f"Temperatura at Heat Index ngayon sa Barangay Don Felipe Larrazabal:\n"
+                    f"• Aktwal na temperatura: {temp_f:.1f}°C · Heat Index (Feels Like): {feels_f:.1f}°C — {hi_cat}\n"
+                    f"• UV Index: {uv_now:.1f} · Humidity: {hum_f:.0f}% · Sunrise: {sr} / Sunset: {ss}.\n"
+                    f"{'Iwasan ang matagal na pagbibilad mula 10 AM hanggang 3 PM at uminom ng maraming tubig.' if feels_f >= 33 else 'Katamtaman ang temperatura ngayon.'}"
+                )
+            else:
+                answer = (
+                    f"Temperature & Heat Index in Barangay Don Felipe Larrazabal:\n"
+                    f"• Air Temperature: {temp_f:.1f}°C · Feels Like (Heat Index): {feels_f:.1f}°C — {hi_cat}\n"
+                    f"• UV Index: {uv_now:.1f} · Humidity: {hum_f:.0f}% · Sunrise: {sr} / Sunset: {ss}.\n"
+                    f"{'Limit prolonged direct sun exposure between 10 AM and 3 PM and stay well hydrated.' if feels_f >= 33 else 'Thermal conditions are currently moderate.'}"
+                )
+        elif any(k in low_q for k in ("heavy rain", "rainfall", "yellow", "orange", "red", "baha", "flood")):
+            peak_txt = f"{peak_rain_hr.get('label')} ({int(_num(peak_rain_hr.get('prob')))}%, {_num(peak_rain_hr.get('rain')):.1f} mm)" if peak_rain_hr else "none expected"
+            if language == "cebuano":
+                answer = (
+                    f"PAGASA Rainfall Warning Guide:\n"
+                    f"• Yellow (7.5–15 mm/hr): Posible ang baha sa ubos nga lugar.\n"
+                    f"• Orange (15–30 mm/hr): Peligro sa baha, pag-andam sa evacuation.\n"
+                    f"• Red (>30 mm/hr): Grabe nga baha, pag-evacuate dayon.\n"
+                    f"Live data karon: 24h ulan {rain_24h:.1f} mm, peak rain window sa sunod 12h kay {peak_txt}."
+                )
+            elif language == "filipino":
+                answer = (
+                    f"PAGASA Rainfall Warning Guide:\n"
+                    f"• Yellow (7.5–15 mm/hr): Posibleng pagbaha sa mabababang lugar.\n"
+                    f"• Orange (15–30 mm/hr): Nagbabantang pagbaha, maghanda sa paglikas.\n"
+                    f"• Red (>30 mm/hr): Matinding pagbaha, lumikas agad.\n"
+                    f"Live data ngayon: 24h ulan {rain_24h:.1f} mm, pinakamataas na tsansa ng ulan sa 12h: {peak_txt}."
+                )
+            else:
+                answer = (
+                    f"PAGASA Rainfall Warning Levels:\n"
+                    f"• Yellow (7.5–15 mm/hr): Flooding possible in low-lying areas.\n"
+                    f"• Orange (15–30 mm/hr): Flooding threatening; prepare to evacuate.\n"
+                    f"• Red (>30 mm/hr): Serious flooding expected; evacuate immediately.\n"
+                    f"Live Ormoc reading: 24h rainfall {rain_24h:.1f} mm; highest 12h rain window is {peak_txt}."
+                )
+        elif any(k in low_q for k in ("ulan", "uwan", "rain", "umbrella", "payong", "forecast", "later", "tonight", "afternoon", "hapon", "gabii", "gabi", "buntag", "morning", "unya", "mamaya", "next", "hour")):
+            summary_6h = " · ".join(f"{h.get('label')}: {h.get('temp')} ({int(_num(h.get('prob')))}%)" for h in next6[:6]) if next6 else f"{temp_f:.1f}°C"
+            peak_txt = f"{peak_rain_hr.get('label')} ({int(_num(peak_rain_hr.get('prob')))}%)" if peak_rain_hr else "—"
+            if language == "cebuano":
+                answer = (
+                    f"Forecast sa sunod nga 6 ka oras sa Barangay Don Felipe Larrazabal:\n{summary_6h}\n"
+                    f"• Pinakataas nga tsansa sa ulan (12h): {int(max_prob_12h)}% bandang {peak_txt} · 24h total: {rain_24h:.1f} mm.\n"
+                    f"{'Mas maayo magdala og payong kon mogawas.' if max_prob_12h >= 45 else 'Ubos ang tsansa sa kusog nga ulan sa sunod nga mga oras.'}"
+                )
+            elif language == "filipino":
+                answer = (
+                    f"Susunod na 6-hour forecast sa Barangay Don Felipe Larrazabal:\n{summary_6h}\n"
+                    f"• Pinakamataas na tsansa ng ulan (12h): {int(max_prob_12h)}% bandang {peak_txt} · 24h total: {rain_24h:.1f} mm.\n"
+                    f"{'Magdala ng payong kung lalabas.' if max_prob_12h >= 45 else 'Mababa ang tsansa ng malakas na ulan sa susunod na mga oras.'}"
+                )
+            else:
+                answer = (
+                    f"Next 6-hour outlook for Barangay Don Felipe Larrazabal:\n{summary_6h}\n"
+                    f"• Peak 12h rain probability: {int(max_prob_12h)}% around {peak_txt} · 24h rainfall total: {rain_24h:.1f} mm.\n"
+                    f"{'Bringing an umbrella is recommended if heading out.' if max_prob_12h >= 45 else 'Heavy rain risk is low over the next few hours.'}"
+                )
+        elif any(k in low_q for k in ("typhoon", "bagyo", "signal", "tcws", "wind", "hangin", "storm", "gust")):
+            if language == "cebuano":
+                answer = (
+                    f"Kahimtang sa hangin karon sa Barangay Don Felipe Larrazabal: {wind_f:.1f} km/h (gusts hangtod {gust_f:.1f} km/h gikan sa {wind_dir_label}).\n"
+                    f"PAGASA Wind Signals: #1 (39–61 km/h), #2 (62–88 km/h), #3 (89–117 km/h), #4 (118–184 km/h), #5 (≥185 km/h).\n"
+                    "Susiha kanunay ang opisyal nga PAGASA Severe Weather Bulletin para sa eksaktong track sa bagyo."
+                )
+            elif language == "filipino":
+                answer = (
+                    f"Lakas ng hangin ngayon sa Barangay Don Felipe Larrazabal: {wind_f:.1f} km/h (bugso hanggang {gust_f:.1f} km/h mula {wind_dir_label}).\n"
+                    f"PAGASA Wind Signals: #1 (39–61 km/h), #2 (62–88 km/h), #3 (89–117 km/h), #4 (118–184 km/h), #5 (≥185 km/h).\n"
+                    "Suriin ang opisyal na PAGASA Severe Weather Bulletin para sa aktwal na track ng bagyo."
+                )
+            else:
+                answer = (
+                    f"Current wind in Barangay Don Felipe Larrazabal: {wind_f:.1f} km/h (gusts up to {gust_f:.1f} km/h from {wind_dir_label}).\n"
+                    f"PAGASA TCWS thresholds: #1 (39–61), #2 (62–88), #3 (89–117), #4 (118–184), #5 (≥185 km/h).\n"
+                    "Verify official PAGASA Tropical Cyclone Bulletins for active storm tracks."
+                )
+        elif any(k in low_q for k in ("humidity", "alisngaw", "visibility", "fog", "cloud", "panganod")):
+            if language == "cebuano":
+                answer = f"Live atmospheric readings sa Ormoc City: Humidity {hum_f:.0f}%, Visibility {vis_km} km, Cloud Cover {cloud_f:.0f}%, Hangin {wind_f:.1f} km/h ({wind_dir_label}). {'Medyo alimuot tungod sa taas nga humidity.' if hum_f >= 75 else 'Komportable ang lebel sa humidity karon.'}"
+            elif language == "filipino":
+                answer = f"Live atmospheric readings sa Ormoc City: Humidity {hum_f:.0f}%, Visibility {vis_km} km, Cloud Cover {cloud_f:.0f}%, Hangin {wind_f:.1f} km/h ({wind_dir_label}). {'Medyo maalinsangan dahil sa mataas na humidity.' if hum_f >= 75 else 'Komportable ang antas ng humidity ngayon.'}"
+            else:
+                answer = f"Live atmospheric readings for Ormoc City: Humidity {hum_f:.0f}%, Visibility {vis_km} km, Cloud Cover {cloud_f:.0f}%, Wind {wind_f:.1f} km/h ({wind_dir_label}). {'Air may feel muggy due to elevated humidity.' if hum_f >= 75 else 'Humidity and visibility are currently comfortable.'}"
+        elif any(k in low_q for k in ("thunder", "lightning", "kidlat", "kilat", "dalugdog", "kulog")):
+            if language == "cebuano":
+                answer = "Safety sa Kilat ug Dalugdog: Sulod dayon sa lig-on nga balay, i-unplug ang sensitibong appliances, likayi ang mga punoan sa kahoy, poste, ug open water, ug paghulat og 30 minutos human ang kataposang dalugdog sa dili pa mogawas."
+            elif language == "filipino":
+                answer = "Kaligtasan sa Kidlat at Kulog: Pumasok agad sa matibay na gusali, i-unplug ang appliances, umiwas sa matataas na puno at open water, at maghintay ng 30 minuto pagkatapos ng huling kulog bago lumabas."
+            else:
+                answer = "Thunderstorm & Lightning Safety: Move indoors immediately, unplug sensitive electronics, avoid tall trees, metal poles, and open water, and wait 30 minutes after the last thunder before resuming outdoor activity."
+        elif any(k in low_q for k in ("landslide", "earthquake", "linog", "lindol", "tsunami", "volcan")):
+            if language == "cebuano":
+                answer = "Responsableng Pahinumdom: Ang AI dili makatagna sa eksaktong linog o landslide. Kon maglinog, buhata ang Duck, Cover, and Hold ug palayo sa mga bildo o taas nga estruktura. Para sa opisyal nga updates, susiha ang PHIVOLCS ug DENR-MGB."
+            elif language == "filipino":
+                answer = "Responsableng Paalala: Hindi kayang hulaan ng AI ang eksaktong lindol o landslide. Kapag lumindol, gawin ang Duck, Cover, and Hold at lumayo sa mabibigat na bagay. Suriin ang opisyal na PHIVOLCS at DENR-MGB updates."
+            else:
+                answer = "Responsible Notice: AI cannot predict exact earthquakes or landslides. During shaking, perform Duck, Cover, and Hold and move away from falling hazards. Check official PHIVOLCS and DENR-MGB bulletins for verified seismic and slope alerts."
+        elif any(k in low_q for k in ("safety", "tip", "tips", "prepare", "buhaton", "gawin", "evacuate", "bakwit", "kit", "go bag", "emergency", "hotline")):
+            if language == "cebuano":
+                answer = (
+                    f"Mga Safety Tips karon ({cond}, {temp_f:.1f}°C, Heat Index {feels_f:.1f}°C):\n"
+                    "1) I-andam ang Emergency Go-Bag (tubig, flashlight, first aid, tambal, importanteng IDs, powerbank).\n"
+                    "2) Ayaw paglabang sa bahaan nga dalan o kusog nga sapa; paminaw sa BDRRMC Barangay Don Felipe Larrazabal.\n"
+                    "3) Kon init kaayo, pag-inom og daghang tubig ug likayi ang dugay nga pagpainit."
+                )
+            elif language == "filipino":
+                answer = (
+                    f"Mga Safety Tips ngayon ({cond}, {temp_f:.1f}°C, Heat Index {feels_f:.1f}°C):\n"
+                    "1) Ihanda ang Emergency Go-Bag (tubig, flashlight, first aid, gamot, mahahalagang ID, powerbank).\n"
+                    "2) Huwag tumawid sa binabahang kalsada o rumaragasang ilog; makinig sa BDRRMC Barangay Don Felipe Larrazabal.\n"
+                    "3) Kapag mainit, uminom ng sapat na tubig at iwasan ang matagal na pagbibilad."
+                )
+            else:
+                answer = (
+                    f"Preparedness & Safety Tips ({cond}, {temp_f:.1f}°C, Heat Index {feels_f:.1f}°C):\n"
+                    "1) Keep an Emergency Go-Bag ready (water, flashlight, first aid kit, medicines, IDs, power bank).\n"
+                    "2) Never cross flooded roads or swollen waterways; coordinate with BDRRMC Barangay Don Felipe Larrazabal.\n"
+                    "3) Hydrate regularly during peak heat hours and verify severe alerts with PAGASA."
+                )
+        elif any(k in low_q for k in ("hi", "hello", "hey", "kumusta", "maayong", "help", "tabang", "tulong")) and len(low_q) < 35:
+            if language == "cebuano":
+                answer = f"Maayong adlaw! Live sa Barangay Don Felipe Larrazabal karon: {temp_f:.1f}°C ({cond}, Heat Index {feels_f:.1f}°C). Pwede ka mangutana bisan unsa bahin sa panahon—sama sa oras sa ulan (e.g. 'muulan ba alas 3?'), forecast ugma, paglaba, byahe, klase, bagyo, o safety tips!"
+            elif language == "filipino":
+                answer = f"Magandang araw! Live sa Barangay Don Felipe Larrazabal ngayon: {temp_f:.1f}°C ({cond}, Heat Index {feels_f:.1f}°C). Maaari kang magtanong kahit ano tungkol sa panahon—oras ng ulan (hal. 'uulan ba alas 3?'), bukas/7-day forecast, paglalaba, biyahe, klase, bagyo, o safety tips!"
+            else:
+                answer = f"Hello! Live in Barangay Don Felipe Larrazabal: {temp_f:.1f}°C ({cond}, feels like {feels_f:.1f}°C). Ask me anything about the weather—exact hours ('will it rain at 3 PM?'), tomorrow or 5-day outlook, heat index, laundry, travel/fishing, class suspensions, typhoons, or safety tips!"
+        else:
+            hi_cat = _heat_category(feels_f, language)
+            peak_txt = f"{peak_rain_hr.get('label')} ({int(_num(peak_rain_hr.get('prob')))}%)" if peak_rain_hr else "low risk"
+            tmr_txt = f"{tomorrow_daily.get('min')}–{tomorrow_daily.get('max')}°C, {tomorrow_daily.get('prob')}% rain" if tomorrow_daily else "N/A"
+            if language == "cebuano":
+                answer = (
+                    f"Base sa live nga weather telemetry sa Barangay Don Felipe Larrazabal, Ormoc City:\n"
+                    f"• Karon: {temp_f:.1f}°C ({cond}), Heat Index {feels_f:.1f}°C ({hi_cat})\n"
+                    f"• Hangin: {wind_f:.1f} km/h ({wind_dir_label}) · Humidity: {hum_f:.0f}% · Visibility: {vis_km} km\n"
+                    f"• Ulan (24h): {rain_24h:.1f} mm (peak 12h chance: {peak_txt}) · Ugma: {tmr_txt}.\n"
+                    "Pwede pud ko nimo pangutan-on og espesipikong oras (e.g. 'alas 4'), ugma/semana, paglaba, byahe, klase, o safety tips!"
+                )
+            elif language == "filipino":
+                answer = (
+                    f"Batay sa live weather telemetry sa Barangay Don Felipe Larrazabal, Ormoc City:\n"
+                    f"• Ngayon: {temp_f:.1f}°C ({cond}), Heat Index {feels_f:.1f}°C ({hi_cat})\n"
+                    f"• Hangin: {wind_f:.1f} km/h ({wind_dir_label}) · Humidity: {hum_f:.0f}% · Visibility: {vis_km} km\n"
+                    f"• Ulan (24h): {rain_24h:.1f} mm (peak 12h chance: {peak_txt}) · Bukas: {tmr_txt}.\n"
+                    "Maaari mo rin akong tanungin ng eksaktong oras (hal. 'alas 4'), bukas/linggo, paglalaba, biyahe, klase, o safety tips!"
+                )
+            else:
+                answer = (
+                    f"Live weather analysis for Barangay Don Felipe Larrazabal, Ormoc City:\n"
+                    f"• Now: {temp_f:.1f}°C ({cond}), Heat Index {feels_f:.1f}°C ({hi_cat})\n"
+                    f"• Wind: {wind_f:.1f} km/h ({wind_dir_label}) · Humidity: {hum_f:.0f}% · Visibility: {vis_km} km\n"
+                    f"• 24h Rain: {rain_24h:.1f} mm (peak 12h chance: {peak_txt}) · Tomorrow: {tmr_txt}.\n"
+                    "You can also ask about a specific hour (e.g. '3 PM'), tomorrow or 5-day forecast, laundry, travel/sea conditions, class suspensions, or emergency safety."
+                )
+
+    return jsonify(
+        {
+            "data": {
+                "reply": answer,
+                "language": language,
+                "source": ai_provider or adv_source,
+                "source_url": "https://bagong.pagasa.dost.gov.ph/weather",
+                "last_updated": updated_at,
+                "disclaimer": "AI-assisted explanation only — not an official PAGASA warning.",
+            }
+        }
+    )
 
 
 def _resolve_household_for_resident(
@@ -890,10 +1494,11 @@ def create_document():
             if value and len(value) > maximum:
                 return jsonify({"error": f"{label} must be {maximum} characters or fewer"}), 400
         supporting_doc_type = str(payload.get("supporting_doc_type", "")).strip() or None
+        submitted_email = str(payload.get("resident_email") or payload.get("email") or "").strip()
         resolved_email = (
-            str(user.get("email") or "").strip()
-            if is_resident and user.get("email")
-            else supabase_repository._resolve_account_email(None, resident_name)
+            submitted_email
+            or (str(user.get("email") or "").strip() if is_resident and user.get("email") else "")
+            or supabase_repository._resolve_account_email(None, resident_name)
         )
         data = {
             "document_type": document_type,
@@ -914,7 +1519,7 @@ def create_document():
         }
         if is_resident and not supabase_repository.can_create_document(user["id"], document_type):
             return jsonify({"error": "You already have an active request for this document"}), 429
-        if not is_resident and user["role"] not in {"admin", "barangay_official"}:
+        if not is_resident and user["role"] not in {"super_admin", "admin", "barangay_official"}:
             return jsonify({"error": "You do not have permission to create document requests"}), 403
         return jsonify({"data": supabase_repository.insert_row("documents", data)}), 201
     except RepositoryConfigurationError as error:
@@ -935,11 +1540,12 @@ def _resolve_resident_email(doc: dict) -> str:
         "pedro.villanueva@gmail.com",
         "resident@gmail.com",
     }
-    cur = str(doc.get("resident_email") or "").strip()
-    if cur and cur.lower() not in fake_demo_emails:
-        return cur
+    for email_key in ("resident_email", "email", "applicant_email", "requester_email", "contact_email"):
+        cur = str(doc.get(email_key) or "").strip()
+        if cur and cur.lower() not in fake_demo_emails:
+            return cur
     return supabase_repository._resolve_account_email(
-        doc.get("requester_id"),
+        doc.get("requester_id") or doc.get("resident_id"),
         doc.get("resident_name"),
     )
 
@@ -955,7 +1561,7 @@ def _send_gmail_notification(to_email: str, subject: str, body: str, resident_na
     clean_subject = subject.replace("—", "-").replace("–", "-")
     clean_body = body.replace("•", "-").replace("—", "-")
     recipients = [addr.strip() for addr in str(to_email or "").split(",") if addr.strip()]
-    delivery = "Resident Portal Notification (SMTP Not Configured)"
+    delivery = "SmartBarangay Mobile App Notification (SMTP Not Configured)"
     smtp_delivered = False
     smtp_error = None
     if smtp_user and smtp_pass and recipients:
@@ -1136,7 +1742,9 @@ def send_document_payment_instructions(document_id: int):
 
         tx_ref = doc.get("tx_ref") or f"TXN-SB-{manila_today().year}-{document_id:04d}"
         resident_name = str(doc.get("resident_name") or "Resident").strip()
-        to_email = str(payload.get("resident_email") or _resolve_resident_email(doc)).strip()
+        to_email = str(_resolve_resident_email(doc) or payload.get("resident_email") or "").strip()
+        if not to_email:
+            return jsonify({"error": "No resident email address is associated with this document request."}), 400
 
         subject = f"[SmartBarangay] Payment Instructions for {resident_name} — {doc_type} ({tx_ref})"
         body = (
@@ -1152,7 +1760,7 @@ def send_document_payment_instructions(document_id: int):
             f"   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n"
             f"   3. Over-the-Counter: Barangay Hall Treasurer's Office\n\n"
             f"NEXT STEP:\n"
-            f"Once payment is completed, please log in to your SmartBarangay Resident Portal and upload your payment receipt / proof of payment referencing {tx_ref}.\n\n"
+            f"Once payment is completed, please open the SmartBarangay Mobile App and upload your payment receipt / proof of payment referencing {tx_ref}.\n\n"
             f"Thank you,\n"
             f"Office of the Punong Barangay — Hon. Nenito S. Anonat\n"
             f"Barangay Don Felipe Larrazabal, Ormoc City, Leyte"
@@ -1324,7 +1932,7 @@ def update_document(document_id):
             f"• Amount Verified: PHP {paid_float:.2f}\n"
             f"• Payment Verification Status: VERIFIED\n"
             f"• Document Status: APPROVED & READY FOR DOWNLOAD\n\n"
-            f"You may now log in to your SmartBarangay Resident Portal and click 'Download PDF' to get your official {doc.get('document_type', 'Barangay Certificate')}.\n\n"
+            f"You may now open the SmartBarangay Mobile App and download your official {doc.get('document_type', 'Barangay Certificate')}.\n\n"
             f"Thank you,\n"
             f"Office of the Punong Barangay — Hon. Nenito S. Anonat\n"
             f"Barangay Don Felipe Larrazabal, Ormoc City, Leyte"
@@ -1339,6 +1947,19 @@ def update_document(document_id):
         })
         updates["email_logs"] = email_logs
         updates["transaction_history"] = tx_history
+    elif status == "Rejected":
+        updates["status"] = "Rejected"
+        updates["verification_status"] = "Rejected"
+        if doc.get("payment_status") == "Verified" or payload.get("payment_status") == "Rejected":
+            updates["payment_status"] = "Rejected"
+        reason = str(payload.get("verification_remarks") or "Document requirements not met").strip()
+        tx_history.insert(0, {
+            "timestamp": manila_now().isoformat(),
+            "actor": official_name,
+            "event": "Rejected Request",
+            "details": reason,
+        })
+        updates["transaction_history"] = tx_history
     elif payload.get("payment_status") == "Rejected":
         updates["payment_status"] = "Rejected"
         reason = str(payload.get("verification_remarks") or "Submitted payment receipt could not be validated.").strip()
@@ -1347,7 +1968,7 @@ def update_document(document_id):
             f"Dear {resident_name},\n\n"
             f"Your uploaded payment receipt for {doc.get('document_type', 'your document request')} ({tx_ref}) could not be verified.\n"
             f"Reason / Official Remarks: {reason}\n\n"
-            f"Please log in to the SmartBarangay Resident Portal and upload a valid proof of payment.\n\n"
+            f"Please open the SmartBarangay Mobile App and upload a valid proof of payment.\n\n"
             f"Office of the Punong Barangay — Hon. Nenito S. Anonat"
         )
         email_entry = _send_gmail_notification(to_email, subject, body, resident_name=resident_name)
@@ -1850,26 +2471,38 @@ def respond_concern_appointment(concern_id: int):
 
 
 @app.post("/api/admin/register")
-@roles_required("admin")
+@roles_required("super_admin")
 def register_account():
     payload = request.get_json(silent=True) or {}
-    required = ("email", "password", "full_name", "role")
+    required = ("email", "password", "full_name")
     missing = [field for field in required if not payload.get(field)]
     if missing:
         return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
-    if payload["role"] not in ("resident", "barangay_official"):
-        return jsonify({"error": "Admin can register residents or barangay officials only"}), 400
-    department = str(payload.get("department", "")).strip() or None
-    if payload["role"] == "barangay_official" and department not in DEPARTMENT_CATEGORIES:
-        return jsonify({"error": "Choose a valid barangay official department"}), 400
     position = str(payload.get("position", "")).strip() or None
+    requested_role = str(payload.get("role", "barangay_official")).strip().lower()
+    if requested_role not in ("admin", "barangay_official"):
+        return jsonify({"error": "Super Admin can register Barangay Officials and Barangay Secretary only."}), 400
+    # Barangay Secretary receives Admin role; all other registered officials are Authorized Users (barangay_official)
+    assigned_role = "admin" if (position and "secretary" in position.lower()) else requested_role
+    raw_password = str(payload.get("password") or "")
+    if (
+        len(raw_password) < 8
+        or not re.search(r"[A-Z]", raw_password)
+        or not re.search(r"[a-z]", raw_password)
+        or not re.search(r"[0-9]", raw_password)
+        or not re.search(r"[^A-Za-z0-9]", raw_password)
+    ):
+        return jsonify({"error": "Password must be at least 8 characters and include uppercase, lowercase, number, and special character."}), 400
+    department = str(payload.get("department", "")).strip() or None
+    if department not in DEPARTMENT_CATEGORIES:
+        department = "Social Services"
     phone = str(payload.get("phone", "")).strip() or None
     try:
         user = supabase_repository.register_account(
             email=str(payload["email"]).strip().lower(),
             password=str(payload["password"]),
             full_name=str(payload["full_name"]).strip(),
-            role=str(payload["role"]),
+            role=assigned_role,
             department=department,
             position=position,
             phone=phone,
@@ -1884,6 +2517,15 @@ def register_account():
         return jsonify({"error": str(error)}), 502
 
 if __name__ == "__main__":
+    import threading
+
+    def _startup_sync_warmup():
+        try:
+            supabase_repository.sync_now()
+        except Exception:
+            pass
+
+    threading.Thread(target=_startup_sync_warmup, daemon=True).start()
     app.run(
         host=os.getenv("FLASK_HOST", "127.0.0.1"),
         port=int(os.getenv("PORT", "5000")),

@@ -50,9 +50,9 @@
                         </div>
 
                         <div class="brand-title-wrap">
-                            <h1 class="brand-main-title">SMART BARANGAY SYSTEM</h1>
+                            <h1 class="brand-main-title">Smart Barangay Governance and Public Service Management System with Resident Analytics Dashboard</h1>
                             <div class="brand-divider-line"></div>
-                            <p class="brand-primary-desc">Digital Governance &amp; Citizen Services Portal</p>
+                            <p class="brand-primary-desc">Barangay Officials Management &amp; Governance Portal</p>
                             <p class="brand-secondary-desc">Barangay Don Felipe Larrazabal &middot; Ormoc City, Leyte</p>
                         </div>
                     </div>
@@ -62,7 +62,7 @@
                 <section class="card-form-panel">
                     <div class="form-panel-header">
                         <h2 class="form-title">Welcome Back</h2>
-                        <p class="form-subtitle">Please enter your credentials to log in.</p>
+                        <p class="form-subtitle">Authorized Barangay Officials only. Enter your credentials to log in.</p>
                     </div>
 
                     <form id="login-form" class="auth-form" novalidate>
@@ -135,6 +135,7 @@
 
     <script src="https://unpkg.com/lucide@latest"></script>
     <script>
+        if (typeof window.lucide === 'undefined') { window.lucide = { createIcons: () => {} }; }
         lucide.createIcons();
 
         // 1. Dark / Light Theme Toggle with LocalStorage persistence

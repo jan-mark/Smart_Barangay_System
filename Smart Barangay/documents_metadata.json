@@ -1,21 +1,42 @@
 {
-  "2": {
-    "amount_paid": 100.0
-  },
-  "6": {
-    "tx_ref": "TXN-SB-2026-0006",
-    "amount_due": 0.0,
-    "resident_email": "johnmarktangil@gmail.com",
-    "payment_status": "Awaiting Payment",
+  "15": {
+    "tx_ref": "TXN-SB-2026-0015",
+    "amount_due": 50.0,
+    "resident_email": "carlosmiguel.coste@evsu.edu.ph",
+    "payment_status": "Verified",
     "email_logs": [
       {
         "from": "johnmark.manidlangan@evsu.edu.ph",
-        "to": "johnmarktangil@gmail.com",
-        "resident_name": "Juan dela Cruz",
-        "subject": "[SmartBarangay] Payment Instructions for Juan dela Cruz \u2014 Certificate of Indigency (TXN-SB-2026-0006)",
-        "body": "Dear Juan dela Cruz,\n\nYour document request for Certificate of Indigency has passed initial verification by HON. NENITO S. ANONAT.\n\nPAYMENT DETAILS & INSTRUCTIONS:\n\u2022 Applicant / Resident Name: Juan dela Cruz\n\u2022 Transaction Reference No.: TXN-SB-2026-0006\n\u2022 Document Requested: Certificate of Indigency\n\u2022 Required Fee Amount: PHP 0.00\n\u2022 Accepted Payment Methods:\n   1. GCash: 0917-123-4567 (Brgy. Don Felipe Larrazabal Treasury)\n   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n   3. Over-the-Counter: Barangay Hall Treasurer's Office\n\nNEXT STEP:\nOnce payment is completed, please log in to your SmartBarangay Resident Portal and upload your payment receipt / proof of payment referencing TXN-SB-2026-0006.\n\nThank you,\nOffice of the Punong Barangay \u2014 Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
-        "sent_at": "2026-11-18T21:37:20.189461+08:00",
-        "delivery": "Sent from johnmark.manidlangan@evsu.edu.ph to johnmarktangil@gmail.com",
+        "to": "carlosmiguel.coste@evsu.edu.ph",
+        "resident_name": "Carlos Miguel M. Coste",
+        "subject": "[SmartBarangay] Payment Verified for Carlos Miguel M. Coste - Barangay Clearance Approved (TXN-SB-2026-0015)",
+        "body": "Dear Carlos Miguel M. Coste,\n\nWe are pleased to inform you that your payment has been verified by HON. NENITO S. ANONAT.\n\nPAYMENT CONFIRMATION SUMMARY:\n- Applicant / Resident Name: Carlos Miguel M. Coste\n- Transaction Reference: TXN-SB-2026-0015\n- Receipt Reference: Verified\n- Amount Verified: PHP 50.00\n- Payment Verification Status: VERIFIED\n- Document Status: APPROVED & READY FOR DOWNLOAD\n\nYou may now log in to your SmartBarangay Resident Portal and click 'Download PDF' to get your official Barangay Clearance.\n\nThank you,\nOffice of the Punong Barangay - Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
+        "sent_at": "2026-11-24T12:41:10.306410+08:00",
+        "delivery": "Sent from johnmark.manidlangan@evsu.edu.ph to carlosmiguel.coste@evsu.edu.ph",
+        "smtp_delivered": true,
+        "smtp_configured": true,
+        "smtp_error": null
+      },
+      {
+        "from": "johnmark.manidlangan@evsu.edu.ph",
+        "to": "carlosmiguel.coste@evsu.edu.ph",
+        "resident_name": "Carlos Miguel M. Coste",
+        "subject": "[SmartBarangay] Payment Verified for Carlos Miguel M. Coste - Barangay Clearance Approved (TXN-SB-2026-0015)",
+        "body": "Dear Carlos Miguel M. Coste,\n\nWe are pleased to inform you that your payment has been verified by HON. NENITO S. ANONAT.\n\nPAYMENT CONFIRMATION SUMMARY:\n- Applicant / Resident Name: Carlos Miguel M. Coste\n- Transaction Reference: TXN-SB-2026-0015\n- Receipt Reference: Verified\n- Amount Verified: PHP 50.00\n- Payment Verification Status: VERIFIED\n- Document Status: APPROVED & READY FOR DOWNLOAD\n\nYou may now log in to your SmartBarangay Resident Portal and click 'Download PDF' to get your official Barangay Clearance.\n\nThank you,\nOffice of the Punong Barangay - Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
+        "sent_at": "2026-11-24T12:38:46.250225+08:00",
+        "delivery": "Sent from johnmark.manidlangan@evsu.edu.ph to carlosmiguel.coste@evsu.edu.ph",
+        "smtp_delivered": true,
+        "smtp_configured": true,
+        "smtp_error": null
+      },
+      {
+        "from": "johnmark.manidlangan@evsu.edu.ph",
+        "to": "carlosmiguel.coste@evsu.edu.ph",
+        "resident_name": "Carlos Miguel M. Coste",
+        "subject": "[SmartBarangay] Payment Instructions for Carlos Miguel M. Coste - Barangay Clearance (TXN-SB-2026-0015)",
+        "body": "Dear Carlos Miguel M. Coste,\n\nYour document request for Barangay Clearance has passed initial verification by HON. NENITO S. ANONAT.\n\nPAYMENT DETAILS & INSTRUCTIONS:\n- Applicant / Resident Name: Carlos Miguel M. Coste\n- Transaction Reference No.: TXN-SB-2026-0015\n- Document Requested: Barangay Clearance\n- Required Fee Amount: PHP 50.00\n- Accepted Payment Methods:\n   1. GCash: 0917-123-4567 (Brgy. Don Felipe Larrazabal Treasury)\n   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n   3. Over-the-Counter: Barangay Hall Treasurer's Office\n\nNEXT STEP:\nOnce payment is completed, please log in to your SmartBarangay Resident Portal and upload your payment receipt / proof of payment referencing TXN-SB-2026-0015.\n\nThank you,\nOffice of the Punong Barangay - Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
+        "sent_at": "2026-11-23T14:06:42.491603+08:00",
+        "delivery": "Sent from johnmark.manidlangan@evsu.edu.ph to carlosmiguel.coste@evsu.edu.ph",
         "smtp_delivered": true,
         "smtp_configured": true,
         "smtp_error": null
@@ -23,10 +44,10 @@
       {
         "from": "johnmark.manidlangan@evsu.edu.ph",
         "to": "johnmarktangil@gmail.com",
-        "resident_name": "Juan dela Cruz",
-        "subject": "[SmartBarangay] Payment Instructions for Juan dela Cruz \u2014 Certificate of Indigency (TXN-SB-2026-0006)",
-        "body": "Dear Juan dela Cruz,\n\nYour document request for Certificate of Indigency has passed initial verification by HON. NENITO S. ANONAT.\n\nPAYMENT DETAILS & INSTRUCTIONS:\n\u2022 Applicant / Resident Name: Juan dela Cruz\n\u2022 Transaction Reference No.: TXN-SB-2026-0006\n\u2022 Document Requested: Certificate of Indigency\n\u2022 Required Fee Amount: PHP 0.00\n\u2022 Accepted Payment Methods:\n   1. GCash: 0917-123-4567 (Brgy. Don Felipe Larrazabal Treasury)\n   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n   3. Over-the-Counter: Barangay Hall Treasurer's Office\n\nNEXT STEP:\nOnce payment is completed, please log in to your SmartBarangay Resident Portal and upload your payment receipt / proof of payment referencing TXN-SB-2026-0006.\n\nThank you,\nOffice of the Punong Barangay \u2014 Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
-        "sent_at": "2026-11-18T21:20:32.815398+08:00",
+        "resident_name": "Carlos Miguel M. Coste",
+        "subject": "[SmartBarangay] Payment Instructions for Carlos Miguel M. Coste - Barangay Clearance (TXN-SB-2026-0015)",
+        "body": "Dear Carlos Miguel M. Coste,\n\nYour document request for Barangay Clearance has passed initial verification by HON. NENITO S. ANONAT.\n\nPAYMENT DETAILS & INSTRUCTIONS:\n- Applicant / Resident Name: Carlos Miguel M. Coste\n- Transaction Reference No.: TXN-SB-2026-0015\n- Document Requested: Barangay Clearance\n- Required Fee Amount: PHP 50.00\n- Accepted Payment Methods:\n   1. GCash: 0917-123-4567 (Brgy. Don Felipe Larrazabal Treasury)\n   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n   3. Over-the-Counter: Barangay Hall Treasurer's Office\n\nNEXT STEP:\nOnce payment is completed, please log in to your SmartBarangay Resident Portal and upload your payment receipt / proof of payment referencing TXN-SB-2026-0015.\n\nThank you,\nOffice of the Punong Barangay - Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
+        "sent_at": "2026-11-23T14:04:22.687883+08:00",
         "delivery": "Sent from johnmark.manidlangan@evsu.edu.ph to johnmarktangil@gmail.com",
         "smtp_delivered": true,
         "smtp_configured": true,
@@ -35,25 +56,128 @@
     ],
     "transaction_history": [
       {
-        "timestamp": "2026-11-18T21:37:20.189568+08:00",
+        "timestamp": "2026-11-24T12:50:33.039843+08:00",
         "actor": "HON. NENITO S. ANONAT",
-        "event": "Payment Instructions Sent via Gmail",
-        "details": "Sent payment instructions for Juan dela Cruz (\u20b10.00, Ref: TXN-SB-2026-0006) to johnmarktangil@gmail.com"
+        "event": "Rejected Request",
+        "details": "Document requirements not met"
       },
       {
-        "timestamp": "2026-11-18T21:20:32.815523+08:00",
+        "timestamp": "2026-11-24T12:41:10.306589+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Payment Verified & Confirmation Gmail Sent",
+        "details": "Verified \u20b150.00 for Carlos Miguel M. Coste (Ref: TXN-SB-2026-0015). Sent confirmation email to carlosmiguel.coste@evsu.edu.ph."
+      },
+      {
+        "timestamp": "2026-11-24T12:38:46.250412+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Payment Verified & Confirmation Gmail Sent",
+        "details": "Verified \u20b150.00 for Carlos Miguel M. Coste (Ref: TXN-SB-2026-0015). Sent confirmation email to carlosmiguel.coste@evsu.edu.ph."
+      },
+      {
+        "timestamp": "2026-11-23T14:06:42.491736+08:00",
         "actor": "HON. NENITO S. ANONAT",
         "event": "Payment Instructions Sent via Gmail",
-        "details": "Sent payment instructions for Juan dela Cruz (\u20b10.00, Ref: TXN-SB-2026-0006) to johnmarktangil@gmail.com"
+        "details": "Sent payment instructions for Carlos Miguel M. Coste (\u20b150.00, Ref: TXN-SB-2026-0015) to carlosmiguel.coste@evsu.edu.ph"
+      },
+      {
+        "timestamp": "2026-11-23T14:04:22.688020+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Payment Instructions Sent via Gmail",
+        "details": "Sent payment instructions for Carlos Miguel M. Coste (\u20b150.00, Ref: TXN-SB-2026-0015) to johnmarktangil@gmail.com"
       }
     ],
-    "verification_status": "Verified",
-    "checklist_summary": "4/4 Verified",
+    "verification_status": "Rejected",
+    "checklist_summary": "0/4 Verified",
     "verified_by": "HON. NENITO S. ANONAT",
-    "verified_at": "2026-11-18T21:37:20.189585+08:00",
-    "action_performed": "Checklist Verified & Payment Email Sent",
+    "verified_at": "2026-11-24T12:50:33.039801+08:00",
+    "action_performed": "Rejected Request",
     "manual_checks": [
-      "completeness"
-    ]
+      "supporting_docs",
+      "completeness",
+      "address_match",
+      "registration"
+    ],
+    "amount_paid": 50.0,
+    "verification_remarks": "Document requirements not met"
+  },
+  "12": {
+    "tx_ref": "TXN-SB-2026-0012",
+    "resident_email": "johnmarktangil@gmail.com",
+    "transaction_history": [
+      {
+        "timestamp": "2026-11-24T12:50:46.621782+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Rejected Request",
+        "details": "Document requirements not met"
+      }
+    ],
+    "verification_status": "Rejected",
+    "checklist_summary": "0/4 Verified",
+    "verified_by": "HON. NENITO S. ANONAT",
+    "verified_at": "2026-11-24T12:50:46.621733+08:00",
+    "action_performed": "Rejected Request",
+    "verification_remarks": "Document requirements not met",
+    "manual_checks": []
+  },
+  "14": {
+    "tx_ref": "TXN-SB-2026-0014",
+    "resident_email": "johnmarktangil@gmail.com",
+    "payment_status": "Rejected",
+    "email_logs": [
+      {
+        "from": "johnmark.manidlangan@evsu.edu.ph",
+        "to": "johnmarktangil@gmail.com",
+        "resident_name": "Carlos Miguel M. Coste",
+        "subject": "[SmartBarangay] Payment Receipt Update for Carlos Miguel M. Coste - Certificate of Indigency (TXN-SB-2026-0014)",
+        "body": "Dear Carlos Miguel M. Coste,\n\nYour uploaded payment receipt for Certificate of Indigency (TXN-SB-2026-0014) could not be verified.\nReason / Official Remarks: Document requirements not met\n\nPlease log in to the SmartBarangay Resident Portal and upload a valid proof of payment.\n\nOffice of the Punong Barangay - Hon. Nenito S. Anonat",
+        "sent_at": "2026-11-24T14:23:56.815855+08:00",
+        "delivery": "Sent from johnmark.manidlangan@evsu.edu.ph to johnmarktangil@gmail.com",
+        "smtp_delivered": true,
+        "smtp_configured": true,
+        "smtp_error": null
+      }
+    ],
+    "transaction_history": [
+      {
+        "timestamp": "2026-11-24T14:23:56.816005+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Payment Receipt Rejected",
+        "details": "Rejected receipt for Carlos Miguel M. Coste: Document requirements not met"
+      }
+    ],
+    "verification_status": "Rejected",
+    "checklist_summary": "0/4 Verified",
+    "verified_by": "HON. NENITO S. ANONAT",
+    "verified_at": "2026-11-24T14:23:53.512916+08:00",
+    "action_performed": "Rejected Request",
+    "verification_remarks": "Document requirements not met",
+    "manual_checks": []
+  },
+  "13": {
+    "tx_ref": "TXN-SB-2026-0013",
+    "resident_email": "johnmarktangil@gmail.com",
+    "transaction_history": [
+      {
+        "timestamp": "2026-11-24T16:05:39.142668+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Rejected Request",
+        "details": "Please update your information. Thank you."
+      },
+      {
+        "timestamp": "2026-11-24T15:21:51.504838+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Returned to Resident for Correction",
+        "details": "Please update your information. Thank you."
+      }
+    ],
+    "verification_status": "Rejected",
+    "checklist_summary": "0/4 Verified",
+    "verified_by": "HON. NENITO S. ANONAT",
+    "verified_at": "2026-11-24T16:05:39.142610+08:00",
+    "action_performed": "Rejected Request",
+    "verification_remarks": "Please update your information. Thank you.",
+    "manual_checks": [],
+    "status": "Rejected",
+    "payment_status": "Rejected"
   }
 }
