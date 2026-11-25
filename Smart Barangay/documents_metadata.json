@@ -179,5 +179,75 @@
     "manual_checks": [],
     "status": "Rejected",
     "payment_status": "Rejected"
+  },
+  "16": {
+    "tx_ref": "TXN-SB-2026-0016",
+    "resident_email": "migueboy16@gmail.com",
+    "email_logs": [
+      {
+        "from": "johnmark.manidlangan@evsu.edu.ph",
+        "to": "migueboy16@gmail.com",
+        "resident_name": "Carlos Miguel M. Coste",
+        "subject": "[SmartBarangay] Official Barangay Clearance Released for Carlos Miguel M. Coste (TXN-SB-2026-0016)",
+        "body": "Dear Carlos Miguel M. Coste,\n\nYour requested Barangay Clearance from Barangay Don Felipe Larrazabal, Ormoc City has been officially approved and released by HON. NENITO S. ANONAT.\n\nDOCUMENT SUMMARY:\n- Resident Name: Carlos Miguel M. Coste\n- Document Type: Barangay Clearance\n- Transaction Reference: TXN-SB-2026-0016\n- Status: APPROVED & RELEASED\n\nAttached to this email is your official Barangay Clearance PDF document.\n\nThank you,\nOffice of the Punong Barangay - Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
+        "sent_at": "2026-11-25T00:32:56.846453+08:00",
+        "delivery": "Sent from johnmark.manidlangan@evsu.edu.ph to migueboy16@gmail.com (Attached: barangay-clearance-DOC-0016.pdf)",
+        "attachments": [
+          "barangay-clearance-DOC-0016.pdf"
+        ],
+        "smtp_delivered": true,
+        "smtp_configured": true,
+        "smtp_error": null
+      }
+    ],
+    "transaction_history": [
+      {
+        "timestamp": "2026-11-25T00:32:56.847004+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Official PDF Document Emailed to Resident",
+        "details": "Sent from johnmark.manidlangan@evsu.edu.ph to migueboy16@gmail.com (Attached: barangay-clearance-DOC-0016.pdf)"
+      }
+    ]
+  },
+  "25": {
+    "status": "Processing",
+    "tx_ref": "TXN-SB-2026-0025",
+    "amount_due": 50.0,
+    "resident_email": "migueboy16@gmail.com",
+    "payment_status": "Awaiting Payment",
+    "email_logs": [
+      {
+        "from": "johnmark.manidlangan@evsu.edu.ph",
+        "to": "migueboy16@gmail.com",
+        "resident_name": "Carlos Miguel M. Coste",
+        "subject": "[SmartBarangay] Payment Instructions for Carlos Miguel M. Coste - Barangay Clearance (TXN-SB-2026-0025)",
+        "body": "Dear Carlos Miguel M. Coste,\n\nYour document request for Barangay Clearance has passed initial verification by HON. NENITO S. ANONAT.\n\nPAYMENT DETAILS & INSTRUCTIONS:\n- Applicant / Resident Name: Carlos Miguel M. Coste\n- Transaction Reference No.: TXN-SB-2026-0025\n- Document Requested: Barangay Clearance\n- Required Fee Amount: PHP 50.00\n- Accepted Payment Methods:\n   1. GCash: 0917-123-4567 (Brgy. Don Felipe Larrazabal Treasury)\n   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n   3. Over-the-Counter: Barangay Hall Treasurer's Office\n\nNEXT STEP:\nOnce payment is completed, please open the SmartBarangay Mobile App and upload your payment receipt / proof of payment referencing TXN-SB-2026-0025.\n\nThank you,\nOffice of the Punong Barangay - Hon. Nenito S. Anonat\nBarangay Don Felipe Larrazabal, Ormoc City, Leyte",
+        "sent_at": "2026-11-25T13:35:41.877569+08:00",
+        "delivery": "Notification Only (SMTP Error: [Errno 11001] getaddrinfo failed)",
+        "attachments": [],
+        "smtp_delivered": false,
+        "smtp_configured": true,
+        "smtp_error": "[Errno 11001] getaddrinfo failed"
+      }
+    ],
+    "transaction_history": [
+      {
+        "timestamp": "2026-11-25T13:35:41.877820+08:00",
+        "actor": "HON. NENITO S. ANONAT",
+        "event": "Payment Instructions Sent via Gmail",
+        "details": "Sent payment instructions for Carlos Miguel M. Coste (\u20b150.00, Ref: TXN-SB-2026-0025) to migueboy16@gmail.com"
+      }
+    ],
+    "verification_status": "Verified",
+    "checklist_summary": "4/4 Verified",
+    "verified_by": "HON. NENITO S. ANONAT",
+    "verified_at": "2026-11-25T13:35:41.877858+08:00",
+    "action_performed": "Checklist Verified & Payment Email Sent",
+    "manual_checks": [
+      "registration",
+      "address_match",
+      "completeness",
+      "supporting_docs"
+    ]
   }
 }

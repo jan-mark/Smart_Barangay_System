@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smartbarangay-shell-v2';
+const CACHE_NAME = 'smartbarangay-shell-v24';
 const APP_SHELL_ASSETS = [
     '/',
     '/login',

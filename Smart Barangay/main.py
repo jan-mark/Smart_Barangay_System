@@ -3,7 +3,7 @@ import os
 import csv
 import io
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import wraps
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -14,7 +14,7 @@ from xml.sax.saxutils import escape as xml_escape
 from flask import Flask, jsonify, make_response, redirect, render_template, request, session, url_for
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Image as RLImage, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -358,15 +358,16 @@ def announcements():
 @roles_required("admin", "barangay_official")
 def create_announcement():
     payload = request.get_json(silent=True) or {}
-    required = ("category", "title", "audience")
-    if any(not payload.get(field) for field in required):
-        return jsonify({"error": "Category, title, and audience are required"}), 400
-    category = str(payload["category"]).strip()
-    title = str(payload["title"]).strip()
-    description = str(payload.get("description", "")).strip() or None
-    audience = str(payload["audience"]).strip()
-    if category not in ANNOUNCEMENT_CATEGORIES:
-        return jsonify({"error": "Choose a valid announcement category"}), 400
+    title = str(payload.get("title") or "").strip()
+    description = str(payload.get("description") or "").strip() or None
+    audience = str(payload.get("audience") or "All Residents").strip() or "All Residents"
+    is_urgent = bool(payload.get("is_urgent", False))
+    is_pinned = bool(payload.get("is_pinned", False))
+    raw_category = str(payload.get("category") or "").strip()
+    if raw_category in ANNOUNCEMENT_CATEGORIES:
+        category = raw_category
+    else:
+        category = "Emergency" if is_urgent else "General"
     if not title or len(title) > 180:
         return jsonify({"error": "Announcement title must be between 1 and 180 characters"}), 400
     if description and len(description) > 2000:
@@ -384,6 +385,8 @@ def create_announcement():
                         "author": current_user().get("full_name", current_user()["email"]),
                         "published_at": manila_today().isoformat(),
                         "status": "Active",
+                        "is_urgent": is_urgent,
+                        "is_pinned": is_pinned,
                     },
                 )
             }
@@ -399,11 +402,39 @@ def create_announcement():
 @roles_required("admin", "barangay_official")
 def update_announcement(announcement_id: int):
     payload = request.get_json(silent=True) or {}
-    status = str(payload.get("status", "")).strip()
-    if status not in {"Active", "Expired"}:
-        return jsonify({"error": "Invalid announcement status"}), 400
+    updates: dict[str, object] = {}
+    if "status" in payload:
+        status = str(payload.get("status", "")).strip()
+        if status not in {"Active", "Archived", "Expired"}:
+            return jsonify({"error": "Invalid announcement status"}), 400
+        updates["status"] = "Archived" if status == "Expired" else status
+    if "title" in payload:
+        title = str(payload.get("title") or "").strip()
+        if not title or len(title) > 180:
+            return jsonify({"error": "Announcement title must be between 1 and 180 characters"}), 400
+        updates["title"] = title
+    if "description" in payload:
+        description = str(payload.get("description") or "").strip()
+        if len(description) > 2000:
+            return jsonify({"error": "Announcement description must be 2000 characters or fewer"}), 400
+        updates["description"] = description or None
+    if "audience" in payload:
+        updates["audience"] = str(payload.get("audience") or "All Residents").strip() or "All Residents"
+    if "is_urgent" in payload:
+        is_urgent = bool(payload.get("is_urgent"))
+        updates["is_urgent"] = is_urgent
+        if "category" not in payload:
+            updates["category"] = "Emergency" if is_urgent else "General"
+    if "is_pinned" in payload:
+        updates["is_pinned"] = bool(payload.get("is_pinned"))
+    if "category" in payload:
+        cat = str(payload.get("category") or "").strip()
+        if cat in ANNOUNCEMENT_CATEGORIES:
+            updates["category"] = cat
+    if not updates:
+        return jsonify({"error": "No announcement fields to update"}), 400
     try:
-        return jsonify({"data": supabase_repository.update_row("announcements", announcement_id, {"status": status})})
+        return jsonify({"data": supabase_repository.update_row("announcements", announcement_id, updates)})
     except RepositoryConfigurationError as error:
         return jsonify({"error": str(error), "configured": False}), 503
     except Exception as error:
@@ -525,31 +556,333 @@ def auto_weather_early_warning():
         return jsonify({"error": str(error)}), 502
 
 
+def _parse_iso_date_prefix(raw: object) -> date | None:
+    s = str(raw or "").strip()
+    if len(s) < 10:
+        return None
+    try:
+        return date.fromisoformat(s[:10])
+    except ValueError:
+        return None
+
+
+def _matches_report_period(raw_date: object, period: str) -> bool:
+    p = str(period or "all").strip()
+    if not p or p.lower() == "all":
+        return True
+    dt = _parse_iso_date_prefix(raw_date)
+    if not dt:
+        return False
+    m_month = re.match(r"^(\d{4})-(\d{2})$", p)
+    if m_month:
+        return dt.year == int(m_month.group(1)) and dt.month == int(m_month.group(2))
+    m_q = re.match(r"^Q([1-4])-(\d{4})$", p, re.IGNORECASE)
+    if m_q:
+        q = int(m_q.group(1))
+        yr = int(m_q.group(2))
+        q_start = (q - 1) * 3 + 1
+        return dt.year == yr and q_start <= dt.month <= q_start + 2
+    m_yr = re.match(r"^(\d{4})$", p)
+    if m_yr:
+        return dt.year == int(m_yr.group(1))
+    return True
+
+
+def _build_report_pdf(
+    title: str,
+    subtitle: str,
+    filters_summary: str,
+    summary_cards: list[dict[str, object]],
+    columns: list[tuple[str, str]],
+    rows: list[dict[str, object]],
+    prepared_by: str,
+) -> bytes:
+    styles = getSampleStyleSheet()
+    page_size = landscape(A4)
+    margin = 0.55 * inch
+    usable_w = page_size[0] - (margin * 2)
+
+    buf = io.BytesIO()
+    pdf = SimpleDocTemplate(
+        buf,
+        pagesize=page_size,
+        leftMargin=margin,
+        rightMargin=margin,
+        topMargin=0.55 * inch,
+        bottomMargin=0.55 * inch,
+        title=title,
+        author="Barangay Don Felipe Larrazabal, Ormoc City",
+    )
+
+    h_gov = ParagraphStyle("RptGov", parent=styles["Normal"], fontName="Helvetica", fontSize=9, leading=12, alignment=TA_CENTER, textColor=colors.HexColor("#475569"))
+    h_title = ParagraphStyle("RptTitle", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=16, leading=20, alignment=TA_CENTER, textColor=colors.HexColor("#0B2545"))
+    h_sub = ParagraphStyle("RptSub", parent=styles["Normal"], fontName="Helvetica", fontSize=9.5, leading=13, alignment=TA_CENTER, textColor=colors.HexColor("#64748B"))
+    th_style = ParagraphStyle("RptTh", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=8.5, leading=11, textColor=colors.white)
+    td_style = ParagraphStyle("RptTd", parent=styles["Normal"], fontName="Helvetica", fontSize=8.5, leading=11.5, textColor=colors.HexColor("#1E293B"))
+    kpi_lbl = ParagraphStyle("RptKpiLbl", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=7.5, leading=10, alignment=TA_CENTER, textColor=colors.HexColor("#64748B"))
+    kpi_val = ParagraphStyle("RptKpiVal", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=14, leading=17, alignment=TA_CENTER, textColor=colors.HexColor("#0B2545"))
+    sig_style = ParagraphStyle("RptSig", parent=styles["Normal"], fontName="Helvetica", fontSize=9, leading=13, textColor=colors.HexColor("#0F172A"))
+
+    now_label = manila_now().strftime("%B %d, %Y · %I:%M %p")
+    story: list[object] = [
+        Paragraph("Republic of the Philippines · City of Ormoc · Barangay Don Felipe Larrazabal", h_gov),
+        Spacer(1, 3),
+        Paragraph(xml_escape(title), h_title),
+        Paragraph(f"{xml_escape(subtitle)} &nbsp;|&nbsp; Generated: {xml_escape(now_label)}", h_sub),
+        Paragraph(f"<b>Filters:</b> {xml_escape(filters_summary)}", h_sub),
+        Spacer(1, 12),
+    ]
+
+    if summary_cards:
+        card_cells = [
+            Paragraph(f"{xml_escape(str(c['label']).upper())}<br/><font size='13' color='#0B2545'><b>{xml_escape(str(c['value']))}</b></font>", kpi_lbl)
+            for c in summary_cards
+        ]
+        kpi_tbl = Table([card_cells], colWidths=[usable_w / len(card_cells)] * len(card_cells))
+        kpi_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+            ("BOX", (0, 0), (-1, -1), 0.75, colors.HexColor("#CBD5E1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+        story.extend([kpi_tbl, Spacer(1, 12)])
+
+    if rows:
+        header_row = [Paragraph(xml_escape(lbl), th_style) for _, lbl in columns]
+        body_rows = [
+            [Paragraph(xml_escape(str(r.get(key) if r.get(key) not in (None, "") else "—")), td_style) for key, _ in columns]
+            for r in rows
+        ]
+        col_w = usable_w / max(len(columns), 1)
+        data_tbl = Table([header_row, *body_rows], colWidths=[col_w] * len(columns), repeatRows=1)
+        tbl_styles = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B2545")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2E8F0")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]
+        for idx in range(1, len(body_rows) + 1):
+            if idx % 2 == 0:
+                tbl_styles.append(("BACKGROUND", (0, idx), (-1, idx), colors.HexColor("#F8FAFC")))
+        data_tbl.setStyle(TableStyle(tbl_styles))
+        story.append(data_tbl)
+    else:
+        story.append(Paragraph("No matching records found for the selected filters.", h_sub))
+
+    story.extend([
+        Spacer(1, 22),
+        Table(
+            [[
+                Paragraph(f"Prepared by:<br/><br/><b>{xml_escape(prepared_by)}</b><br/>Barangay Official", sig_style),
+                Paragraph("Noted by:<br/><br/><b>HON. NENITO S. ANONAT</b><br/>Punong Barangay", ParagraphStyle("RptSigR", parent=sig_style, alignment=TA_RIGHT)),
+            ]],
+            colWidths=[usable_w * 0.5, usable_w * 0.5],
+        ),
+    ])
+
+    pdf.build(story)
+    return buf.getvalue()
+
+
 @app.get("/api/reports/<report_name>")
 @roles_required("admin", "barangay_official")
 def download_report(report_name: str):
     if not supabase_repository.server_configured:
         return server_data_unavailable()
     categories = current_department_categories(current_user())
+    out_format = str(request.args.get("format", "csv")).strip().lower()
+    prepared_by = str(current_user().get("full_name") or current_user().get("email") or "Barangay Official")
+
     try:
         if report_name == "residents":
-            rows = supabase_repository.list_residents()
+            all_rows = supabase_repository.list_residents()
+            period = str(request.args.get("period", "all")).strip()
+            purok = str(request.args.get("purok", "all")).strip()
+            groups_raw = [g.strip().lower() for g in str(request.args.get("groups", "all")).split(",") if g.strip()]
+            use_all_groups = (not groups_raw) or ("all" in groups_raw)
+
+            filtered = []
+            for r in all_rows:
+                if not _matches_report_period(r.get("resident_since") or r.get("created_at"), period):
+                    continue
+                if purok and purok.lower() != "all":
+                    addr = str(r.get("address") or "").lower()
+                    if purok.lower() not in addr:
+                        continue
+                if not use_all_groups:
+                    try:
+                        age_num = int(r.get("age") or 0)
+                    except (TypeError, ValueError):
+                        age_num = 0
+                    sec = str(r.get("sector") or "").lower()
+                    matched_group = False
+                    if "minors" in groups_raw and 0 <= age_num <= 17:
+                        matched_group = True
+                    if "adults" in groups_raw and 18 <= age_num <= 59:
+                        matched_group = True
+                    if "seniors" in groups_raw and (age_num >= 60 or bool(r.get("is_senior")) or "senior" in sec):
+                        matched_group = True
+                    if "pwd" in groups_raw and (bool(r.get("is_pwd")) or "pwd" in sec):
+                        matched_group = True
+                    if "4ps" in groups_raw and (bool(r.get("is_4ps")) or "4ps" in sec):
+                        matched_group = True
+                    if "solo_parent" in groups_raw and (bool(r.get("is_solo_parent")) or "solo parent" in sec):
+                        matched_group = True
+                    if "indigenous" in groups_raw and ("indigenous" in sec or "ip" in sec.split()):
+                        matched_group = True
+                    if not matched_group:
+                        continue
+                filtered.append(r)
+
+            title = "Resident Registration Report"
+            subtitle = "Residents by age group and sector"
+            period_lbl = "All Time" if period.lower() == "all" else period
+            grp_lbl = "All Groups" if use_all_groups else ", ".join(g.replace("_", " ").title() for g in groups_raw)
+            purok_lbl = "All Puroks" if purok.lower() == "all" else purok
+            filters_summary = f"Period: {period_lbl} · Group: {grp_lbl} · Purok: {purok_lbl}"
+            columns = [
+                ("resident_id", "Resident ID"),
+                ("full_name", "Full Name"),
+                ("age", "Age"),
+                ("gender", "Sex"),
+                ("marital_status", "Civil Status"),
+                ("household", "Household"),
+                ("address", "Address"),
+                ("sector", "Sector"),
+                ("status", "Status"),
+            ]
+            verified_cnt = sum(1 for r in filtered if str(r.get("status") or "").lower() == "verified")
+            hh_cnt = len({str(r.get("household") or "").strip() for r in filtered if str(r.get("household") or "").strip()})
+            summary_cards = [
+                {"label": "Total Residents", "value": len(filtered)},
+                {"label": "Verified", "value": verified_cnt},
+                {"label": "Households", "value": hh_cnt},
+            ]
+            rows = filtered
+
         elif report_name == "documents":
-            rows = supabase_repository.list_table("documents")
+            all_rows = supabase_repository.list_table("documents", "date_requested")
+            period = str(request.args.get("period", "all")).strip()
+            types_raw = [t.strip() for t in str(request.args.get("doc_types", "all")).split(",") if t.strip()]
+            use_all_types = (not types_raw) or any(t.lower() == "all" for t in types_raw)
+            types_lower = {t.lower() for t in types_raw}
+
+            filtered = []
+            for d in all_rows:
+                if not _matches_report_period(d.get("date_requested") or d.get("created_at"), period):
+                    continue
+                if not use_all_types:
+                    dtype = str(d.get("document_type") or "").strip().lower()
+                    if dtype not in types_lower:
+                        continue
+                eff_status = "Rejected" if str(d.get("verification_status") or "").lower() == "rejected" else str(d.get("status") or "Pending")
+                row_copy = dict(d)
+                row_copy["effective_status"] = eff_status
+                row_copy["approved_by"] = d.get("verified_by") or d.get("processor") or "—"
+                row_copy["fee_display"] = f"PHP {float(d.get('amount_paid') or 0):.2f}" if d.get("amount_paid") not in (None, "") else "—"
+                filtered.append(row_copy)
+
+            title = "Document Issuance Summary"
+            subtitle = "Clearances, certificates and IDs issued"
+            period_lbl = "All Time" if period.lower() == "all" else period
+            types_lbl = "All Types" if use_all_types else ", ".join(types_raw)
+            filters_summary = f"Period: {period_lbl} · Document Type: {types_lbl}"
+            columns = [
+                ("request_id", "Request ID"),
+                ("resident_name", "Resident Name"),
+                ("document_type", "Document Type"),
+                ("date_requested", "Date Requested"),
+                ("effective_status", "Status"),
+                ("fee_display", "Fee Paid"),
+                ("approved_by", "Processed By"),
+            ]
+            approved_cnt = sum(1 for r in filtered if r.get("effective_status") in ("Approved", "Resolved"))
+            rejected_cnt = sum(1 for r in filtered if r.get("effective_status") == "Rejected")
+            total_fees = sum(float(r.get("amount_paid") or 0) for r in filtered if r.get("effective_status") in ("Approved", "Resolved"))
+            summary_cards = [
+                {"label": "Total Requests", "value": len(filtered)},
+                {"label": "Approved", "value": approved_cnt},
+                {"label": "Rejected", "value": rejected_cnt},
+                {"label": "Total Fees", "value": f"PHP {total_fees:,.2f}"},
+            ]
+            rows = filtered
+
         elif report_name == "concerns":
-            rows = supabase_repository.list_table("concerns", categories=categories)
+            all_rows = supabase_repository.list_table("concerns", "submitted_at", categories=categories)
+            month_param = str(request.args.get("month", "all")).strip()
+            year_param = str(request.args.get("year", "all")).strip()
+            statuses_raw = [s.strip() for s in str(request.args.get("statuses", "all")).split(",") if s.strip()]
+            use_all_statuses = (not statuses_raw) or any(s.lower() == "all" for s in statuses_raw)
+            statuses_lower = {s.lower() for s in statuses_raw}
+
+            filtered = []
+            for c in all_rows:
+                dt = _parse_iso_date_prefix(c.get("submitted_at") or c.get("created_at"))
+                if year_param and year_param.lower() != "all":
+                    if not dt or str(dt.year) != year_param:
+                        continue
+                if month_param and month_param.lower() != "all":
+                    if not dt or str(dt.month) != str(int(month_param)):
+                        continue
+                if not use_all_statuses:
+                    st = str(c.get("status") or "Open").strip().lower()
+                    # Treat Pending concerns as Open when filtering for Open
+                    if st not in statuses_lower and not (st == "pending" and "open" in statuses_lower):
+                        continue
+                filtered.append(c)
+
+            month_names = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+            m_lbl = month_names[int(month_param)] if month_param.isdigit() and 1 <= int(month_param) <= 12 else "All Months"
+            y_lbl = "All Years" if year_param.lower() == "all" else year_param
+            s_lbl = "All Statuses" if use_all_statuses else ", ".join(statuses_raw)
+            title = "Community Concerns Monitoring"
+            subtitle = "Monthly concerns by status"
+            filters_summary = f"Month: {m_lbl} · Year: {y_lbl} · Status: {s_lbl}"
+            columns = [
+                ("concern_id", "Concern ID"),
+                ("title", "Title"),
+                ("category", "Category"),
+                ("priority", "Priority"),
+                ("submitted_by", "Submitted By"),
+                ("submitted_at", "Date Submitted"),
+                ("status", "Status"),
+            ]
+            open_cnt = sum(1 for r in filtered if str(r.get("status") or "").lower() in ("open", "pending"))
+            resolved_cnt = sum(1 for r in filtered if str(r.get("status") or "").lower() == "resolved")
+            summary_cards = [
+                {"label": "Total Concerns", "value": len(filtered)},
+                {"label": "Open / Pending", "value": open_cnt},
+                {"label": "Resolved", "value": resolved_cnt},
+            ]
+            rows = filtered
+
         elif report_name == "weather-alerts":
             rows = supabase_repository.list_table("weather_alerts")
+            title, subtitle, filters_summary = "Emergency Preparedness Report", "Weather and emergency alerts", "All records"
+            columns = [("alert_type", "Type"), ("title", "Title"), ("severity", "Severity"), ("issued_at", "Issued At")]
+            summary_cards = [{"label": "Total Alerts", "value": len(rows)}]
         elif report_name == "demographics":
             summary = supabase_repository.dashboard_summary(categories)
             rows = [{"metric": key, "value": value} for key, value in summary["age_groups"].items()]
+            title, subtitle, filters_summary = "Demographic Profile Report", "Age demographics summary", "All residents"
+            columns = [("metric", "Age Group"), ("value", "Count")]
+            summary_cards = [{"label": "Total Residents", "value": summary["total_residents"]}]
         elif report_name == "audit":
             summary = supabase_repository.dashboard_summary(categories)
             rows = [
-                {"metric": "total_residents", "value": summary["total_residents"]},
-                {"metric": "documents_total", "value": summary["documents_total"]},
-                {"metric": "open_concerns", "value": summary["open_concerns"]},
+                {"metric": "Total Residents", "value": summary["total_residents"]},
+                {"metric": "Total Documents", "value": summary["documents_total"]},
+                {"metric": "Open Concerns", "value": summary["open_concerns"]},
             ]
+            title, subtitle, filters_summary = "Governance Audit Summary", "Key operational metrics", "Current snapshot"
+            columns = [("metric", "Metric"), ("value", "Value")]
+            summary_cards = []
         else:
             return jsonify({"error": "Unknown report"}), 404
     except RepositoryConfigurationError as error:
@@ -558,17 +891,48 @@ def download_report(report_name: str):
         app.logger.exception("Could not generate report")
         return jsonify({"error": str(error)}), 502
 
+    if out_format == "json":
+        preview_rows = [
+            {key: (r.get(key) if r.get(key) not in (None, "") else "—") for key, _ in columns}
+            for r in rows
+        ]
+        return jsonify({
+            "data": {
+                "report_name": report_name,
+                "title": title,
+                "subtitle": subtitle,
+                "filters_summary": filters_summary,
+                "generated_at": manila_now().strftime("%B %d, %Y · %I:%M %p"),
+                "total": len(preview_rows),
+                "summary_cards": summary_cards,
+                "columns": [{"key": k, "label": lbl} for k, lbl in columns],
+                "rows": preview_rows,
+            }
+        })
+
+    if out_format == "pdf":
+        pdf_bytes = _build_report_pdf(title, subtitle, filters_summary, summary_cards, columns, rows, prepared_by)
+        response = make_response(pdf_bytes)
+        response.headers["Content-Type"] = "application/pdf"
+        disposition = "inline" if request.args.get("preview") in ("1", "true") else "attachment"
+        response.headers["Content-Disposition"] = f'{disposition}; filename="smartbarangay-{report_name}-report.pdf"'
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+    # Excel-ready UTF-8 BOM CSV (opens directly in Microsoft Excel with proper columns and characters)
     output = io.StringIO()
-    if rows:
-        fieldnames = list(rows[0].keys())
-        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
-    else:
-        output.write("No records found\n")
+    output.write("\ufeff")
+    writer = csv.writer(output)
+    writer.writerow([title])
+    writer.writerow([f"Barangay Don Felipe Larrazabal, Ormoc City | {filters_summary}"])
+    writer.writerow([])
+    writer.writerow([lbl for _, lbl in columns])
+    for r in rows:
+        writer.writerow([r.get(key) if r.get(key) not in (None, "") else "" for key, _ in columns])
     response = make_response(output.getvalue())
     response.headers["Content-Type"] = "text/csv; charset=utf-8"
-    response.headers["Content-Disposition"] = f'attachment; filename="smartbarangay-{report_name}.csv"'
+    response.headers["Content-Disposition"] = f'attachment; filename="smartbarangay-{report_name}-report.csv"'
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 
@@ -1550,7 +1914,13 @@ def _resolve_resident_email(doc: dict) -> str:
     )
 
 
-def _send_gmail_notification(to_email: str, subject: str, body: str, resident_name: str | None = None) -> dict:
+def _send_gmail_notification(
+    to_email: str,
+    subject: str,
+    body: str,
+    resident_name: str | None = None,
+    attachments: list[tuple[str, bytes, str, str]] | None = None,
+) -> dict:
     import html as html_lib
     import smtplib
     from email.message import EmailMessage
@@ -1564,6 +1934,7 @@ def _send_gmail_notification(to_email: str, subject: str, body: str, resident_na
     delivery = "SmartBarangay Mobile App Notification (SMTP Not Configured)"
     smtp_delivered = False
     smtp_error = None
+    attached_names: list[str] = []
     if smtp_user and smtp_pass and recipients:
         try:
             msg = EmailMessage()
@@ -1588,7 +1959,12 @@ def _send_gmail_notification(to_email: str, subject: str, body: str, resident_na
             )
             msg.add_alternative(html_body, subtype="html")
 
-            with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+            for att_name, att_bytes, maintype, subtype in (attachments or []):
+                if att_bytes:
+                    msg.add_attachment(att_bytes, maintype=maintype, subtype=subtype, filename=att_name)
+                    attached_names.append(att_name)
+
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
                 server.ehlo()
                 server.starttls()
                 server.ehlo()
@@ -1596,13 +1972,17 @@ def _send_gmail_notification(to_email: str, subject: str, body: str, resident_na
                 refused = server.send_message(msg, from_addr=smtp_user, to_addrs=recipients)
                 if refused:
                     raise RuntimeError(f"Recipient refused by server: {refused}")
-            delivery = f"Sent from {smtp_user} to {', '.join(recipients)}"
+            att_suffix = f" (Attached: {', '.join(attached_names)})" if attached_names else ""
+            delivery = f"Sent from {smtp_user} to {', '.join(recipients)}{att_suffix}"
             smtp_delivered = True
-            print(f"[SMTP DELIVERED] From {smtp_user} -> To {recipients} | Subject: {clean_subject}", flush=True)
+            print(f"[SMTP DELIVERED] From {smtp_user} -> To {recipients}{att_suffix} | Subject: {clean_subject}", flush=True)
         except Exception as err:
             smtp_error = str(err)
-            delivery = f"Portal Notification Only (SMTP Error: {smtp_error})"
+            delivery = f"Notification Only (SMTP Error: {smtp_error})"
             print(f"[SMTP ERROR] {smtp_error}", flush=True)
+    elif not recipients:
+        smtp_error = "No resident email address on record."
+        delivery = "No recipient email address"
     return {
         "from": smtp_user or "SmartBarangay System",
         "to": ", ".join(recipients) if recipients else to_email,
@@ -1611,6 +1991,7 @@ def _send_gmail_notification(to_email: str, subject: str, body: str, resident_na
         "body": clean_body,
         "sent_at": manila_now().isoformat(),
         "delivery": delivery,
+        "attachments": attached_names,
         "smtp_delivered": smtp_delivered,
         "smtp_configured": bool(smtp_user and smtp_pass),
         "smtp_error": smtp_error,
@@ -1921,29 +2302,51 @@ def update_document(document_id):
             paid_float = 50.0
         updates["amount_paid"] = paid_float
 
-        subject = f"[SmartBarangay] Payment Verified for {resident_name} — {doc.get('document_type', 'Certificate')} Approved ({tx_ref})"
+        doc_type = str(doc.get("document_type") or "Barangay Certificate")
+        merged_for_pdf = {**doc, **updates}
+        pdf_bytes = None
+        pdf_filename = ""
+        try:
+            pdf_bytes = _certificate_pdf(merged_for_pdf)
+            req_slug = re.sub(r"[^A-Za-z0-9_-]+", "-", str(merged_for_pdf.get("request_id") or tx_ref or document_id))
+            doc_slug = re.sub(r"[^A-Za-z0-9_-]+", "-", doc_type.lower())
+            pdf_filename = f"{doc_slug}-{req_slug}.pdf"
+        except Exception:
+            app.logger.exception("Could not generate PDF attachment for approval email")
+
+        subject = f"[SmartBarangay] Official {doc_type} Released for {resident_name} ({tx_ref})"
         body = (
             f"Dear {resident_name},\n\n"
-            f"We are pleased to inform you that your payment has been verified by {official_name}.\n\n"
-            f"PAYMENT CONFIRMATION SUMMARY:\n"
+            f"We are pleased to inform you that your payment has been verified and your requested {doc_type} has been officially approved and released by {official_name}.\n\n"
+            f"RELEASE & PAYMENT SUMMARY:\n"
             f"• Applicant / Resident Name: {resident_name}\n"
+            f"• Document Type: {doc_type}\n"
             f"• Transaction Reference: {tx_ref}\n"
             f"• Receipt Reference: {doc.get('receipt_ref_no') or 'Verified'}\n"
             f"• Amount Verified: PHP {paid_float:.2f}\n"
-            f"• Payment Verification Status: VERIFIED\n"
-            f"• Document Status: APPROVED & READY FOR DOWNLOAD\n\n"
-            f"You may now open the SmartBarangay Mobile App and download your official {doc.get('document_type', 'Barangay Certificate')}.\n\n"
+            f"• Status: APPROVED & RELEASED\n\n"
+            f"Attached to this email is your official {doc_type} PDF issued by Barangay Don Felipe Larrazabal, Ormoc City. You may also access it anytime on the SmartBarangay Mobile App.\n\n"
             f"Thank you,\n"
             f"Office of the Punong Barangay — Hon. Nenito S. Anonat\n"
             f"Barangay Don Felipe Larrazabal, Ormoc City, Leyte"
         )
-        email_entry = _send_gmail_notification(to_email, subject, body, resident_name=resident_name)
+        attachments = [(pdf_filename, pdf_bytes, "application", "pdf")] if pdf_bytes else None
+        email_entry = _send_gmail_notification(
+            to_email,
+            subject,
+            body,
+            resident_name=resident_name,
+            attachments=attachments,
+        )
         email_logs.insert(0, email_entry)
         tx_history.insert(0, {
             "timestamp": manila_now().isoformat(),
             "actor": official_name,
-            "event": "Payment Verified & Confirmation Gmail Sent",
-            "details": f"Verified ₱{paid_float:.2f} for {resident_name} (Ref: {doc.get('receipt_ref_no') or tx_ref}). Sent confirmation email to {to_email}.",
+            "event": "Document Released & Official PDF Emailed" if email_entry.get("smtp_delivered") else "Document Released (Email Pending)",
+            "details": (
+                f"Verified ₱{paid_float:.2f} for {resident_name} (Ref: {doc.get('receipt_ref_no') or tx_ref}). "
+                f"{'Sent official PDF to ' + to_email if email_entry.get('smtp_delivered') else (email_entry.get('smtp_error') or 'Email not delivered')}"
+            ),
         })
         updates["email_logs"] = email_logs
         updates["transaction_history"] = tx_history
@@ -1999,322 +2402,684 @@ def update_document(document_id):
         return jsonify({"error": str(error)}), 502
 
 
+def _norm_person_name(value: object) -> str:
+    cleaned = re.sub(r"[^a-z0-9\s]+", " ", str(value or "").strip().lower())
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _find_matching_resident(resident_name: str | None, resident_email: str | None = None) -> dict | None:
+    target = _norm_person_name(resident_name)
+    target_email = str(resident_email or "").strip().lower()
+    if not target and not target_email:
+        return None
+    try:
+        residents = supabase_repository.list_residents()
+    except Exception:
+        return None
+    # Pass 1: exact normalized name match
+    for r in residents:
+        rname = _norm_person_name(r.get("full_name") or r.get("name"))
+        if target and rname and rname == target:
+            return r
+    # Pass 2: email match
+    if target_email:
+        for r in residents:
+            rem = str(r.get("email") or "").strip().lower()
+            if rem and rem == target_email:
+                return r
+    # Pass 3: substring name match
+    for r in residents:
+        rname = _norm_person_name(r.get("full_name") or r.get("name"))
+        if target and rname and (target in rname or rname in target):
+            return r
+    return None
+
+
+def _format_dob_label(raw_dob: object) -> str:
+    s = str(raw_dob or "").strip()
+    if not s:
+        return ""
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%B %d, %Y"):
+        try:
+            dt = datetime.strptime(s[:10] if fmt == "%Y-%m-%d" else s, fmt).date()
+            return dt.strftime("%B %d, %Y").upper()
+        except ValueError:
+            continue
+    try:
+        dt = date.fromisoformat(s[:10])
+        return dt.strftime("%B %d, %Y").upper()
+    except ValueError:
+        return s.upper()
+
+
+def _compute_age_from_dob(raw_dob: object) -> int | None:
+    s = str(raw_dob or "").strip()
+    if not s:
+        return None
+    try:
+        dob = date.fromisoformat(s[:10])
+        today = manila_today()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    except ValueError:
+        return None
+
+
+def _normalize_barangay_address(raw_addr: str) -> str:
+    addr = re.sub(r"\s+", " ", str(raw_addr or "").strip()).strip(" ,")
+    if not addr:
+        return "Barangay Don Felipe Larrazabal, Ormoc City"
+    # Fix common single-r spelling typo ("Larazabal" -> "Larrazabal")
+    addr = re.sub(r"\blar+azabal\b", "Larrazabal", addr, flags=re.IGNORECASE)
+    # Collapse accidental duplicate barangay suffixes
+    addr = re.sub(
+        r"(?:,?\s*(?:Barangay|Brgy\.?)\s+Don\s+Felipe\s+Larrazabal){2,}",
+        ", Barangay Don Felipe Larrazabal",
+        addr,
+        flags=re.IGNORECASE,
+    ).strip(" ,")
+    has_brgy = bool(re.search(r"don\s+felipe\s+larrazabal", addr, re.IGNORECASE))
+    has_city = bool(re.search(r"\bormoc(\s+city)?\b|\bo\.?c\.?\b", addr, re.IGNORECASE))
+    if not has_brgy:
+        addr = f"{addr}, Barangay Don Felipe Larrazabal"
+    if not has_city:
+        addr = f"{addr}, Ormoc City"
+    return addr
+
+
 def _certificate_pdf(document: dict) -> bytes:
     styles = getSampleStyleSheet()
+    matched_res = _find_matching_resident(
+        document.get("resident_name"),
+        document.get("resident_email") or document.get("email"),
+    ) or {}
 
-    header_style = ParagraphStyle(
-        "CertificateHeader",
-        parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=10.5,
-        leading=14.5,
-        alignment=TA_CENTER,
-        textColor=colors.black,
+    def clean_first(*candidates: object) -> str:
+        invalid = {"", "n/a", "na", "none", "null", "not provided", "-", "--", "—", "none / n/a"}
+        for val in candidates:
+            if val is None:
+                continue
+            s = str(val).strip()
+            if s and s.lower() not in invalid:
+                return s
+        return ""
+
+    def text(value: object, fallback: str = "") -> str:
+        s = clean_first(value)
+        return xml_escape(s) if s else fallback
+
+    document_type = str(document.get("document_type") or "Barangay Clearance").strip()
+    full_name = text(clean_first(document.get("resident_name"), matched_res.get("full_name")), "RESIDENT NAME").upper()
+    purpose_raw = clean_first(document.get("purpose"))
+    purpose = xml_escape(purpose_raw) if purpose_raw else ""
+    request_id = text(clean_first(document.get("request_id"), document.get("tx_ref"), f"DOC-{document.get('id', '0000')}"), "")
+    tx_ref = text(clean_first(document.get("tx_ref"), document.get("receipt_ref_no")), "")
+    processor_name = text(clean_first(document.get("verified_by"), document.get("processor")), "")
+
+    raw_address = clean_first(
+        document.get("applicant_address"),
+        matched_res.get("address"),
     )
-    office_style = ParagraphStyle(
-        "CertificateOffice",
-        parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=12,
-        leading=16,
-        alignment=TA_CENTER,
-        textColor=colors.black,
+    full_address = _normalize_barangay_address(raw_address)
+    full_address_escaped = xml_escape(full_address)
+
+    raw_dob = clean_first(
+        document.get("applicant_date_of_birth"),
+        matched_res.get("date_of_birth"),
+        matched_res.get("dob"),
+        matched_res.get("birthdate"),
     )
+    dob_label = text(_format_dob_label(raw_dob), "N/A")
+    age_val = matched_res.get("age") or _compute_age_from_dob(raw_dob)
+    age_display = f"{int(age_val)} years old" if age_val not in (None, "") and str(age_val).isdigit() else "of legal age"
+
+    gender_raw = clean_first(
+        document.get("applicant_gender"),
+        matched_res.get("gender"),
+        matched_res.get("sex"),
+    )
+    gender_display = text(gender_raw.upper(), "N/A")
+    gender_prose = xml_escape(gender_raw.lower()) if gender_raw else ""
+
+    civil_raw = clean_first(
+        document.get("applicant_civil_status"),
+        matched_res.get("marital_status"),
+        matched_res.get("civil_status"),
+    )
+    civil_display = text(civil_raw.upper(), "N/A")
+    civil_prose = xml_escape(civil_raw.lower()) if civil_raw else "single"
+
+    birthplace_display = text(
+        clean_first(document.get("applicant_place_of_birth"), matched_res.get("place_of_birth"), "ORMOC CITY"),
+        "ORMOC CITY",
+    ).upper()
+
+    resident_since_raw = str(matched_res.get("resident_since") or "").strip()
+    since_year = resident_since_raw[:4] if len(resident_since_raw) >= 4 and resident_since_raw[:4].isdigit() else ""
+
+    today = manila_today()
+    day = today.day
+    ord_suffix = "th" if 11 <= (day % 100) <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    month_upper = today.strftime("%B").upper()
+    month_title = today.strftime("%B")
+    issue_date_long = f"{day}<sup>{ord_suffix}</sup> day of {month_upper}, {today.year}"
+
+    # Typography aligned to the official Barangay Don Felipe Larrazabal templates
     title_style = ParagraphStyle(
-        "CertificateTitle",
+        "OfficialCertTitle",
         parent=styles["Normal"],
-        fontName="Helvetica-BoldOblique",
-        fontSize=14,
-        leading=18,
+        fontName="Times-BoldItalic",
+        fontSize=21,
+        leading=26,
         alignment=TA_CENTER,
-        textColor=colors.black,
+        textColor=colors.HexColor("#0F172A"),
+    )
+    title_upper_style = ParagraphStyle(
+        "OfficialCertTitleUpper",
+        parent=styles["Normal"],
+        fontName="Times-Bold",
+        fontSize=19,
+        leading=24,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#0F172A"),
     )
     to_whom_style = ParagraphStyle(
-        "CertificateToWhom",
+        "OfficialToWhom",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=11,
+        fontName="Times-Bold",
+        fontSize=11.5,
         leading=16,
         alignment=TA_LEFT,
         textColor=colors.black,
     )
     body_style = ParagraphStyle(
-        "CertificateBody",
+        "OfficialBody",
         parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=11,
-        leading=18,
+        fontName="Times-Roman",
+        fontSize=11.5,
+        leading=18.5,
         alignment=TA_JUSTIFY,
-        firstLineIndent=36,
+        firstLineIndent=34,
+        textColor=colors.black,
+    )
+    body_plain_style = ParagraphStyle(
+        "OfficialBodyPlain",
+        parent=styles["Normal"],
+        fontName="Times-Roman",
+        fontSize=11.5,
+        leading=17.5,
+        alignment=TA_LEFT,
+        textColor=colors.black,
+    )
+    field_label_style = ParagraphStyle(
+        "OfficialFieldLabel",
+        parent=styles["Normal"],
+        fontName="Times-Bold",
+        fontSize=11,
+        leading=16,
+        alignment=TA_LEFT,
+        textColor=colors.black,
+    )
+    field_val_style = ParagraphStyle(
+        "OfficialFieldVal",
+        parent=styles["Normal"],
+        fontName="Times-Roman",
+        fontSize=11,
+        leading=16,
+        alignment=TA_LEFT,
         textColor=colors.black,
     )
     captain_name_style = ParagraphStyle(
-        "CertificateCaptainName",
+        "OfficialCaptainName",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=11,
+        fontName="Times-Bold",
+        fontSize=11.5,
         leading=15,
         alignment=TA_CENTER,
         textColor=colors.black,
     )
     captain_sub_style = ParagraphStyle(
-        "CertificateCaptainSub",
+        "OfficialCaptainSub",
         parent=styles["Normal"],
-        fontName="Helvetica",
+        fontName="Times-Roman",
         fontSize=10.5,
         leading=14,
         alignment=TA_CENTER,
         textColor=colors.black,
     )
-    sig_label_style = ParagraphStyle(
-        "CertificateSigLabel",
+    meta_style = ParagraphStyle(
+        "OfficialMeta",
         parent=styles["Normal"],
-        fontName="Helvetica-Oblique",
-        fontSize=9,
-        leading=12,
-        alignment=TA_CENTER,
-        textColor=colors.black,
-    )
-    bottom_left_style = ParagraphStyle(
-        "CertificateBottomLeft",
-        parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=9,
-        leading=15,
+        fontName="Times-Roman",
+        fontSize=9.5,
+        leading=14,
         alignment=TA_LEFT,
         textColor=colors.black,
     )
-    dry_seal_style = ParagraphStyle(
-        "CertificateDrySeal",
+    seal_notice_style = ParagraphStyle(
+        "OfficialSealNotice",
         parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=9,
-        leading=12,
-        alignment=TA_CENTER,
-        textColor=colors.black,
+        fontName="Times-BoldItalic",
+        fontSize=9.5,
+        leading=13,
+        alignment=TA_RIGHT,
+        textColor=colors.HexColor("#334155"),
     )
 
-    def text(value: object, fallback: str = "") -> str:
-        return xml_escape(str(value).strip()) if value not in (None, "") else fallback
-
-    document_type = str(document.get("document_type", "Barangay Clearance"))
-    full_name = text(document.get("resident_name"), "RESIDENT NAME").upper()
-    purpose = text(document.get("purpose"), "").strip()
-    request_id = text(document.get("request_id"), "")
-
-    today = manila_today()
-    day = today.day
-    if 11 <= (day % 100) <= 13:
-        ord_suffix = "th"
-    else:
-        ord_suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
-    issue_date_phrase = f"Issued this {day}<sup>{ord_suffix}</sup> day of {today.strftime('%B')} {today.year} at Barangay Don Felipe Larrazabal, Ormoc City, Leyte."
-
-    if document_type == "Barangay Clearance":
-        cert_title = "BARANGAY CLEARANCE"
-        p1 = (
-            f"This is to certify that <u><b>{full_name}</b></u> of legal age, "
-            "male/female and a bonafide resident of Barangay Don Felipe Larrazabal, Ormoc City, Leyte and "
-            "he/she is known to me and is a person of good moral character, peaceful and "
-            "law-abiding citizen."
-        )
-        if purpose and purpose.lower() not in ("not provided", "none", "general", "whatever legal purposes it may serve"):
-            p2 = f"This certification is issued upon the request of above-mentioned name for {purpose} and whatever legal purposes it may serve."
-        else:
-            p2 = "This certification is issued upon the request of above-mentioned name for whatever legal purposes it may serve."
-    elif document_type == "Certificate of Residency":
-        cert_title = "CERTIFICATE OF RESIDENCY"
-        p1 = (
-            f"This is to certify that <u><b>{full_name}</b></u> of legal age, "
-            "male/female is a bona fide resident of Barangay Don Felipe Larrazabal, Ormoc City, Leyte."
-        )
-        if purpose and purpose.lower() not in ("not provided", "none", "general", "whatever legal purposes it may serve"):
-            p2 = f"This certification is issued upon the request of above-mentioned name for {purpose}."
-        else:
-            p2 = "This certification is issued upon the request of above-mentioned name for whatever legal purposes it may serve."
-    elif document_type == "Certificate of Indigency":
-        cert_title = "CERTIFICATE OF INDIGENCY"
-        p1 = (
-            f"This is to certify that <u><b>{full_name}</b></u> of legal age, "
-            "male/female is a bona fide resident of Barangay Don Felipe Larrazabal, Ormoc City, Leyte, "
-            "and belongs to an indigent family in this barangay."
-        )
-        if purpose and purpose.lower() not in ("not provided", "none", "general", "whatever legal purposes it may serve"):
-            p2 = f"This certification is issued upon the request of above-mentioned name for {purpose}."
-        else:
-            p2 = "This certification is issued upon the request of above-mentioned name for whatever legal assistance it may serve."
-    else:
-        cert_title = "BARANGAY BUSINESS CLEARANCE"
-        business = text(document.get("business_name"), "BUSINESS NAME").upper()
-        business_address = text(document.get("business_address"), "Barangay Don Felipe Larrazabal, Ormoc City, Leyte").upper()
-        p1 = (
-            f"This is to certify that <u><b>{full_name}</b></u> is hereby granted clearance to operate or register "
-            f"the business <b>{business}</b> located at <b>{business_address}</b>, subject to applicable laws, "
-            "ordinances, and barangay regulations."
-        )
-        if purpose and purpose.lower() not in ("not provided", "none", "general", "whatever legal purposes it may serve"):
-            p2 = f"This certification is issued upon the request of above-mentioned name for {purpose}."
-        else:
-            p2 = "This certification is issued upon the request of above-mentioned name for business clearance requirements."
-
     buffer = io.BytesIO()
+    # Margins positioned cleanly inside the official Barangay Don Felipe Larrazabal letterhead artwork
+    left_m = 1.28 * inch
+    right_m = 0.80 * inch
+    top_m = 2.18 * inch
+    bottom_m = 0.85 * inch
+    usable_width = A4[0] - left_m - right_m
+
     pdf = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=0.75 * inch,
-        leftMargin=0.75 * inch,
-        topMargin=0.65 * inch,
-        bottomMargin=0.65 * inch,
-        title=f"{cert_title} - {request_id}",
-        author="SmartBarangay",
+        rightMargin=right_m,
+        leftMargin=left_m,
+        topMargin=top_m,
+        bottomMargin=bottom_m,
+        title=f"{document_type} - {request_id}",
+        author="Barangay Don Felipe Larrazabal, Ormoc City",
     )
 
-    usable_width = A4[0] - 1.5 * inch
+    letterhead_path = os.path.join(app.root_path, "public", "static", "barangay_letterhead.png")
 
-    barangay_logo_path = os.path.join(app.root_path, "public", "static", "barangay_logo.png")
-    municipality_logo_path = os.path.join(app.root_path, "public", "static", "municipality_logo.png")
+    def _draw_official_letterhead(canvas, _doc):
+        canvas.saveState()
+        if os.path.exists(letterhead_path):
+            canvas.drawImage(
+                letterhead_path,
+                0,
+                0,
+                width=A4[0],
+                height=A4[1],
+                preserveAspectRatio=False,
+                mask="auto",
+            )
+        else:
+            canvas.setFont("Times-Bold", 12)
+            canvas.drawCentredString(A4[0] / 2, A4[1] - 48, "Republic of the Philippines")
+            canvas.drawCentredString(A4[0] / 2, A4[1] - 64, "OFFICE OF THE SANGGUNIANG BARANGAY")
+            canvas.drawCentredString(A4[0] / 2, A4[1] - 80, "Barangay Don Felipe Larrazabal, Ormoc City")
+        canvas.restoreState()
 
-    b_logo = RLImage(barangay_logo_path, width=68, height=68) if os.path.exists(barangay_logo_path) else ""
-    m_logo = RLImage(municipality_logo_path, width=68, height=68) if os.path.exists(municipality_logo_path) else ""
-
-    header_text = Paragraph(
-        "Republic of the Philippines<br/>"
-        "Province of Leyte<br/>"
-        "City of Ormoc<br/>"
-        "Barangay Don Felipe Larrazabal",
-        header_style,
-    )
-
-    header_table = Table(
-        [[b_logo, header_text, m_logo]],
-        colWidths=[78, usable_width - 156, 78],
-        hAlign="CENTER",
-    )
-    header_table.setStyle(
-        TableStyle(
+    def _signature_block(name_line: str = "NENITO S. ANONAT", title_line: str = "Punong Barangay", include_resident_sig: bool = False, attested_by: str | None = None):
+        captain_tbl = Table(
             [
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("ALIGN", (0, 0), (0, 0), "LEFT"),
-                ("ALIGN", (1, 0), (1, 0), "CENTER"),
-                ("ALIGN", (2, 0), (2, 0), "RIGHT"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-            ]
+                [Paragraph(f"<u><b>{name_line}</b></u>", captain_name_style)],
+                [Paragraph(title_line, captain_sub_style)],
+            ],
+            colWidths=[200],
+            hAlign="RIGHT",
         )
-    )
+        captain_tbl.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ]))
 
-    captain_table = Table(
-        [
-            [Paragraph("<u><b>HON. NENITO S. ANONAT</b></u>", captain_name_style)],
-            [Paragraph("Punong Barangay", captain_sub_style)],
-        ],
-        colWidths=[240],
-        hAlign="RIGHT",
-    )
-    captain_table.setStyle(
-        TableStyle(
-            [
+        if include_resident_sig:
+            res_tbl = Table(
+                [
+                    [Paragraph("___________________________", captain_name_style)],
+                    [Paragraph("Signature of Resident", captain_sub_style)],
+                ],
+                colWidths=[190],
+                hAlign="LEFT",
+            )
+            res_tbl.setStyle(TableStyle([
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("TOPPADDING", (0, 0), (-1, -1), 1),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
-            ]
-        )
-    )
+            ]))
+            grid = Table([[res_tbl, captain_tbl]], colWidths=[usable_width * 0.48, usable_width * 0.52])
+            grid.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            return grid
 
-    sig_table = Table(
-        [
-            [Paragraph("________________________", captain_name_style)],
-            [Paragraph("Signature over printed name", sig_label_style)],
-        ],
-        colWidths=[200],
-        hAlign="LEFT",
-    )
-    sig_table.setStyle(
-        TableStyle(
-            [
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        if attested_by:
+            att_tbl = Table(
+                [
+                    [Paragraph("Attested by:", ParagraphStyle("AttLbl", parent=captain_sub_style, alignment=TA_LEFT, fontName="Times-Italic"))],
+                    [Spacer(1, 14)],
+                    [Paragraph(f"<u><b>{attested_by.upper()}</b></u>", captain_name_style)],
+                    [Paragraph("Barangay Official on Duty", captain_sub_style)],
+                ],
+                colWidths=[210],
+                hAlign="LEFT",
+            )
+            att_tbl.setStyle(TableStyle([
+                ("ALIGN", (0, 2), (-1, -1), "CENTER"),
                 ("TOPPADDING", (0, 0), (-1, -1), 1),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
-            ]
-        )
-    )
-
-    sig_grid = Table(
-        [
-            ["", captain_table],
-            [sig_table, ""],
-        ],
-        colWidths=[usable_width * 0.48, usable_width * 0.52],
-        hAlign="CENTER",
-    )
-    sig_grid.setStyle(
-        TableStyle(
-            [
+            ]))
+            grid = Table([["", captain_tbl], [att_tbl, ""]], colWidths=[usable_width * 0.50, usable_width * 0.50])
+            grid.setStyle(TableStyle([
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                ("TOPPADDING", (0, 0), (-1, -1), 10),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-            ]
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            return grid
+
+        grid = Table([["", captain_tbl]], colWidths=[usable_width * 0.45, usable_width * 0.55])
+        grid.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        return grid
+
+    has_purpose = bool(purpose_raw and purpose_raw.lower() not in ("not provided", "none", "general", "whatever legal purposes it may serve"))
+    story: list[object] = []
+
+    if document_type == "Barangay Clearance":
+        # Exact format matching EMILY T. MANGAHOC Barangay Clearance template
+        purpose_display = text(purpose_raw.upper(), "WHATEVER LEGAL PURPOSES IT MAY SERVE")
+        info_rows = [
+            [Paragraph("Full Name", field_label_style), Paragraph(f":  <b>{full_name}</b>", field_val_style)],
+            [Paragraph("Age", field_label_style), Paragraph(f":  {age_display}", field_val_style)],
+            [Paragraph("Address", field_label_style), Paragraph(f":  {full_address_escaped}", field_val_style)],
+            [Paragraph("Gender", field_label_style), Paragraph(f":  {gender_display}", field_val_style)],
+            [Paragraph("Civil Status", field_label_style), Paragraph(f":  {civil_display}", field_val_style)],
+            [Paragraph("Date of Birth", field_label_style), Paragraph(f":  {dob_label}", field_val_style)],
+            [Paragraph("Place of Birth", field_label_style), Paragraph(f":  {birthplace_display}", field_val_style)],
+            [Paragraph("Purpose", field_label_style), Paragraph(f":  <b>{purpose_display}</b>", field_val_style)],
+        ]
+        info_table = Table(info_rows, colWidths=[110, usable_width - 110], hAlign="LEFT")
+        info_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        footer_meta = Table(
+            [[
+                Paragraph(
+                    f"Comm. Tax : ________________<br/>"
+                    f"Issued On : {month_title} {day}, {today.year}<br/>"
+                    f"Issued At : Ormoc City<br/>"
+                    f"O.R Number : {tx_ref or '________________'}",
+                    meta_style,
+                ),
+                Paragraph("NOT VALID WITHOUT A SEAL", seal_notice_style),
+            ]],
+            colWidths=[usable_width * 0.62, usable_width * 0.38],
         )
-    )
+        footer_meta.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story = [
+            Paragraph("Barangay Clearance", title_style),
+            Spacer(1, 18),
+            Paragraph("To whom it may concern:", to_whom_style),
+            Spacer(1, 10),
+            Paragraph("This is to CERTIFY that according to the record available in this Office that,", body_plain_style),
+            Spacer(1, 10),
+            info_table,
+            Spacer(1, 14),
+            Paragraph(
+                f"Is a bona-fide resident of Barangay Don Felipe Larrazabal, Ormoc City. "
+                f"This certifies further that, <b>{full_name}</b> has no derogatory/criminal record in our barangay. "
+                f"This certification is being issued upon the request of said party.",
+                body_style,
+            ),
+            Spacer(1, 14),
+            Paragraph(
+                f"ISSUED THIS {issue_date_long}, at Barangay Don Felipe Larrazabal, Ormoc City, Leyte, Philippines.",
+                body_style,
+            ),
+            Spacer(1, 34),
+            _signature_block("NENITO S. ANONAT", "Punong Barangay", include_resident_sig=True),
+            Spacer(1, 24),
+            footer_meta,
+        ]
 
-    bottom_left = Paragraph(
-        "Comm. Tax Cert. No.: __________<br/>"
-        "Issued On: ____________________<br/>"
-        "O.R. No.: _____________________<br/>"
-        "Issued On: ____________________",
-        bottom_left_style,
-    )
+    elif document_type == "Certificate of Residency":
+        # Exact format matching NOR HISHAM R. IBRA CERTIFICATION OF RESIDENCY template
+        desc_bits = [bit for bit in (age_display, civil_prose, gender_prose, "Filipino") if bit]
+        since_clause = f", since {since_year} up to the present" if since_year else " up to the present"
+        purpose_clause = f" in support of his/her requirement for <b>{purpose}</b> and as proof of his/her residency purposes." if has_purpose else " in support of his/her requirement and as proof of his/her residency purposes."
+        story = [
+            Paragraph("CERTIFICATION OF RESIDENCY", title_upper_style),
+            Spacer(1, 26),
+            Paragraph("To Whom it may concern:", to_whom_style),
+            Spacer(1, 18),
+            Paragraph(
+                f"THIS IS TO CERTIFY that, <b>{full_name}</b>, {', '.join(desc_bits)}, "
+                f"bona-fide resident at Barangay Don Felipe Larrazabal.",
+                body_style,
+            ),
+            Spacer(1, 16),
+            Paragraph(
+                f"THIS IS TO CERTIFY that the person mentioned above is a bona-fide resident at "
+                f"<b>{full_address_escaped}</b>{since_clause}.",
+                body_style,
+            ),
+            Spacer(1, 16),
+            Paragraph(
+                f"THIS CERTIFICATION is issued upon the request of the aforementioned{purpose_clause}",
+                body_style,
+            ),
+            Spacer(1, 18),
+            Paragraph(
+                f"Issued this {issue_date_long} at Barangay Don Felipe Larrazabal, Ormoc City.",
+                body_style,
+            ),
+            Spacer(1, 56),
+            _signature_block("NENITO S. ANONAT", "Punong Barangay"),
+        ]
 
-    dry_seal = Paragraph(
-        "Not valid<br/>without<br/>dry seal",
-        dry_seal_style,
-    )
+    elif document_type == "Certificate of Indigency":
+        # Exact format matching Certificate of Indigency template (MAE LORAINE G. YU / ARIEL RIVERA)
+        desc_bits = [bit for bit in (age_display, gender_prose, civil_prose) if bit]
+        purpose_clause = f"for <b>{purpose}</b> purposes." if has_purpose else "for whatever legal or medical/financial assistance purposes it may serve."
+        attested_name = processor_name if (processor_name and "anonat" not in processor_name.lower()) else "Barangay Secretary / Official on Duty"
+        story = [
+            Paragraph("Certificate of Indigency", title_style),
+            Spacer(1, 24),
+            Paragraph("TO WHOM IT MAY CONCERN:", to_whom_style),
+            Spacer(1, 18),
+            Paragraph(
+                f"This is to certify that, <b>{full_name}</b>, {', '.join(desc_bits)}, "
+                f"a bona-fide resident of {full_address_escaped}.",
+                body_style,
+            ),
+            Spacer(1, 16),
+            Paragraph(
+                "Certifies further that, the above-named person earns a living as a low income "
+                "which is not sufficient for their daily needs that government interventions are necessary.",
+                body_style,
+            ),
+            Spacer(1, 16),
+            Paragraph(
+                f"THIS CERTIFICATION is issued upon the request of the above person {purpose_clause}",
+                body_style,
+            ),
+            Spacer(1, 18),
+            Paragraph(
+                f"Done this {issue_date_long}, at Barangay Don Felipe Larrazabal, Ormoc City, Leyte.",
+                body_style,
+            ),
+            Spacer(1, 44),
+            _signature_block("Hon. Nenito S. Anonat", "Punong Barangay", attested_by=attested_name),
+        ]
 
-    bottom_table = Table(
-        [[bottom_left, dry_seal]],
-        colWidths=[usable_width * 0.7, usable_width * 0.3],
-        hAlign="CENTER",
-    )
-    bottom_table.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ]
+    elif document_type == "Business Clearance":
+        # Exact format matching SHAWNIX BARBERSHOP Barangay Business Clearance template
+        business_name = text(document.get("business_name"), "BUSINESS ESTABLISHMENT").upper()
+        business_addr_raw = str(document.get("business_address") or full_address).strip()
+        if "don felipe larrazabal" in business_addr_raw.lower():
+            business_addr_full = business_addr_raw if "ormoc" in business_addr_raw.lower() else f"{business_addr_raw}, Ormoc City"
+        else:
+            business_addr_full = f"{business_addr_raw}, Barangay Don Felipe Larrazabal, Ormoc City"
+        business_addr = text(business_addr_raw, "Barangay Don Felipe Larrazabal, Ormoc City")
+        business_addr_full_escaped = text(business_addr_full, "Barangay Don Felipe Larrazabal, Ormoc City")
+        nature_business = text(purpose_raw.upper(), "GENERAL MERCHANDISE / SERVICES")
+        biz_rows = [
+            [Paragraph("Business Name:", field_label_style), Paragraph(f"<b>{business_name}</b>", field_val_style)],
+            [Paragraph("Business Address:", field_label_style), Paragraph(business_addr, field_val_style)],
+            [Paragraph("Nature of Business:", field_label_style), Paragraph(f"<b>{nature_business}</b>", field_val_style)],
+        ]
+        biz_table = Table(biz_rows, colWidths=[125, usable_width - 125], hAlign="LEFT")
+        biz_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        series_no = f"{today.year}-{int(document.get('id') or 0):03d}"
+        biz_meta = Paragraph(
+            f"<b>Series No.:</b> &nbsp;&nbsp;&nbsp;&nbsp;{series_no}<br/>"
+            f"<b>OR No.:</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{tx_ref or '________________'}<br/>"
+            f"<b>CTC No.:</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;________________<br/>"
+            f"<b>Date Issued:</b> &nbsp;{month_upper} {day}, {today.year}<br/>"
+            f"<b>Valid until:</b> &nbsp;&nbsp;December 31, {today.year}",
+            meta_style,
         )
-    )
+        story = [
+            Paragraph("Barangay Business Clearance", title_style),
+            Spacer(1, 22),
+            biz_table,
+            Spacer(1, 20),
+            Paragraph(
+                f"This is to certify that <b>{full_name}</b> of legal age, and engaging a business "
+                f"in our barangay situated at {business_addr_full_escaped}.",
+                body_style,
+            ),
+            Spacer(1, 16),
+            Paragraph(
+                "This Business Clearance is issued upon the request of the above mentioned name "
+                "for whatever legal purposes it may serve and avail.",
+                body_style,
+            ),
+            Spacer(1, 16),
+            Paragraph(
+                f"Issued this {issue_date_long} at Barangay Don Felipe Larrazabal, Ormoc City.",
+                body_style,
+            ),
+            Spacer(1, 44),
+            _signature_block("NENITO S. ANONAT", "Punong Barangay"),
+            Spacer(1, 28),
+            biz_meta,
+        ]
 
-    story = [
-        header_table,
-        Spacer(1, 22),
-        Paragraph("OFFICE OF THE PUNONG BARANGAY", office_style),
-        Spacer(1, 16),
-        Paragraph(f"<i><b>{cert_title}</b></i>", title_style),
-        Spacer(1, 32),
-        Paragraph("<b>TO WHOM IT MAY CONCERN:</b>", to_whom_style),
-        Spacer(1, 18),
-        Paragraph(p1, body_style),
-        Spacer(1, 18),
-        Paragraph(p2, body_style),
-        Spacer(1, 18),
-        Paragraph(issue_date_phrase, body_style),
-        Spacer(1, 45),
-        sig_grid,
-        Spacer(1, 40),
-        bottom_table,
-    ]
+    else:
+        # Generic Barangay Certification template
+        desc_bits = [bit for bit in (age_display, gender_prose, civil_prose, "Filipino citizen") if bit]
+        purpose_clause = f"for <b>{purpose}</b> purposes." if has_purpose else "for whatever legal purposes it may serve."
+        story = [
+            Paragraph("Barangay Certification", title_style),
+            Spacer(1, 24),
+            Paragraph("TO WHOM IT MAY CONCERN:", to_whom_style),
+            Spacer(1, 18),
+            Paragraph(
+                f"THIS IS TO CERTIFY that <b>{full_name}</b>, {', '.join(desc_bits)}, "
+                f"is a bona-fide resident of {full_address_escaped}.",
+                body_style,
+            ),
+            Spacer(1, 16),
+            Paragraph(
+                f"This certification is issued upon the request of the name above mentioned {purpose_clause}",
+                body_style,
+            ),
+            Spacer(1, 18),
+            Paragraph(
+                f"Issued this {issue_date_long} at Barangay Don Felipe Larrazabal, Ormoc City, Leyte, Philippines.",
+                body_style,
+            ),
+            Spacer(1, 52),
+            _signature_block("NENITO S. ANONAT", "Punong Barangay"),
+        ]
 
-    pdf.build(story)
+    pdf.build(story, onFirstPage=_draw_official_letterhead, onLaterPages=_draw_official_letterhead)
     return buffer.getvalue()
 
 
+@app.post("/api/documents/<int:document_id>/send-document-email")
+@roles_required("admin", "barangay_official")
+def send_released_document_email(document_id: int):
+    try:
+        doc = supabase_repository.get_row("documents", document_id)
+        if not doc:
+            return jsonify({"error": "Document request not found"}), 404
+        if doc.get("status") not in {"Approved", "Resolved"}:
+            return jsonify({"error": "Only approved/released documents can be emailed to residents"}), 409
+
+        official_name = current_user().get("full_name", current_user()["email"])
+        resident_name = str(doc.get("resident_name") or "Resident").strip()
+        doc_type = str(doc.get("document_type") or "Barangay Certificate").strip()
+        tx_ref = str(doc.get("tx_ref") or f"TXN-SB-{manila_today().year}-{document_id:04d}")
+        to_email = str(_resolve_resident_email(doc) or "").strip()
+        if not to_email:
+            return jsonify({"error": "No resident email address is associated with this document request."}), 400
+
+        pdf_bytes = _certificate_pdf(doc)
+        req_slug = re.sub(r"[^A-Za-z0-9_-]+", "-", str(doc.get("request_id") or tx_ref or document_id))
+        doc_slug = re.sub(r"[^A-Za-z0-9_-]+", "-", doc_type.lower())
+        pdf_filename = f"{doc_slug}-{req_slug}.pdf"
+
+        subject = f"[SmartBarangay] Official {doc_type} Released for {resident_name} ({tx_ref})"
+        body = (
+            f"Dear {resident_name},\n\n"
+            f"Your requested {doc_type} from Barangay Don Felipe Larrazabal, Ormoc City has been officially approved and released by {official_name}.\n\n"
+            f"DOCUMENT SUMMARY:\n"
+            f"• Resident Name: {resident_name}\n"
+            f"• Document Type: {doc_type}\n"
+            f"• Transaction Reference: {tx_ref}\n"
+            f"• Status: APPROVED & RELEASED\n\n"
+            f"Attached to this email is your official {doc_type} PDF document.\n\n"
+            f"Thank you,\n"
+            f"Office of the Punong Barangay — Hon. Nenito S. Anonat\n"
+            f"Barangay Don Felipe Larrazabal, Ormoc City, Leyte"
+        )
+        email_entry = _send_gmail_notification(
+            to_email,
+            subject,
+            body,
+            resident_name=resident_name,
+            attachments=[(pdf_filename, pdf_bytes, "application", "pdf")],
+        )
+        email_logs = list(doc.get("email_logs") or [])
+        email_logs.insert(0, email_entry)
+        tx_history = list(doc.get("transaction_history") or [])
+        tx_history.insert(0, {
+            "timestamp": manila_now().isoformat(),
+            "actor": official_name,
+            "event": "Official PDF Document Emailed to Resident" if email_entry.get("smtp_delivered") else "Document Email Delivery Failed",
+            "details": email_entry.get("delivery") or f"Target: {to_email}",
+        })
+        updated = supabase_repository.update_row(
+            "documents",
+            document_id,
+            {
+                "tx_ref": tx_ref,
+                "resident_email": to_email,
+                "email_logs": email_logs,
+                "transaction_history": tx_history,
+            },
+        )
+        if not email_entry.get("smtp_delivered"):
+            return jsonify({
+                "error": email_entry.get("smtp_error") or "SMTP is not configured or failed to deliver email",
+                "data": updated,
+                "email_sent": email_entry,
+            }), 502
+        return jsonify({"data": updated, "email_sent": email_entry})
+    except Exception as error:
+        app.logger.exception("Could not send released document PDF email")
+        return jsonify({"error": str(error)}), 502
+
+
+@app.get("/api/documents/<int:document_id>/pdf")
 @app.get("/api/documents/<int:document_id>/certificate.pdf")
 @login_required
 def download_certificate(document_id: int):
@@ -2337,7 +3102,11 @@ def download_certificate(document_id: int):
         document_slug = re.sub(r"[^A-Za-z0-9_-]+", "-", str(document.get("document_type") or "certificate").lower())
         response = make_response(pdf_bytes)
         response.headers["Content-Type"] = "application/pdf"
-        response.headers["Content-Disposition"] = f'attachment; filename="{document_slug}-{request_id}.pdf"'
+        disposition = "attachment" if request.args.get("download") in ("1", "true") else "inline"
+        response.headers["Content-Disposition"] = f'{disposition}; filename="{document_slug}-{request_id}.pdf"'
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         return response
     except RepositoryConfigurationError as error:
         return jsonify({"error": str(error), "configured": False}), 503

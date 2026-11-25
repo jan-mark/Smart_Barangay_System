@@ -328,5 +328,24 @@
     "is_young_parent": false,
     "is_4ps": false,
     "sector": "Senior Citizen"
+  },
+  "32": {
+    "is_head": false,
+    "household_role": "Son",
+    "family_no": null,
+    "date_of_birth": "2001-06-02",
+    "marital_status": "Single",
+    "years_living_in": null,
+    "family_planning": "None",
+    "educational_attainment": "Secondary",
+    "residence_type": "Concrete",
+    "is_pwd": false,
+    "is_senior": false,
+    "is_lgbt": false,
+    "is_solo_parent": false,
+    "is_pregnant": false,
+    "is_young_parent": false,
+    "is_4ps": false,
+    "sector": "Adult"
   }
 }

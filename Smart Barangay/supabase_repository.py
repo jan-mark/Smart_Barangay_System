@@ -108,6 +108,58 @@ class SupabaseRepository:
         self._doc_meta: dict[str, dict[str, Any]] = self._load_doc_meta()
         self._concern_meta_path = os.path.join(os.path.dirname(__file__), "concerns_metadata.json")
         self._concern_meta: dict[str, dict[str, Any]] = self._load_concern_meta()
+        self._ann_meta_path = os.path.join(os.path.dirname(__file__), "announcements_metadata.json")
+        self._ann_meta: dict[str, dict[str, Any]] = self._load_ann_meta()
+
+    def _load_ann_meta(self) -> dict[str, dict[str, Any]]:
+        if os.path.exists(self._ann_meta_path):
+            try:
+                with open(self._ann_meta_path, "r", encoding="utf-8") as f:
+                    saved = json.load(f)
+                if isinstance(saved, dict):
+                    return saved
+            except Exception:
+                pass
+        return {}
+
+    def _save_ann_meta(self) -> None:
+        try:
+            with open(self._ann_meta_path, "w", encoding="utf-8") as f:
+                json.dump(self._ann_meta, f, indent=2)
+        except Exception:
+            pass
+
+    def _update_ann_meta(self, row_id: Any, data: dict[str, Any]) -> None:
+        if row_id is None:
+            return
+        self._ann_meta = self._load_ann_meta()
+        updates = {k: data[k] for k in ("is_urgent", "is_pinned", "status") if k in data}
+        if not updates:
+            return
+        key = str(row_id)
+        current = dict(self._ann_meta.get(key, {}))
+        current.update(updates)
+        self._ann_meta[key] = current
+        self._save_ann_meta()
+
+    def _apply_ann_meta(self, row: dict[str, Any]) -> dict[str, Any]:
+        enriched = dict(row)
+        key = str(enriched.get("id", ""))
+        meta = self._ann_meta.get(key, {})
+        for k, v in meta.items():
+            enriched[k] = v
+        # Normalize legacy Expired -> Archived and infer Urgent for Emergency category if unset
+        raw_status = str(enriched.get("status") or "Active").strip()
+        if raw_status.lower() in ("expired", "archived"):
+            enriched["status"] = "Archived"
+        else:
+            enriched["status"] = "Active"
+        if "is_urgent" not in enriched:
+            enriched["is_urgent"] = str(enriched.get("category") or "").strip().lower() == "emergency"
+        else:
+            enriched["is_urgent"] = bool(enriched["is_urgent"])
+        enriched["is_pinned"] = bool(enriched.get("is_pinned", False))
+        return enriched
 
     def _load_concern_meta(self) -> dict[str, dict[str, Any]]:
         if os.path.exists(self._concern_meta_path):
@@ -802,6 +854,8 @@ class SupabaseRepository:
             return self._apply_doc_meta(row)
         if table_name == "concerns":
             return self._apply_concern_meta(row)
+        if table_name == "announcements":
+            return self._apply_ann_meta(row)
         return dict(row)
 
     def _migrate_local_meta_id(self, table_name: str, local_id: Any, remote_id: Any) -> None:
@@ -818,6 +872,9 @@ class SupabaseRepository:
         elif table_name == "concerns" and old_key in self._concern_meta:
             self._concern_meta[new_key] = {**self._concern_meta.get(new_key, {}), **self._concern_meta.pop(old_key)}
             self._save_concern_meta()
+        elif table_name == "announcements" and old_key in self._ann_meta:
+            self._ann_meta[new_key] = {**self._ann_meta.get(new_key, {}), **self._ann_meta.pop(old_key)}
+            self._save_ann_meta()
 
     def list_table(
         self,
@@ -907,6 +964,8 @@ class SupabaseRepository:
             optional_cols = set(self._RESIDENT_META_COLS) | {
                 "supporting_doc_type",
                 "resident_email",
+                "is_urgent",
+                "is_pinned",
             }
             if any(col in err_text for col in optional_cols):
                 clean_data = {k: v for k, v in payload.items() if k not in optional_cols}
@@ -923,6 +982,8 @@ class SupabaseRepository:
             self._update_doc_meta(created_row.get("id"), payload)
         elif table_name == "concerns":
             self._update_concern_meta(created_row.get("id"), payload)
+        elif table_name == "announcements":
+            self._update_ann_meta(created_row.get("id"), payload)
         enriched = self._apply_table_meta(table_name, created_row)
         self.offline_store.upsert_cached_row(table_name, enriched, is_local_only=False)
         return enriched
@@ -951,6 +1012,8 @@ class SupabaseRepository:
             elif table_name == "residents":
                 record.setdefault("resident_id", f"RES-OFF-{local_id % 1000:03d}")
                 self._update_resident_meta(local_id, record)
+            elif table_name == "announcements":
+                self._update_ann_meta(local_id, record)
             record.setdefault("created_at", datetime.now(timezone.utc).isoformat())
             stored = self.offline_store.enqueue_insert(table_name, record, data)
             return self._apply_table_meta(table_name, stored)
@@ -963,7 +1026,11 @@ class SupabaseRepository:
             self._update_doc_meta(row_id, payload)
         elif table_name == "concerns":
             self._update_concern_meta(row_id, payload)
+        elif table_name == "announcements":
+            self._update_ann_meta(row_id, payload)
         optional_cols = set(self._RESIDENT_META_COLS) | {
+            "is_urgent",
+            "is_pinned",
             "tx_ref",
             "amount_due",
             "amount_paid",
@@ -1009,7 +1076,17 @@ class SupabaseRepository:
             )
         except Exception as update_err:
             err_text = str(update_err)
-            if any(col in err_text for col in optional_cols):
+            if table_name == "announcements" and payload.get("status") == "Archived" and ("check" in err_text.lower() or "constraint" in err_text.lower() or any(col in err_text for col in optional_cols)):
+                clean_data = {k: v for k, v in payload.items() if k not in optional_cols}
+                if clean_data.get("status") == "Archived":
+                    clean_data["status"] = "Expired"
+                response = (
+                    client.table(table_name)
+                    .update(clean_data)
+                    .eq("id", row_id)
+                    .execute()
+                ) if clean_data else client.table(table_name).select("*").eq("id", row_id).execute()
+            elif any(col in err_text for col in optional_cols):
                 clean_data = {k: v for k, v in payload.items() if k not in optional_cols}
                 if clean_data:
                     response = (
@@ -1047,6 +1124,8 @@ class SupabaseRepository:
             self._update_doc_meta(row_id, data)
         elif table_name == "concerns":
             self._update_concern_meta(row_id, data)
+        elif table_name == "announcements":
+            self._update_ann_meta(row_id, data)
 
         # Offline-created record not yet synced to Supabase: update locally and coalesce into its queued INSERT
         if OfflineSyncStore.is_local_temp_id(row_id) and not _from_sync:
