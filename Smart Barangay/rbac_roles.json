@@ -1,0 +1,49 @@
+[
+  {
+    "id": "super-admin",
+    "name": "Super Admin (Barangay Captain)",
+    "description": "Full system control & registers Barangay Officials",
+    "modules": [
+      "Dashboard",
+      "Residents",
+      "Manage Officials",
+      "Documents",
+      "Concerns",
+      "Announcements",
+      "Weather & Alerts",
+      "Reports",
+      "Settings"
+    ]
+  },
+  {
+    "id": "admin",
+    "name": "Barangay Secretary",
+    "description": "Manage residents, documents, concerns & reports",
+    "modules": [
+      "Dashboard",
+      "Residents",
+      "Documents",
+      "Reports",
+      "Settings"
+    ]
+  },
+  {
+    "id": "barangay-official",
+    "name": "Barangay Officials",
+    "description": "Officials registered by the Super Admin",
+    "modules": [
+      "Dashboard",
+      "Residents",
+      "Documents",
+      "Concerns"
+    ]
+  },
+  {
+    "id": "role-1795589469121",
+    "name": "Population Collector",
+    "description": "Collects and Register Residents",
+    "modules": [
+      "Residents"
+    ]
+  }
+]

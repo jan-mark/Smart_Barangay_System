@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SmartBarangay | Dashboard</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='municipality_logo.png') }}?v=2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -16,7 +17,7 @@
                 <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" type="button" aria-label="Toggle sidebar" aria-controls="sidebar" aria-expanded="true" title="Collapse sidebar">
                     <i data-lucide="chevrons-left"></i>
                 </button>
-                <img src="{{ url_for('static', filename='municipality_logo.png') }}" alt="Barangay Official Seal" class="brand-seal">
+                <img src="{{ url_for('static', filename='municipality_logo.png') }}?v=2" alt="SmartBarangay Logo" class="brand-seal">
                 <div>
                     <strong>SmartBarangay</strong>
                     <span>Barangay Management<br>System</span>
@@ -153,7 +154,30 @@
                 </section>
                 </div>
 
-                <div class="app-view" id="manage-officials-view" hidden><section class="page-heading"><div><h1>Manage Barangay Officials</h1><p>Register and manage barangay officials</p></div><button class="primary-button" type="button" id="register-official"><i data-lucide="user-plus"></i> Register Official</button></section><section class="resident-table-panel officials-panel"><div class="table-toolbar"><div class="table-search"><i data-lucide="search"></i><input id="official-search" placeholder="Search officials by name or position..." aria-label="Search officials" /></div></div><div class="resident-table-wrap"><table class="resident-table"><thead><tr><th>NAME</th><th>POSITION</th></tr></thead><tbody id="official-rows"></tbody></table></div></section></div>
+                <div class="app-view" id="manage-officials-view" hidden>
+                    <section class="page-heading">
+                        <div>
+                            <h1>Manage Barangay Officials</h1>
+                            <p>Register and manage barangay officials</p>
+                        </div>
+                        <button class="primary-button" type="button" id="register-official"><i data-lucide="user-plus"></i> Register Official</button>
+                    </section>
+                    <section class="resident-table-panel officials-panel">
+                        <div class="resident-table-wrap">
+                            <table class="resident-table">
+                                <thead>
+                                    <tr>
+                                        <th>NAME</th>
+                                        <th>POSITION</th>
+                                        <th>STATUS</th>
+                                        <th>ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="official-rows"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
 
                 <div id="official-dashboard-view"{% if not official_mode %} hidden{% endif %}><section class="page-heading official-heading"><div><h1 id="official-dashboard-title">Department Dashboard</h1><p id="official-dashboard-subtitle">Welcome, department official</p></div><div class="sync"><i data-lucide="activity"></i> Live sync: <time id="official-sync-time"></time></div></section><section class="department-banner"><i data-lucide="users-round"></i><div><strong id="official-department-label">Department</strong><p>Your dashboard is filtered to department-related records and concerns.</p></div></section><section class="resident-metrics official-metrics"><article class="metric-card"><div class="metric-label">OPEN CONCERNS <i data-lucide="message-square"></i></div><strong id="official-open-concerns">0</strong></article><article class="metric-card"><div class="metric-label">PENDING DOCS <i data-lucide="file-text"></i></div><strong id="official-pending-docs">0</strong></article><article class="metric-card"><div class="metric-label">RESOLVED (<span id="official-resolved-month"></span>) <i data-lucide="circle-check"></i></div><strong id="official-resolved">0</strong></article><article class="metric-card"><div class="metric-label">DEPT. RESIDENTS <i data-lucide="users-round"></i></div><strong id="official-residents">0</strong></article></section><section class="data-panel department-panel"><h2><i data-lucide="message-square"></i> Department Concerns</h2><div class="record-list" id="official-concerns-list"></div></section><section class="data-panel department-panel"><h2><i data-lucide="file-text"></i> Department Document Requests</h2><div class="record-list" id="official-documents-list"></div></section></div>
 
@@ -183,7 +207,6 @@
                                 <option value="all">All Status</option>
                                 <option value="Verified">Verified</option>
                                 <option value="Pending">Pending</option>
-                                <option value="Inactive">Inactive</option>
                             </select>
                         </div>
                         <div class="resident-table-wrap" id="resident-table-wrap">
@@ -208,7 +231,7 @@
 
                 <div class="app-view" id="documents-view" hidden><section class="page-heading"><div><h1>Document Processing</h1><p>Certificate issuance, payment verification, and remote digital document release</p></div></section><section class="metric-grid compact-metrics"><article class="metric-card"><div class="metric-label">ALL REQUESTS</div><strong id="documents-total">0</strong></article><article class="metric-card"><div class="metric-label">APPROVED</div><strong id="documents-approved">0</strong></article><article class="metric-card"><div class="metric-label">REJECTED</div><strong id="documents-rejected">0</strong></article></section><section class="data-panel"><div class="filter-tabs" data-filter-target="documents"><button class="current" data-filter="all">All</button><button data-filter="Approved">Approved</button><button data-filter="Rejected">Rejected</button><input placeholder="Search..." data-search="documents"></div><div class="doc-table-head"><span>RESIDENT</span><span>DOCUMENT TYPE</span><span>DATE REQUESTED</span><span>STATUS</span><span>PROCESSED BY</span><span class="doc-head-actions">ACTIONS</span></div><div class="record-list" id="documents-list"></div></section></div>
 
-                <div class="app-view" id="concerns-view" hidden><section class="page-heading"><div><h1>Community Concerns</h1><p>Track and resolve resident-submitted community issues</p></div></section><div class="filter-tabs" data-filter-target="concerns"><button class="current" data-filter="all">All</button><button data-filter="Open">Open</button><button data-filter="In Progress">In Progress</button><button data-filter="Escalated">Escalated</button><button data-filter="Resolved">Resolved</button></div><div class="record-list concern-list" id="concerns-list"></div></div>
+                <div class="app-view" id="concerns-view" hidden><section class="page-heading"><div><h1>Community Concerns</h1><p>Click a concern title to view its full details</p></div></section><div class="filter-tabs" data-filter-target="concerns"><button class="current" data-filter="all">All</button></div><div class="record-list concern-list" id="concerns-list"></div></div>
 
                 <div class="app-view" id="announcements-view" hidden>
                     <div class="ann-header-row">
@@ -218,7 +241,6 @@
                     <div class="ann-tabs" id="ann-filter-tabs" role="tablist">
                         <button type="button" class="ann-tab active" data-ann-filter="all">All (<span id="ann-count-all">0</span>)</button>
                         <button type="button" class="ann-tab" data-ann-filter="Active">Active (<span id="ann-count-active">0</span>)</button>
-                        <button type="button" class="ann-tab" data-ann-filter="Archived">Archived (<span id="ann-count-archived">0</span>)</button>
                     </div>
                     <div class="ann-card-list" id="announcements-list"></div>
                 </div>
@@ -392,6 +414,17 @@
                                 <i data-lucide="chevron-right" class="settings-hub-chevron"></i>
                             </button>
 
+                            <button type="button" class="settings-hub-card setting-card" data-setting="archives">
+                                <div class="settings-hub-card-left">
+                                    <span class="settings-card-icon tone-amber"><i data-lucide="archive"></i></span>
+                                    <div>
+                                        <strong>Archives</strong>
+                                        <small>View and restore archived residents, documents, and records</small>
+                                    </div>
+                                </div>
+                                <i data-lucide="chevron-right" class="settings-hub-chevron"></i>
+                            </button>
+
                             <button type="button" class="settings-hub-card setting-card" data-setting="governance">
                                 <div class="settings-hub-card-left">
                                     <span class="settings-card-icon tone-purple"><i data-lucide="cpu"></i></span>
@@ -438,7 +471,7 @@
                                 <div class="settings-tab-pane" id="gen-profile">
                                     <div class="settings-two-col">
                                         <div class="settings-visual-box tone-blue">
-                                            <img src="{{ url_for('static', filename='municipality_logo.png') }}" alt="Barangay Seal" class="settings-seal-preview" id="settings-seal-img">
+                                            <img src="{{ url_for('static', filename='municipality_logo.png') }}?v=2" alt="SmartBarangay Logo" class="settings-seal-preview" id="settings-seal-img">
                                             <label class="outline-button" style="height: 34px; font-size: 12px; padding: 0 14px; margin-top: 6px; cursor: pointer;">
                                                 <i data-lucide="upload" style="width: 14px; height: 14px;"></i> Change Logo
                                                 <input type="file" id="settings-logo-input" accept="image/png,image/jpeg,image/webp" hidden>
@@ -792,6 +825,120 @@
                                     </div>
                                     <div class="settings-actions-row">
                                         <button type="button" class="settings-blue-btn settings-save-pref-btn"><i data-lucide="save"></i> Save Privacy Settings</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 7. Archives Sub-Page -->
+                    <div class="settings-subview" id="settings-panel-archives" hidden>
+                        <section class="settings-hero">
+                            <div class="settings-hero-left">
+                                <div class="settings-hero-icon tone-amber"><i data-lucide="archive"></i></div>
+                                <div>
+                                    <h1>Archives</h1>
+                                    <p>Locate and restore archived residents, documents, and barangay records.</p>
+                                </div>
+                            </div>
+                            <button type="button" class="settings-back-btn" data-settings-back><i data-lucide="arrow-left"></i> Back to Settings</button>
+                        </section>
+
+                        <div class="settings-sub-card">
+                            <div class="settings-sub-tabs" data-settings-tabs="archives" id="settings-archives-tabs">
+                                <button type="button" class="settings-sub-tab active" data-tab="arc-residents" data-arc-module="Residents"><i data-lucide="users"></i> Residents (<span id="arc-count-residents">0</span>)</button>
+                                <button type="button" class="settings-sub-tab" data-tab="arc-documents" data-arc-module="Documents"><i data-lucide="file-text"></i> Documents (<span id="arc-count-documents">0</span>)</button>
+                                <button type="button" class="settings-sub-tab" data-tab="arc-announcements" data-arc-module="Announcements"><i data-lucide="bell"></i> Announcements (<span id="arc-count-announcements">0</span>)</button>
+                                <button type="button" class="settings-sub-tab" data-tab="arc-officials" data-arc-module="Manage Officials"><i data-lucide="user-round-cog"></i> Officials (<span id="arc-count-officials">0</span>)</button>
+                            </div>
+                            <div class="settings-sub-body">
+                                <div class="settings-tab-pane" id="arc-residents">
+                                    <div class="settings-section-bar">
+                                        <div>
+                                            <strong>Archived Residents</strong>
+                                            <small>Residents marked as Inactive. Restore any record to make it Verified again.</small>
+                                        </div>
+                                    </div>
+                                    <div style="overflow-x: auto;">
+                                        <table class="settings-roles-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Resident Name</th>
+                                                    <th>Address &amp; Household</th>
+                                                    <th>Status</th>
+                                                    <th style="text-align: right;">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="arc-residents-tbody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="settings-tab-pane" id="arc-documents" hidden>
+                                    <div class="settings-section-bar">
+                                        <div>
+                                            <strong>Archived / Rejected Documents</strong>
+                                            <small>Document requests that were archived or rejected. Restore to re-open for verification.</small>
+                                        </div>
+                                    </div>
+                                    <div style="overflow-x: auto;">
+                                        <table class="settings-roles-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Resident</th>
+                                                    <th>Document Type</th>
+                                                    <th>Date Requested</th>
+                                                    <th>Status</th>
+                                                    <th style="text-align: right;">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="arc-documents-tbody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="settings-tab-pane" id="arc-announcements" hidden>
+                                    <div class="settings-section-bar">
+                                        <div>
+                                            <strong>Archived Announcements</strong>
+                                            <small>Hidden or expired advisories. Restore to publish back to Active announcements.</small>
+                                        </div>
+                                    </div>
+                                    <div style="overflow-x: auto;">
+                                        <table class="settings-roles-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Title</th>
+                                                    <th>Audience</th>
+                                                    <th>Date</th>
+                                                    <th>Status</th>
+                                                    <th style="text-align: right;">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="arc-announcements-tbody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="settings-tab-pane" id="arc-officials" hidden>
+                                    <div class="settings-section-bar">
+                                        <div>
+                                            <strong>Archived Officials</strong>
+                                            <small>Deactivated official accounts. Restore to re-enable portal access.</small>
+                                        </div>
+                                    </div>
+                                    <div style="overflow-x: auto;">
+                                        <table class="settings-roles-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Official Name</th>
+                                                    <th>Position</th>
+                                                    <th>Status</th>
+                                                    <th style="text-align: right;">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="arc-officials-tbody"></tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
@@ -1532,6 +1679,26 @@
         </div>
     </div>
 
+    <div class="modal" id="concern-view-modal" hidden role="dialog" aria-modal="true" aria-labelledby="concern-view-title">
+        <div class="modal-card concern-view-card">
+            <div class="concern-view-head">
+                <div>
+                    <span class="concern-view-kicker">Community Concern</span>
+                    <h2 id="concern-view-title">Concern Title</h2>
+                    <small class="concern-view-meta" id="concern-view-meta"></small>
+                </div>
+                <button type="button" class="modal-close concern-view-close" aria-label="Close concern details"><i data-lucide="x"></i></button>
+            </div>
+            <div class="concern-view-body">
+                <label class="concern-view-label">Description</label>
+                <div class="concern-view-desc" id="concern-view-description"></div>
+            </div>
+            <div class="concern-view-footer">
+                <button type="button" class="outline-button concern-view-close" style="height: 36px;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal sb-confirm-overlay" id="sb-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="sb-confirm-title" aria-describedby="sb-confirm-message">
         <div class="modal-card sb-confirm-card">
             <div class="sb-confirm-icon tone-primary" id="sb-confirm-icon"><i data-lucide="help-circle"></i></div>
@@ -1655,30 +1822,37 @@
     <div class="modal" id="official-modal" hidden>
         <div class="modal-card official-modal-card">
             <div class="modal-heading">
-                <div><h2>Register Barangay Official</h2></div>
+                <div><h2 id="official-modal-title">Register Barangay Official</h2></div>
                 <button type="button" class="modal-close official-close" aria-label="Close dialog"><i data-lucide="x"></i></button>
             </div>
             <form id="official-form" autocomplete="off">
+                <input type="hidden" id="official-edit-id" value="">
                 <div class="official-form-grid">
                     <label>Full Name
                         <input name="full_name" required placeholder="e.g. Dr. Maria Santos" autocomplete="off">
                     </label>
                     <label>Position
-                        <input name="position" required placeholder="e.g. Barangay Kagawad" autocomplete="off">
+                        <input name="position" list="official-position-suggestions" required placeholder="e.g. Barangay Secretary, Barangay Kagawad" autocomplete="off">
+                        <datalist id="official-position-suggestions">
+                            <option value="Barangay Secretary"></option>
+                            <option value="Barangay Kagawad"></option>
+                            <option value="Barangay Treasurer"></option>
+                            <option value="SK Chairperson"></option>
+                        </datalist>
                     </label>
                     <label>Email Address
                         <input name="email" type="email" required placeholder="e.g. official@barangay.gov.ph" autocomplete="new-email">
                     </label>
                     <label>Phone Number
-                        <input name="phone" required placeholder="e.g. 09171234567" autocomplete="off">
+                        <input name="phone" placeholder="e.g. 09171234567" autocomplete="off">
                     </label>
-                    <label>Password
+                    <label class="official-pw-field">Password
                         <div class="pw-input-wrap">
                             <input id="official-password" name="password" type="password" minlength="8" required placeholder="Enter strong password" autocomplete="new-password">
                             <button type="button" class="pw-eye-btn" data-toggle-pw="official-password" aria-label="Show password"><i data-lucide="eye"></i></button>
                         </div>
                     </label>
-                    <label>Confirm Password
+                    <label class="official-pw-field">Confirm Password
                         <div class="pw-input-wrap">
                             <input id="official-confirm-password" name="confirm_password" type="password" minlength="8" required placeholder="Re-enter password" autocomplete="new-password">
                             <button type="button" class="pw-eye-btn" data-toggle-pw="official-confirm-password" aria-label="Show confirm password"><i data-lucide="eye"></i></button>
@@ -1698,7 +1872,7 @@
                 </div>
                 <div class="official-form-actions">
                     <button type="button" class="outline-button official-cancel-btn">Cancel</button>
-                    <button class="primary-button" type="submit">Register Official</button>
+                    <button class="primary-button" type="submit" id="official-submit-btn">Register Official</button>
                 </div>
             </form>
         </div>
@@ -1880,6 +2054,7 @@
             }
         };
         let allowedAccessSet = new Set(['Dashboard', 'Profile']);
+        let roleAccessLoaded = false;
         const applyRoleAccess = async () => {
             const response = await fetch('/api/me');
             if (!response.ok) { window.location.href = '/login'; return; }
@@ -1887,16 +2062,16 @@
             currentUserData = result.user;
             currentRole = result.user.role === 'official' ? 'barangay_official' : result.user.role;
             allowedAccessSet = new Set([...(result.access || []), 'Profile']);
+            roleAccessLoaded = true;
             document.querySelectorAll('.nav-item[data-section]').forEach((item) => {
                 const sec = item.dataset.section;
                 item.hidden = !allowedAccessSet.has(sec);
             });
             document.querySelector('.profile strong').textContent = result.user.full_name || result.user.email;
+            const matchedRoleName = result.matched_role && result.matched_role.name ? result.matched_role.name : '';
             const roleDisplayLabel = currentRole === 'super_admin'
                 ? (result.user.position || 'Super Admin · Barangay Captain')
-                : (currentRole === 'admin'
-                    ? (result.user.position || 'Admin · Barangay Secretary')
-                    : (result.user.position || 'Authorized Official'));
+                : (result.user.position || matchedRoleName || (currentRole === 'admin' ? 'Barangay Secretary' : 'Barangay Official'));
             document.querySelector('.profile small').textContent = roleDisplayLabel;
             document.querySelector('#profile-form [name="full_name"]').value = result.user.full_name || '';
             document.querySelector('#profile-form [name="position"]').value = result.user.position || '';
@@ -1911,10 +2086,29 @@
                 if (topbarTitleEl) topbarTitleEl.textContent = dashTitleText;
             }
             document.querySelector('#dashboard-subtitle').textContent = isOfficial ? `${result.user.department || 'Department'} · Barangay Don Felipe Larrazabal · Ormoc City, Leyte` : 'All barangay systems · Don Felipe Larrazabal · Ormoc City, Leyte';
-            if (isOfficial) {
-                document.querySelector('.nav-item[data-section="Residents"] span').textContent = 'Residents';
+            const reviewAlertsBtn = document.querySelector('[data-action="review-alerts"]');
+            if (reviewAlertsBtn) reviewAlertsBtn.hidden = !allowedAccessSet.has('Concerns');
+            const securitySettingsCard = document.querySelector('#settings-home .setting-card[data-setting="security"]');
+            if (securitySettingsCard) securitySettingsCard.hidden = currentRole !== 'super_admin';
+            if (!allowedAccessSet.has('Dashboard')) {
+                document.querySelector('#dashboard-view').hidden = true;
+                document.querySelector('#official-dashboard-view').hidden = true;
+                const firstAllowedNav = document.querySelector('.nav-item[data-section]:not([hidden])');
+                if (firstAllowedNav) firstAllowedNav.click();
+            } else if (isOfficial) {
+                const resSpan = document.querySelector('.nav-item[data-section="Residents"] span');
+                if (resSpan) resSpan.textContent = 'Residents';
                 document.querySelector('#dashboard-view').hidden = true;
                 document.querySelector('#official-dashboard-view').hidden = false;
+            }
+            if (allowedAccessSet.has('Manage Officials') && typeof loadOfficials === 'function') {
+                loadOfficials();
+            }
+            if (typeof loadRbacRolesFromServer === 'function') {
+                loadRbacRolesFromServer();
+            }
+            if (typeof loadNotifications === 'function') {
+                loadNotifications();
             }
             renderAdminProfileView();
         };
@@ -1933,7 +2127,8 @@
             document.querySelector('#official-open-concerns').textContent = concerns.filter((item) => !['Resolved'].includes(item.status)).length;
             document.querySelector('#official-pending-docs').textContent = documents.filter((item) => ['Pending', 'In Progress', 'Processing'].includes(item.status)).length;
             document.querySelector('#official-resolved').textContent = concerns.filter((item) => item.status === 'Resolved').length;
-            document.querySelector('#official-residents').textContent = residents.length;
+            const activeOfficialResidents = residents.filter((item) => String(item.status || '').trim().toLowerCase() !== 'inactive');
+            document.querySelector('#official-residents').textContent = activeOfficialResidents.length;
             document.querySelector('#official-concerns-list').innerHTML = concerns.length ? concerns.slice(0, 6).map((item) => `<div class="department-row"><div><strong>${escapeHtml(item.title)}</strong><small>By ${escapeHtml(item.submitted_by)} · ${escapeHtml(smartBarangayTime.formatDate(item.submitted_at))}</small></div><span class="tag priority-${String(item.priority || '').toLowerCase()}">${escapeHtml(item.priority)}</span><em class="status ${String(item.status || 'Pending').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status)}</em><button class="status-edit" data-kind="concern" data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(item.status || 'Pending')}" type="button">Edit status</button></div>`).join('') : '<div class="empty-state">No concerns for this department.</div>';
             document.querySelector('#official-documents-list').innerHTML = documents.length ? documents.slice(0, 6).map((item) => {
                 const status = String(item.status || 'Pending');
@@ -1944,35 +2139,59 @@
         };
 
         let officialsData = [];
+        let activeOfficialTab = 'Active';
+        const normalizeOfficialStatus = (o) => (String(o?.status || 'Active').trim().toLowerCase() === 'archived' ? 'Archived' : 'Active');
         const renderOfficials = () => {
-            const query = (document.querySelector('#official-search')?.value || '').trim().toLowerCase();
-            const department = document.querySelector('#official-department-filter')?.value || 'all';
-            const filtered = officialsData.filter((official) => `${official.full_name} ${official.position || ''}`.toLowerCase().includes(query) && (department === 'all' || official.department === department));
+            const activeOfficials = officialsData.filter((o) => normalizeOfficialStatus(o) === 'Active');
+            const archivedOfficials = officialsData.filter((o) => normalizeOfficialStatus(o) === 'Archived');
+            const activeCountEl = document.querySelector('#official-count-active');
+            const archivedCountEl = document.querySelector('#official-count-archived');
+            if (activeCountEl) activeCountEl.textContent = activeOfficials.length;
+            if (archivedCountEl) archivedCountEl.textContent = archivedOfficials.length;
+
+            const filtered = activeOfficialTab === 'Archived' ? archivedOfficials : activeOfficials;
             const getInitials = (name) => String(name || 'BO').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('') || 'BO';
             document.querySelector('#official-rows').innerHTML = filtered.length
-                ? filtered.map((official) => `
-                    <tr>
-                        <td>
-                            <div class="official-name-cell">
-                                <span class="official-avatar">${escapeHtml(getInitials(official.full_name))}</span>
-                                <strong>${escapeHtml(official.full_name)}</strong>
-                            </div>
-                        </td>
-                        <td><span class="official-position-pill">${escapeHtml(official.position || 'Barangay Official')}</span></td>
-                    </tr>
-                `).join('')
-                : '<tr><td class="empty-state" colspan="2">No officials registered yet. Click <strong>+ Register Official</strong> to add one.</td></tr>';
-            const officialCountEl = document.querySelector('#official-count');
-            if (officialCountEl) officialCountEl.textContent = `Showing ${filtered.length} official${filtered.length === 1 ? '' : 's'}`;
+                ? filtered.map((official) => {
+                    const st = normalizeOfficialStatus(official);
+                    const isArchived = st === 'Archived';
+                    return `
+                        <tr>
+                            <td>
+                                <div class="official-name-cell">
+                                    <span class="official-avatar">${escapeHtml(getInitials(official.full_name))}</span>
+                                    <div>
+                                        <strong>${escapeHtml(official.full_name)}</strong>
+                                        ${official.email ? `<div style="font-size: 11.5px; color: #64748B; font-weight: 400;">${escapeHtml(official.email)}</div>` : ''}
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="official-position-pill">${escapeHtml(official.position || 'Barangay Official')}</span></td>
+                            <td><span class="status ${isArchived ? 'inactive' : 'approved'}">${escapeHtml(st)}</span></td>
+                            <td>
+                                <div class="settings-role-actions" style="justify-content: flex-end;">
+                                    <button type="button" class="settings-link-btn edit" data-edit-official="${escapeHtml(official.id)}"><i data-lucide="edit-3"></i> Edit</button>
+                                    <button type="button" class="settings-link-btn ${isArchived ? 'edit' : 'delete'}" data-archive-official="${escapeHtml(official.id)}">
+                                        <i data-lucide="${isArchived ? 'rotate-ccw' : 'archive'}"></i> ${isArchived ? 'Restore' : 'Archive'}
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('')
+                : `<tr><td class="empty-state" colspan="4">${activeOfficialTab === 'Archived' ? 'No archived officials.' : 'No active officials registered yet. Click <strong>+ Register Official</strong> to add one.'}</td></tr>`;
+            lucide.createIcons();
+
             const overview = document.querySelector('#officials-overview-table');
             if (overview) {
-                overview.innerHTML = `<div><b>NAME</b><b>DEPARTMENT</b><b>POSITION</b><b>STATUS</b></div>${officialsData.length ? officialsData.slice(0, 6).map((official) => `<div><strong>${escapeHtml(official.full_name)}</strong><span>${escapeHtml(official.department || 'Unassigned')}</span><span>${escapeHtml(official.position || 'Department Official')}</span><span class="status approved">Active</span></div>`).join('') : '<div class="empty-state">No official records found.</div>'}`;
-                document.querySelector('#officials-overview-count').textContent = `${officialsData.length} official${officialsData.length === 1 ? '' : 's'}`;
+                overview.innerHTML = `<div><b>NAME</b><b>DEPARTMENT</b><b>POSITION</b><b>STATUS</b></div>${activeOfficials.length ? activeOfficials.slice(0, 6).map((official) => `<div><strong>${escapeHtml(official.full_name)}</strong><span>${escapeHtml(official.department || 'Unassigned')}</span><span>${escapeHtml(official.position || 'Department Official')}</span><span class="status approved">Active</span></div>`).join('') : '<div class="empty-state">No official records found.</div>'}`;
+                const ovCount = document.querySelector('#officials-overview-count');
+                if (ovCount) ovCount.textContent = `${activeOfficials.length} official${activeOfficials.length === 1 ? '' : 's'}`;
             }
             const assignSelect = document.querySelector('#concern-assigned-select');
             if (assignSelect) {
                 const prevVal = assignSelect.value;
-                const dynamicOptions = officialsData.map((official) => {
+                const dynamicOptions = activeOfficials.map((official) => {
                     const label = `${official.full_name || 'Official'}${official.position ? ` (${official.position})` : ''}`;
                     return `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`;
                 }).join('');
@@ -2425,35 +2644,54 @@
 
             return `<div class="record-row doc-record-row" data-doc-id="${escapeHtml(record.id)}"><div class="doc-resident-cell"><strong>${escapeHtml(record.resident_name)}</strong></div><span class="doc-type-cell">${escapeHtml(record.document_type)}</span><time class="doc-date-cell">${escapeHtml(smartBarangayTime.formatDate(record.date_requested))}</time><div class="doc-status-cell"><em class="status ${statusClass}">${escapeHtml(statusLabel)}</em></div><div class="doc-by-cell">${processedHtml}</div><div class="doc-row-actions">${actions}</div></div>`;
         };
+        const concernViewModal = document.querySelector('#concern-view-modal');
+        const openConcernDetailModal = (record) => {
+            if (!record || !concernViewModal) return;
+            const titleEl = document.querySelector('#concern-view-title');
+            const metaEl = document.querySelector('#concern-view-meta');
+            const descEl = document.querySelector('#concern-view-description');
+            if (titleEl) titleEl.textContent = record.title || 'Community Concern';
+            if (metaEl) {
+                const parts = [
+                    record.submitted_by ? `Submitted by ${record.submitted_by}` : '',
+                    record.submitted_at ? smartBarangayTime.formatDate(record.submitted_at) : ''
+                ].filter(Boolean);
+                metaEl.textContent = parts.join(' · ');
+            }
+            if (descEl) {
+                descEl.textContent = String(record.description || '').trim() || 'No additional description provided.';
+            }
+            concernViewModal.hidden = false;
+            lucide.createIcons();
+        };
+        document.querySelectorAll('.concern-view-close').forEach((btn) => {
+            btn.addEventListener('click', () => { if (concernViewModal) concernViewModal.hidden = true; });
+        });
+        concernViewModal?.addEventListener('click', (event) => {
+            if (event.target === concernViewModal) concernViewModal.hidden = true;
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && concernViewModal && !concernViewModal.hidden) {
+                concernViewModal.hidden = true;
+            }
+        });
+        document.querySelector('#concerns-list')?.addEventListener('click', (event) => {
+            const card = event.target.closest('.concern-row[data-concern-id]');
+            if (!card) return;
+            const rec = (pageData.Concerns || []).find((c) => String(c.id) === String(card.dataset.concernId));
+            if (rec) openConcernDetailModal(rec);
+        });
+        document.querySelector('#concerns-list')?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            const card = event.target.closest('.concern-row[data-concern-id]');
+            if (!card) return;
+            event.preventDefault();
+            const rec = (pageData.Concerns || []).find((c) => String(c.id) === String(card.dataset.concernId));
+            if (rec) openConcernDetailModal(rec);
+        });
+
         const renderConcernRecord = (record) => {
-            const status = String(record.status || 'Pending');
-            const actions = canManageRecords() ? `<button class="status-edit" data-kind="concern" data-id="${escapeHtml(record.id)}" data-status="${escapeHtml(status)}" type="button">View &amp; Manage</button>` : '';
-            const assignedHtml = record.assigned_to
-                ? `<span class="tag" style="background: #F1F5F9; color: #0F172A; font-weight: 600;">Assigned: ${escapeHtml(record.assigned_to)}</span>`
-                : '';
-            const apptStatus = record.appointment_status || 'Proposed';
-            const apptBadgeColor = apptStatus === 'Confirmed' ? '#059669' : (apptStatus === 'Reschedule Requested' ? '#D97706' : '#1D4ED8');
-            const apptHtml = record.appointment_date
-                ? `<div style="margin-top: 8px; padding: 8px 12px; background: #EFF6FF; border-left: 3px solid ${apptBadgeColor}; border-radius: 6px; font-size: 12px;">
-                    <strong style="color: #1E3A8A;">Appointment: ${escapeHtml(smartBarangayTime.formatDate(record.appointment_date))}${record.appointment_time ? ` at ${escapeHtml(record.appointment_time)}` : ''}</strong>
-                    <span style="margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fff; color: ${apptBadgeColor};">${escapeHtml(apptStatus)}</span>
-                    ${record.appointment_notes ? `<div style="color: #475569; margin-top: 2px;">Location/Note: ${escapeHtml(record.appointment_notes)}</div>` : ''}
-                    ${record.reschedule_note ? `<div style="color: #B45309; font-weight: 600; margin-top: 2px;">Resident Reschedule Request: ${escapeHtml(record.reschedule_note)}</div>` : ''}
-                   </div>`
-                : '';
-            const feedbackHtml = record.official_feedback
-                ? `<div style="margin-top: 8px; padding: 8px 12px; background: #F8FAFC; border-left: 3px solid #0B2545; border-radius: 6px; font-size: 12px;">
-                    <strong style="color: #0B2545;">Official Feedback${record.feedback_by ? ` (${escapeHtml(record.feedback_by)})` : ''}:</strong>
-                    <div style="color: #334155; margin-top: 2px;">${escapeHtml(record.official_feedback)}</div>
-                   </div>`
-                : '';
-            const resolutionHtml = record.resolution_remarks
-                ? `<div style="margin-top: 8px; padding: 8px 12px; background: #ECFDF5; border-left: 3px solid #10B981; border-radius: 6px; font-size: 12px;">
-                    <strong style="color: #065F46;">Resolution Remarks (Action Taken):</strong>
-                    <div style="color: #047857; margin-top: 2px;">${escapeHtml(record.resolution_remarks)}</div>
-                   </div>`
-                : '';
-            return `<article class="concern-row" data-concern-id="${escapeHtml(record.id)}"><div style="flex: 1;"><span class="tag" style="margin-left:0;">${escapeHtml(record.category)}</span><span class="tag priority-${String(record.priority || '').toLowerCase()}">${escapeHtml(record.priority)}</span>${assignedHtml}<h3>${escapeHtml(record.title)}</h3><p>${escapeHtml(record.description || 'No additional description provided.')}</p><small>Submitted by ${escapeHtml(record.submitted_by)} · ${escapeHtml(smartBarangayTime.formatDate(record.submitted_at))}</small>${feedbackHtml}${apptHtml}${resolutionHtml}</div><div style="display: flex; align-items: center; gap: 8px;"><em class="status ${documentStatusClass(status)}">${escapeHtml(status)}</em>${actions}</div></article>`;
+            return `<article class="concern-row concern-title-card" role="button" tabindex="0" data-concern-id="${escapeHtml(record.id)}"><h3 class="concern-title-only">${escapeHtml(record.title || 'Untitled Concern')}</h3><i data-lucide="chevron-right" class="concern-title-chevron"></i></article>`;
         };
         const renderPageData = (section) => {
             const records = pageData[section] || [];
@@ -2467,7 +2705,10 @@
                 const visibleDocs = records.filter((record) => activeFilter === 'all' || getEffectiveDocStatus(record) === activeFilter);
                 document.querySelector('#documents-list').innerHTML = visibleDocs.length ? visibleDocs.map(renderDocumentRecord).join('') : '<div class="empty-state">No matching document requests.</div>';
             }
-            if (section === 'Concerns') document.querySelector('#concerns-list').innerHTML = records.length ? records.map(renderConcernRecord).join('') : '<div class="empty-state">No concerns found.</div>';
+            if (section === 'Concerns') {
+                document.querySelector('#concerns-list').innerHTML = records.length ? records.map(renderConcernRecord).join('') : '<div class="empty-state">No concerns found.</div>';
+                lucide.createIcons();
+            }
             if (section === 'Announcements') renderAnnouncementsList(records);
             if (section === 'Weather & Alerts' && typeof renderWeatherAlertsPanel === 'function') { renderWeatherAlertsPanel(records); }
             if (['Documents', 'Concerns', 'Weather & Alerts'].includes(section) && typeof loadNotifications === 'function') { loadNotifications(); }
@@ -3843,7 +4084,7 @@
                     delete pageData.Announcements;
                     await loadPageData('Announcements');
                     loadNotifications();
-                    showToast(nextStatus === 'Archived' ? 'Moved to Archived' : 'Announcement restored to Active');
+                    showToast(nextStatus === 'Archived' ? 'Moved to Settings → Archives' : 'Announcement restored to Active');
                 } catch (err) {
                     showToast(err.message || 'Could not update announcement');
                     archiveBtn.disabled = false;
@@ -4140,11 +4381,15 @@
             home: 'Settings',
             general: 'General Settings',
             security: 'Security & Access',
+            archives: 'Archives',
             governance: 'AI Governance',
             backup: 'Data & Backup'
         };
 
         const openSettingsPanel = (panelKey = 'home') => {
+            if (panelKey === 'security' && currentRole !== 'super_admin') {
+                panelKey = 'home';
+            }
             document.querySelectorAll('#settings-view .settings-subview').forEach((el) => {
                 el.hidden = true;
             });
@@ -4153,7 +4398,13 @@
             if (target) target.hidden = false;
             const topbarTitle = document.querySelector('#topbar-page-title');
             if (topbarTitle) topbarTitle.textContent = settingsPanelLabels[panelKey] || 'Settings';
-            if (panelKey === 'security') renderSettingsRoles();
+            if (panelKey === 'security') {
+                renderSettingsRoles();
+                loadRbacRolesFromServer();
+            }
+            if (panelKey === 'archives' && typeof loadSettingsArchives === 'function') {
+                loadSettingsArchives();
+            }
             lucide.createIcons();
         };
 
@@ -4318,37 +4569,97 @@
             },
             {
                 id: 'admin',
-                name: 'Admin (Barangay Secretary)',
+                name: 'Barangay Secretary',
                 description: 'Manage residents, documents, concerns & reports',
                 modules: ['Dashboard', 'Residents', 'Documents', 'Concerns', 'Announcements', 'Weather & Alerts', 'Reports']
             },
             {
                 id: 'barangay-official',
-                name: 'Authorized Users (Barangay Officials)',
+                name: 'Barangay Officials',
                 description: 'Officials registered by the Super Admin',
                 modules: ['Dashboard', 'Residents', 'Documents', 'Concerns']
             }
         ];
+        const normalizeClientRbacRoles = (raw) => {
+            if (!Array.isArray(raw) || !raw.length) {
+                return defaultRbacRoles.map((r) => ({ ...r, modules: [...r.modules] }));
+            }
+            return raw.map((r) => ({
+                id: r.id || `role-${Date.now()}`,
+                name: String(r.name || 'Custom Role'),
+                description: String(r.description || ''),
+                modules: Array.isArray(r.modules)
+                    ? r.modules.filter((m) => ALL_RBAC_MODULE_KEYS.includes(m))
+                    : [...ALL_RBAC_MODULE_KEYS]
+            }));
+        };
         const loadRbacRoles = () => {
             try {
                 const raw = JSON.parse(localStorage.getItem(RBAC_STORAGE_KEY) || 'null');
                 if (Array.isArray(raw) && raw.length) {
-                    return raw.map((r) => ({
-                        id: r.id || `role-${Date.now()}`,
-                        name: String(r.name || 'Custom Role'),
-                        description: String(r.description || ''),
-                        modules: Array.isArray(r.modules)
-                            ? r.modules.filter((m) => ALL_RBAC_MODULE_KEYS.includes(m))
-                            : [...ALL_RBAC_MODULE_KEYS]
-                    }));
+                    return normalizeClientRbacRoles(raw);
                 }
             } catch {}
             return defaultRbacRoles.map((r) => ({ ...r, modules: [...r.modules] }));
         };
-        const saveRbacRoles = () => {
+        const syncOfficialPositionSuggestions = () => {
+            const listEl = document.querySelector('#official-position-suggestions');
+            if (!listEl) return;
+            const suggestions = new Set(['Barangay Secretary', 'Barangay Kagawad', 'Barangay Treasurer', 'SK Chairperson']);
+            rbacRoles.forEach((r) => {
+                if (r.id === 'super-admin') return;
+                if (r.name && r.name.trim()) suggestions.add(r.name.trim());
+            });
+            listEl.innerHTML = Array.from(suggestions).map((s) => `<option value="${escapeHtml(s)}"></option>`).join('');
+        };
+        const saveRbacRoles = async () => {
             try { localStorage.setItem(RBAC_STORAGE_KEY, JSON.stringify(rbacRoles)); } catch {}
+            syncOfficialPositionSuggestions();
+            if (currentRole !== 'super_admin') return true;
+            try {
+                const resp = await fetch('/api/rbac/roles', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roles: rbacRoles })
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    showToast(err.error || 'Could not save role permissions to server');
+                    return false;
+                }
+                const saved = await resp.json();
+                if (Array.isArray(saved.data) && saved.data.length) {
+                    rbacRoles = normalizeClientRbacRoles(saved.data);
+                    try { localStorage.setItem(RBAC_STORAGE_KEY, JSON.stringify(rbacRoles)); } catch {}
+                }
+                return true;
+            } catch {
+                showToast('Saved locally; will apply once server is reachable');
+                return false;
+            }
         };
         let rbacRoles = loadRbacRoles();
+        const loadRbacRolesFromServer = async () => {
+            try {
+                const resp = await fetch('/api/rbac/roles');
+                if (!resp.ok) return;
+                const json = await resp.json();
+                const localRaw = (() => {
+                    try { return JSON.parse(localStorage.getItem(RBAC_STORAGE_KEY) || 'null'); } catch { return null; }
+                })();
+                // If server hasn't persisted rbac_roles.json yet and Super Admin already customized roles locally, push them to server once
+                if (!json.persisted && currentRole === 'super_admin' && Array.isArray(localRaw) && localRaw.length) {
+                    rbacRoles = normalizeClientRbacRoles(localRaw);
+                    await saveRbacRoles();
+                } else if (Array.isArray(json.data) && json.data.length) {
+                    rbacRoles = normalizeClientRbacRoles(json.data);
+                    try { localStorage.setItem(RBAC_STORAGE_KEY, JSON.stringify(rbacRoles)); } catch {}
+                }
+                syncOfficialPositionSuggestions();
+                renderSettingsRoles();
+            } catch {}
+        };
+        syncOfficialPositionSuggestions();
 
         const rolePermModal = document.querySelector('#role-permissions-modal');
         const rolePermForm = document.querySelector('#role-permissions-form');
@@ -4480,7 +4791,7 @@
                     existing.description = description || existing.description;
                     existing.modules = checkedModules;
                 }
-                saveRbacRoles();
+                await saveRbacRoles();
                 renderSettingsRoles();
                 closeRolePermModal();
                 showToast(`Updated permissions for ${name} (${checkedModules.length}/${RBAC_MODULES.length} modules)`);
@@ -4491,7 +4802,7 @@
                     description: description || 'Custom barangay role',
                     modules: checkedModules
                 });
-                saveRbacRoles();
+                await saveRbacRoles();
                 renderSettingsRoles();
                 closeRolePermModal();
                 showToast(`Added role: ${name} (${checkedModules.length}/${RBAC_MODULES.length} modules)`);
@@ -4513,6 +4824,9 @@
         const renderSettingsRoles = () => {
             const tbody = document.querySelector('#settings-roles-tbody');
             if (!tbody) return;
+            const canEditRoles = currentRole === 'super_admin';
+            const addRoleBtn = document.querySelector('#settings-add-role-btn');
+            if (addRoleBtn) addRoleBtn.hidden = !canEditRoles;
             tbody.innerHTML = rbacRoles.map((role) => `
                 <tr>
                     <td>${escapeHtml(role.name)}</td>
@@ -4520,13 +4834,15 @@
                     <td>${renderRolePermissionsBadges(role.modules)}</td>
                     <td>
                         <div class="settings-role-actions">
-                            <button type="button" class="settings-link-btn edit" data-edit-role="${escapeHtml(role.id)}"><i data-lucide="edit-3"></i> Edit</button>
-                            ${role.id === 'super-admin' ? '' : `<button type="button" class="settings-link-btn delete" data-delete-role="${escapeHtml(role.id)}"><i data-lucide="trash-2"></i> Delete</button>`}
+                            ${canEditRoles
+                                ? `<button type="button" class="settings-link-btn edit" data-edit-role="${escapeHtml(role.id)}"><i data-lucide="edit-3"></i> Edit</button>${role.id === 'super-admin' ? '' : `<button type="button" class="settings-link-btn delete" data-delete-role="${escapeHtml(role.id)}"><i data-lucide="trash-2"></i> Delete</button>`}`
+                                : '<span style="font-size: 12px; color: #94A3B8;">View only</span>'}
                         </div>
                     </td>
                 </tr>
             `).join('');
             lucide.createIcons();
+            if (!canEditRoles) return;
             tbody.querySelectorAll('[data-edit-role]').forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     const role = rbacRoles.find((r) => r.id === btn.dataset.editRole);
@@ -4558,7 +4874,7 @@
                     });
                     if (!confirmed) return;
                     rbacRoles = rbacRoles.filter((r) => r.id !== role.id);
-                    saveRbacRoles();
+                    await saveRbacRoles();
                     renderSettingsRoles();
                     showToast(`${role.name} role removed`);
                 });
@@ -4583,6 +4899,259 @@
                 </div>
             `).join('');
         };
+
+        // Settings -> Archives Hub (Archived Residents, Documents, Announcements, Officials)
+        const loadSettingsArchives = async () => {
+            const tabBar = document.querySelector('#settings-archives-tabs');
+            if (!tabBar) return;
+            const allowRes = allowedAccessSet.has('Residents');
+            const allowDoc = allowedAccessSet.has('Documents');
+            const allowAnn = allowedAccessSet.has('Announcements');
+            const allowOff = allowedAccessSet.has('Manage Officials');
+
+            const tabPerms = {
+                'arc-residents': allowRes,
+                'arc-documents': allowDoc,
+                'arc-announcements': allowAnn,
+                'arc-officials': allowOff
+            };
+            let firstVisibleTab = null;
+            let activeVisible = false;
+            tabBar.querySelectorAll('.settings-sub-tab').forEach((btn) => {
+                const isAllowed = Boolean(tabPerms[btn.dataset.tab]);
+                btn.hidden = !isAllowed;
+                if (isAllowed && !firstVisibleTab) firstVisibleTab = btn;
+                if (isAllowed && btn.classList.contains('active')) activeVisible = true;
+            });
+            if (!activeVisible && firstVisibleTab) {
+                firstVisibleTab.click();
+            }
+
+            const [resResp, docResp, annResp, offResp] = await Promise.all([
+                allowRes ? fetch('/api/residents').catch(() => null) : Promise.resolve(null),
+                allowDoc ? fetch('/api/documents').catch(() => null) : Promise.resolve(null),
+                allowAnn ? fetch('/api/announcements').catch(() => null) : Promise.resolve(null),
+                allowOff ? fetch('/api/officials').catch(() => null) : Promise.resolve(null)
+            ]);
+
+            const residents = (resResp && resResp.ok) ? ((await resResp.json()).data || []) : [];
+            const docs = (docResp && docResp.ok) ? ((await docResp.json()).data || []) : [];
+            const anns = (annResp && annResp.ok) ? ((await annResp.json()).data || []) : [];
+            const offs = (offResp && offResp.ok) ? ((await offResp.json()).data || []) : [];
+
+            const arcResidents = residents.filter((r) => String(r.status || '').trim().toLowerCase() === 'inactive');
+            const arcDocs = docs.filter((d) => ['rejected', 'archived'].includes(String(getEffectiveDocStatus(d) || '').trim().toLowerCase()));
+            const arcAnns = anns.filter((a) => ['archived', 'expired'].includes(String(a.status || '').trim().toLowerCase()));
+            const arcOffs = offs.filter((o) => String(o.status || '').trim().toLowerCase() === 'archived');
+
+            const setCnt = (id, val) => { const el = document.querySelector(id); if (el) el.textContent = val; };
+            setCnt('#arc-count-residents', arcResidents.length);
+            setCnt('#arc-count-documents', arcDocs.length);
+            setCnt('#arc-count-announcements', arcAnns.length);
+            setCnt('#arc-count-officials', arcOffs.length);
+
+            const resTbody = document.querySelector('#arc-residents-tbody');
+            if (resTbody) {
+                resTbody.innerHTML = arcResidents.length
+                    ? arcResidents.map((r) => `
+                        <tr>
+                            <td>
+                                <strong>${escapeHtml(r.full_name || 'Resident')}</strong>
+                                <div style="font-size: 11.5px; color: #64748B;">${escapeHtml(r.age ? `${r.age} yrs · ` : '')}${escapeHtml(r.gender || '')}</div>
+                            </td>
+                            <td>${escapeHtml(r.address || '—')}${r.household && r.household !== 'UNASSIGNED' ? ` · HH ${escapeHtml(r.household)}` : ''}</td>
+                            <td><span class="status inactive">Inactive</span></td>
+                            <td style="text-align: right;">
+                                <button type="button" class="settings-link-btn edit" data-arc-restore-resident="${escapeHtml(r.id)}" data-arc-label="${escapeHtml(r.full_name || 'Resident')}">
+                                    <i data-lucide="rotate-ccw"></i> Restore
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="4" class="empty-state">No archived residents found.</td></tr>';
+            }
+
+            const docTbody = document.querySelector('#arc-documents-tbody');
+            if (docTbody) {
+                docTbody.innerHTML = arcDocs.length
+                    ? arcDocs.map((d) => `
+                        <tr>
+                            <td><strong>${escapeHtml(d.resident_name || 'Resident')}</strong></td>
+                            <td>${escapeHtml(d.document_type || 'Document')}</td>
+                            <td>${escapeHtml(smartBarangayTime.formatDate(d.date_requested || d.created_at))}</td>
+                            <td><span class="status rejected">${escapeHtml(getEffectiveDocStatus(d))}</span></td>
+                            <td style="text-align: right;">
+                                <button type="button" class="settings-link-btn edit" data-arc-restore-doc="${escapeHtml(d.id)}" data-arc-label="${escapeHtml(`${d.document_type || 'Document'} (${d.resident_name || 'Resident'})`)}">
+                                    <i data-lucide="rotate-ccw"></i> Restore
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="5" class="empty-state">No archived or rejected document requests found.</td></tr>';
+            }
+
+            const annTbody = document.querySelector('#arc-announcements-tbody');
+            if (annTbody) {
+                annTbody.innerHTML = arcAnns.length
+                    ? arcAnns.map((a) => `
+                        <tr>
+                            <td><strong>${escapeHtml(a.title || 'Announcement')}</strong></td>
+                            <td>${escapeHtml(a.audience || 'All Residents')}</td>
+                            <td>${escapeHtml(smartBarangayTime.formatDate(a.published_at || a.created_at))}</td>
+                            <td><span class="status inactive">Archived</span></td>
+                            <td style="text-align: right;">
+                                <button type="button" class="settings-link-btn edit" data-arc-restore-ann="${escapeHtml(a.id)}" data-arc-label="${escapeHtml(a.title || 'Announcement')}">
+                                    <i data-lucide="rotate-ccw"></i> Restore
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="5" class="empty-state">No archived announcements found.</td></tr>';
+            }
+
+            const offTbody = document.querySelector('#arc-officials-tbody');
+            if (offTbody) {
+                offTbody.innerHTML = arcOffs.length
+                    ? arcOffs.map((o) => `
+                        <tr>
+                            <td>
+                                <strong>${escapeHtml(o.full_name || 'Official')}</strong>
+                                ${o.email ? `<div style="font-size: 11.5px; color: #64748B;">${escapeHtml(o.email)}</div>` : ''}
+                            </td>
+                            <td><span class="official-position-pill">${escapeHtml(o.position || 'Barangay Official')}</span></td>
+                            <td><span class="status inactive">Archived</span></td>
+                            <td style="text-align: right;">
+                                <button type="button" class="settings-link-btn edit" data-arc-restore-official="${escapeHtml(o.id)}" data-arc-label="${escapeHtml(o.full_name || 'Official')}">
+                                    <i data-lucide="rotate-ccw"></i> Restore
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="4" class="empty-state">No archived officials found.</td></tr>';
+            }
+
+            lucide.createIcons();
+        };
+
+        document.querySelector('#settings-panel-archives')?.addEventListener('click', async (event) => {
+            const resBtn = event.target.closest('[data-arc-restore-resident]');
+            if (resBtn) {
+                const id = resBtn.dataset.arcRestoreResident;
+                const label = resBtn.dataset.arcLabel || 'this resident';
+                const ok = await showConfirmModal({
+                    title: 'Restore Resident?',
+                    message: `Do you want to restore ${label} back to Verified residents?`,
+                    confirmText: 'Yes, Restore',
+                    cancelText: 'No',
+                    tone: 'primary',
+                    icon: 'rotate-ccw'
+                });
+                if (!ok) return;
+                const resp = await fetch(`/api/residents/${encodeURIComponent(id)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Verified' })
+                });
+                if (resp.ok) {
+                    showToast(`${label} restored to Verified`);
+                    await loadSettingsArchives();
+                    if (typeof loadResidents === 'function') loadResidents();
+                    loadDashboard();
+                } else {
+                    const err = await resp.json().catch(() => ({}));
+                    showToast(err.error || 'Could not restore resident');
+                }
+                return;
+            }
+
+            const docBtn = event.target.closest('[data-arc-restore-doc]');
+            if (docBtn) {
+                const id = docBtn.dataset.arcRestoreDoc;
+                const label = docBtn.dataset.arcLabel || 'this document';
+                const ok = await showConfirmModal({
+                    title: 'Restore Document Request?',
+                    message: `Do you want to restore ${label} back to Pending Verification?`,
+                    confirmText: 'Yes, Restore',
+                    cancelText: 'No',
+                    tone: 'primary',
+                    icon: 'rotate-ccw'
+                });
+                if (!ok) return;
+                const resp = await fetch(`/api/documents/${encodeURIComponent(id)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Pending', verification_status: 'Pending', payment_status: '' })
+                });
+                if (resp.ok) {
+                    showToast(`${label} restored to Pending`);
+                    delete pageData.Documents;
+                    await loadSettingsArchives();
+                    loadDashboard();
+                    loadNotifications();
+                } else {
+                    const err = await resp.json().catch(() => ({}));
+                    showToast(err.error || 'Could not restore document');
+                }
+                return;
+            }
+
+            const annBtn = event.target.closest('[data-arc-restore-ann]');
+            if (annBtn) {
+                const id = annBtn.dataset.arcRestoreAnn;
+                const label = annBtn.dataset.arcLabel || 'this announcement';
+                const ok = await showConfirmModal({
+                    title: 'Restore Announcement?',
+                    message: `Do you want to restore "${label}" back to Active announcements?`,
+                    confirmText: 'Yes, Restore',
+                    cancelText: 'No',
+                    tone: 'primary',
+                    icon: 'rotate-ccw'
+                });
+                if (!ok) return;
+                const resp = await fetch(`/api/announcements/${encodeURIComponent(id)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Active' })
+                });
+                if (resp.ok) {
+                    showToast('Announcement restored to Active');
+                    delete pageData.Announcements;
+                    await loadSettingsArchives();
+                } else {
+                    const err = await resp.json().catch(() => ({}));
+                    showToast(err.error || 'Could not restore announcement');
+                }
+                return;
+            }
+
+            const offBtn = event.target.closest('[data-arc-restore-official]');
+            if (offBtn) {
+                const id = offBtn.dataset.arcRestoreOfficial;
+                const label = offBtn.dataset.arcLabel || 'this official';
+                const ok = await showConfirmModal({
+                    title: 'Restore Official?',
+                    message: `Do you want to restore ${label} back to Active officials?`,
+                    confirmText: 'Yes, Restore',
+                    cancelText: 'No',
+                    tone: 'primary',
+                    icon: 'rotate-ccw'
+                });
+                if (!ok) return;
+                const resp = await fetch(`/api/officials/${encodeURIComponent(id)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Active' })
+                });
+                if (resp.ok) {
+                    showToast(`${label} restored to Active`);
+                    await loadSettingsArchives();
+                    if (typeof loadOfficials === 'function') loadOfficials();
+                } else {
+                    const err = await resp.json().catch(() => ({}));
+                    showToast(err.error || 'Could not restore official');
+                }
+            }
+        });
 
         // Data & Backup real Export / JSON Snapshot Backup / Manage Privacy / Restore
         const triggerFullSystemBackup = async () => {
@@ -4731,22 +5300,25 @@
             });
         };
 
+        const getActiveResidents = () => residentData.filter((r) => String(r.status || '').trim().toLowerCase() !== 'inactive');
+
         const renderDemographicCounts = () => {
             recomputeFamilyKeys();
-            const total = residentData.length;
-            const leaders = residentData.filter((r) => r.is_head || r.household_role === 'Head').length;
-            const kids = residentData.filter((r) => Number(r.age) < 18).length;
-            const adults = residentData.filter((r) => Number(r.age) >= 18 && Number(r.age) < 60).length;
-            const seniors = residentData.filter((r) => r.is_senior || Number(r.age) >= 60).length;
-            const pwd = residentData.filter((r) => r.is_pwd).length;
-            const lgbt = residentData.filter((r) => r.is_lgbt).length;
-            const soloparent = residentData.filter((r) => r.is_solo_parent).length;
-            const pregnant = residentData.filter((r) => r.is_pregnant).length;
-            const youngparent = residentData.filter((r) => r.is_young_parent).length;
-            const fourPs = residentData.filter((r) => r.is_4ps).length;
+            const activeList = getActiveResidents();
+            const total = activeList.length;
+            const leaders = activeList.filter((r) => r.is_head || r.household_role === 'Head').length;
+            const kids = activeList.filter((r) => Number(r.age) < 18).length;
+            const adults = activeList.filter((r) => Number(r.age) >= 18 && Number(r.age) < 60).length;
+            const seniors = activeList.filter((r) => r.is_senior || Number(r.age) >= 60).length;
+            const pwd = activeList.filter((r) => r.is_pwd).length;
+            const lgbt = activeList.filter((r) => r.is_lgbt).length;
+            const soloparent = activeList.filter((r) => r.is_solo_parent).length;
+            const pregnant = activeList.filter((r) => r.is_pregnant).length;
+            const youngparent = activeList.filter((r) => r.is_young_parent).length;
+            const fourPs = activeList.filter((r) => r.is_4ps).length;
 
             const householdsSet = new Set(
-                residentData
+                activeList
                     .map((r) => r.family_key)
                     .filter((k) => k && k !== 'UNASSIGNED')
             );
@@ -4770,14 +5342,14 @@
 
             countEl('#residents-total', total);
             countEl('#residents-households', householdsSet.size);
-            countEl('#residents-verified', residentData.filter((r) => r.status === 'Verified').length);
-            countEl('#residents-pending', residentData.filter((r) => r.status === 'Pending').length);
+            countEl('#residents-verified', activeList.filter((r) => r.status === 'Verified').length);
+            countEl('#residents-pending', activeList.filter((r) => r.status === 'Pending').length);
 
             const hhFilter = document.querySelector('#household-filter');
             if (hhFilter) {
                 const currentHh = hhFilter.value;
                 const hhMap = {};
-                residentData.forEach((r) => {
+                activeList.forEach((r) => {
                     const fKey = r.family_key || 'UNASSIGNED';
                     if (!hhMap[fKey]) hhMap[fKey] = [];
                     hhMap[fKey].push(r);
@@ -4807,9 +5379,10 @@
         const getHouseholdMembers = (familyKey) => {
             if (!familyKey || familyKey === 'UNASSIGNED') return [];
             recomputeFamilyKeys();
-            const byKey = residentData.filter((r) => r.family_key === familyKey);
+            const activeList = getActiveResidents();
+            const byKey = activeList.filter((r) => r.family_key === familyKey);
             if (byKey.length) return byKey;
-            return residentData.filter((r) => r.household === familyKey);
+            return activeList.filter((r) => r.household === familyKey);
         };
 
         const getFamilyName = (members, familyKey) => {
@@ -4981,7 +5554,9 @@
 
             familyModal.querySelectorAll('.archive-family-member-btn').forEach((btn) => btn.addEventListener('click', async () => {
                 await archiveResidentById(btn.dataset.id, btn.dataset.name, btn.dataset.status);
-                openFamilyModal(hh);
+                const remaining = getHouseholdMembers(hh);
+                if (remaining.length) openFamilyModal(hh);
+                else familyModal.hidden = true;
             }));
         };
 
@@ -5188,7 +5763,8 @@
                 renderResidents();
                 modal.hidden = true;
                 await loadDashboard();
-                showToast(isCurrentlyInactive ? `${name || 'Resident'} restored to Verified` : `${name || 'Resident'} archived (Inactive)`);
+                if (typeof loadOfficialDashboard === 'function') loadOfficialDashboard();
+                showToast(isCurrentlyInactive ? `${name || 'Resident'} restored to Verified` : `${name || 'Resident'} moved to Settings → Archives`);
             } catch (err) {
                 showToast(err.message || 'Could not archive resident');
             }
@@ -5373,7 +5949,9 @@
                 p.sector
             ].join(' ').toLowerCase();
 
-            const filtered = residentData.filter((r) => {
+            const activeResidents = getActiveResidents();
+
+            const filtered = activeResidents.filter((r) => {
                 const members = getHouseholdMembers(r.family_key);
                 const familyName = getFamilyName(members, r.family_key);
                 const matchesQuery = !query || personSearchText(r, familyName).includes(query);
@@ -5382,8 +5960,8 @@
                 return matchesQuery && matchesStatus && matchesHousehold && matchesPersonSector(r);
             });
 
-            // Only show the Head of each family (scoped by Purok + Household + Family) in the main table
-            const headRows = residentData.filter((r) => {
+            // Only show the Head of each active family (scoped by Purok + Household + Family) in the main table
+            const headRows = activeResidents.filter((r) => {
                 const isUnassigned = (!r.family_key || r.family_key === 'UNASSIGNED');
                 const hhMembers = getHouseholdMembers(r.family_key);
                 const leader = hhMembers.find((m) => m.is_head || m.household_role === 'Head') || hhMembers[0];
@@ -5413,7 +5991,7 @@
             if (residentCountEl) {
                 residentCountEl.textContent = showIndividualRows
                     ? `Showing ${displayRows.length} matching resident${displayRows.length === 1 ? '' : 's'}`
-                    : `Showing ${displayRows.length} family head${displayRows.length === 1 ? '' : 's'} (${residentData.length} total residents)`;
+                    : `Showing ${displayRows.length} family head${displayRows.length === 1 ? '' : 's'} (${activeResidents.length} active residents)`;
             }
 
             const tableWrap = document.querySelector('#resident-table-wrap');
@@ -6627,6 +7205,25 @@
 
         const renderNotificationsPopover = () => {
             if (!notificationList) return;
+            const allowDoc = allowedAccessSet.has('Documents');
+            const allowCon = allowedAccessSet.has('Concerns');
+            const allowWx = allowedAccessSet.has('Weather & Alerts');
+            const notifWrap = document.querySelector('.notification-wrap');
+            if (notifWrap && roleAccessLoaded) {
+                notifWrap.hidden = !allowDoc && !allowCon && !allowWx;
+            }
+            const tabPermMap = { all: true, document: allowDoc, concern: allowCon, weather: allowWx };
+            Object.entries(tabPermMap).forEach(([k, isAllowed]) => {
+                const tabBtn = notifFilterTabs?.querySelector(`[data-notif-filter="${k}"]`);
+                if (tabBtn) tabBtn.hidden = !isAllowed;
+            });
+            if (!tabPermMap[activeNotifFilter]) {
+                activeNotifFilter = 'all';
+                notifFilterTabs?.querySelectorAll('.notif-tab').forEach((btn) => {
+                    btn.classList.toggle('active', btn.dataset.notifFilter === 'all');
+                });
+            }
+
             const totalCount = cachedNotifications.length;
             const counts = {
                 all: totalCount,
@@ -6737,12 +7334,11 @@
                     delete pageData.Concerns;
                     await loadPageData('Concerns');
                 }
-                document.querySelector('.filter-tabs[data-filter-target="concerns"] button[data-filter="all"]')?.click();
                 const card = document.querySelector(`.concern-row[data-concern-id="${CSS.escape(String(item.recordId))}"]`);
                 highlightElementTemporarily(card);
-                const actionBtn = card?.querySelector(`.status-edit[data-kind="concern"][data-id="${CSS.escape(String(item.recordId))}"]`);
-                if (actionBtn) {
-                    actionBtn.click();
+                const rec = (pageData.Concerns || []).find((c) => String(c.id) === String(item.recordId)) || item.raw;
+                if (rec && typeof openConcernDetailModal === 'function') {
+                    openConcernDetailModal(rec);
                 }
                 return;
             }
@@ -6763,16 +7359,25 @@
         };
 
         const loadNotifications = async () => {
+            if (!roleAccessLoaded) return;
+            const allowDoc = allowedAccessSet.has('Documents');
+            const allowCon = allowedAccessSet.has('Concerns');
+            const allowWx = allowedAccessSet.has('Weather & Alerts');
+            if (!allowDoc && !allowCon && !allowWx) {
+                cachedNotifications = [];
+                renderNotificationsPopover();
+                return;
+            }
             try {
                 const [docRes, conRes, wxRes] = await Promise.all([
-                    fetch('/api/documents').catch(() => null),
-                    fetch('/api/concerns').catch(() => null),
-                    fetch('/api/weather-alerts').catch(() => null)
+                    allowDoc ? fetch('/api/documents').catch(() => null) : Promise.resolve(null),
+                    allowCon ? fetch('/api/concerns').catch(() => null) : Promise.resolve(null),
+                    allowWx ? fetch('/api/weather-alerts').catch(() => null) : Promise.resolve(null)
                 ]);
 
-                const docs = (docRes && docRes.ok) ? ((await docRes.json()).data || []) : (pageData.Documents || []);
-                const concerns = (conRes && conRes.ok) ? ((await conRes.json()).data || []) : (pageData.Concerns || []);
-                const wxAlerts = (wxRes && wxRes.ok) ? ((await wxRes.json()).data || []) : (pageData['Weather & Alerts'] || []);
+                const docs = allowDoc ? ((docRes && docRes.ok) ? ((await docRes.json()).data || []) : (pageData.Documents || [])) : [];
+                const concerns = allowCon ? ((conRes && conRes.ok) ? ((await conRes.json()).data || []) : (pageData.Concerns || [])) : [];
+                const wxAlerts = allowWx ? ((wxRes && wxRes.ok) ? ((await wxRes.json()).data || []) : (pageData['Weather & Alerts'] || [])) : [];
 
                 const items = [];
 
@@ -6848,7 +7453,7 @@
                     if (latestWeatherAdvisory && alert.title === latestWeatherAdvisory.title) addedLiveWx = true;
                 });
 
-                if (!addedLiveWx && typeof latestWeatherAdvisory !== 'undefined' && latestWeatherAdvisory && latestWeatherAdvisory.level && latestWeatherAdvisory.level !== 'Normal') {
+                if (allowWx && !addedLiveWx && typeof latestWeatherAdvisory !== 'undefined' && latestWeatherAdvisory && latestWeatherAdvisory.level && latestWeatherAdvisory.level !== 'Normal') {
                     const adv = latestWeatherAdvisory;
                     const liveTs = adv.updated_at || new Date().toISOString();
                     items.push({
@@ -7382,8 +7987,103 @@
             return 'Social Services';
         };
 
+        const setOfficialModalMode = (official = null) => {
+            const isEdit = Boolean(official);
+            const editIdEl = document.querySelector('#official-edit-id');
+            const titleEl = document.querySelector('#official-modal-title');
+            const submitEl = document.querySelector('#official-submit-btn');
+            const pwRulesBox = document.querySelector('#official-pw-rules');
+            const emailInput = officialForm?.elements?.email;
+            if (editIdEl) editIdEl.value = isEdit ? official.id : '';
+            if (titleEl) titleEl.textContent = isEdit ? 'Edit Barangay Official' : 'Register Barangay Official';
+            if (submitEl) submitEl.textContent = isEdit ? 'Save Changes' : 'Register Official';
+            document.querySelectorAll('#official-form .official-pw-field').forEach((el) => {
+                el.hidden = isEdit;
+            });
+            if (pwRulesBox) pwRulesBox.hidden = isEdit;
+            if (officialPwInput) officialPwInput.required = !isEdit;
+            if (officialConfirmPwInput) officialConfirmPwInput.required = !isEdit;
+            if (emailInput) {
+                emailInput.readOnly = isEdit;
+                emailInput.required = !isEdit;
+            }
+            if (isEdit && officialForm) {
+                officialForm.elements.full_name.value = official.full_name || '';
+                officialForm.elements.position.value = official.position || '';
+                if (emailInput) emailInput.value = official.email || '';
+                if (officialForm.elements.phone) officialForm.elements.phone.value = official.phone || '';
+            }
+        };
+
+        document.querySelector('#official-status-tabs')?.addEventListener('click', (event) => {
+            const tab = event.target.closest('[data-official-tab]');
+            if (!tab) return;
+            activeOfficialTab = tab.dataset.officialTab || 'Active';
+            document.querySelectorAll('#official-status-tabs .ann-tab').forEach((btn) => {
+                btn.classList.toggle('active', btn === tab);
+            });
+            renderOfficials();
+        });
+
+        document.querySelector('#official-rows')?.addEventListener('click', async (event) => {
+            const editBtn = event.target.closest('[data-edit-official]');
+            if (editBtn) {
+                const official = officialsData.find((o) => String(o.id) === String(editBtn.dataset.editOfficial));
+                if (!official) return;
+                const confirmed = await showConfirmModal({
+                    title: 'Edit Official?',
+                    message: `Do you want to edit ${official.full_name || 'this official'}'s details?`,
+                    confirmText: 'Yes, Edit',
+                    cancelText: 'No',
+                    tone: 'primary',
+                    icon: 'edit-3'
+                });
+                if (!confirmed) return;
+                officialForm?.reset();
+                setOfficialModalMode(official);
+                if (officialModal) officialModal.hidden = false;
+                lucide.createIcons();
+                return;
+            }
+            const archiveBtn = event.target.closest('[data-archive-official]');
+            if (archiveBtn) {
+                const official = officialsData.find((o) => String(o.id) === String(archiveBtn.dataset.archiveOfficial));
+                if (!official) return;
+                const isArchived = normalizeOfficialStatus(official) === 'Archived';
+                const nextStatus = isArchived ? 'Active' : 'Archived';
+                const confirmed = await showConfirmModal({
+                    title: isArchived ? 'Restore Official?' : 'Archive Official?',
+                    message: isArchived
+                        ? `Do you want to restore ${official.full_name || 'this official'} back to Active?`
+                        : `Do you want to archive ${official.full_name || 'this official'}? They will not be able to log in until restored.`,
+                    confirmText: isArchived ? 'Yes, Restore' : 'Yes, Archive',
+                    cancelText: 'No',
+                    tone: isArchived ? 'primary' : 'warning',
+                    icon: isArchived ? 'rotate-ccw' : 'archive'
+                });
+                if (!confirmed) return;
+                try {
+                    const resp = await fetch(`/api/officials/${encodeURIComponent(official.id)}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: nextStatus })
+                    });
+                    const res = await resp.json().catch(() => ({}));
+                    if (resp.status === 404 || resp.status === 405) {
+                        throw new Error('Please restart python main.py so the updated server routes take effect.');
+                    }
+                    if (!resp.ok) throw new Error(res.error || 'Could not update official status');
+                    await loadOfficials();
+                    showToast(isArchived ? `${official.full_name} restored to Active` : `${official.full_name} moved to Settings → Archives`);
+                } catch (err) {
+                    showToast(err.message || 'Could not update official status');
+                }
+            }
+        });
+
         document.querySelector('#register-official')?.addEventListener('click', () => {
             officialForm?.reset();
+            setOfficialModalMode(null);
             evaluateOfficialPassword();
             if (officialModal) officialModal.hidden = false;
             lucide.createIcons();
@@ -7392,6 +8092,50 @@
         document.querySelector('.official-cancel-btn')?.addEventListener('click', () => { if (officialModal) officialModal.hidden = true; });
         officialForm?.addEventListener('submit', async (event) => {
             event.preventDefault();
+            const formEl = event.currentTarget;
+            const editId = (document.querySelector('#official-edit-id')?.value || '').trim();
+            const payload = Object.fromEntries(new FormData(formEl));
+
+            if (editId) {
+                const confirmed = await showConfirmModal({
+                    title: 'Save Official Changes?',
+                    message: `Do you want to save your changes to ${payload.full_name || 'this official'}?`,
+                    confirmText: 'Yes, Save',
+                    cancelText: 'No',
+                    tone: 'primary',
+                    icon: 'save'
+                });
+                if (!confirmed) return;
+                const updatePayload = {
+                    full_name: String(payload.full_name || '').trim(),
+                    position: String(payload.position || '').trim(),
+                    phone: String(payload.phone || '').trim(),
+                    department: inferOfficialDepartment(payload.position)
+                };
+                try {
+                    const response = await fetch(`/api/officials/${encodeURIComponent(editId)}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updatePayload)
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (response.status === 404 || response.status === 405) {
+                        showToast('Please restart python main.py so the updated server routes take effect.');
+                        return;
+                    }
+                    showToast(response.ok ? 'Official updated successfully' : (result.error || 'Could not update official'));
+                    if (response.ok) {
+                        if (officialModal) officialModal.hidden = true;
+                        formEl.reset();
+                        setOfficialModalMode(null);
+                        await loadOfficials();
+                    }
+                } catch {
+                    showToast('Could not reach the server API');
+                }
+                return;
+            }
+
             const checks = evaluateOfficialPassword();
             if (!checks.len || !checks.upper || !checks.lower || !checks.num || !checks.special) {
                 showToast('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
@@ -7403,7 +8147,6 @@
                 officialConfirmPwInput?.focus();
                 return;
             }
-            const payload = Object.fromEntries(new FormData(event.currentTarget));
             delete payload.confirm_password;
             const posLower = String(payload.position || '').toLowerCase();
             payload.role = posLower.includes('secretary') ? 'admin' : 'barangay_official';
@@ -7414,7 +8157,7 @@
                 showToast(response.ok ? 'Official registered successfully' : (result.error || 'Official registration failed'));
                 if (response.ok) {
                     if (officialModal) officialModal.hidden = true;
-                    event.currentTarget.reset();
+                    formEl.reset();
                     evaluateOfficialPassword();
                     await loadOfficials();
                 }
@@ -7422,8 +8165,6 @@
                 showToast('Could not reach the server API');
             }
         });
-        document.querySelector('#official-search')?.addEventListener('input', renderOfficials);
-        document.querySelector('#official-department-filter')?.addEventListener('change', renderOfficials);
 
         // Automatically refresh active view after background/reconnection sync finishes
         window.addEventListener('smartbarangay:synced', () => {

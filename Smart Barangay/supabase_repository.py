@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import threading
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
@@ -110,6 +111,52 @@ class SupabaseRepository:
         self._concern_meta: dict[str, dict[str, Any]] = self._load_concern_meta()
         self._ann_meta_path = os.path.join(os.path.dirname(__file__), "announcements_metadata.json")
         self._ann_meta: dict[str, dict[str, Any]] = self._load_ann_meta()
+        self._official_meta_path = os.path.join(os.path.dirname(__file__), "officials_metadata.json")
+        self._official_meta: dict[str, dict[str, Any]] = self._load_official_meta()
+
+    def _load_official_meta(self) -> dict[str, dict[str, Any]]:
+        if os.path.exists(self._official_meta_path):
+            try:
+                with open(self._official_meta_path, "r", encoding="utf-8") as f:
+                    saved = json.load(f)
+                if isinstance(saved, dict):
+                    return saved
+            except Exception:
+                pass
+        return {}
+
+    def _save_official_meta(self) -> None:
+        try:
+            with open(self._official_meta_path, "w", encoding="utf-8") as f:
+                json.dump(self._official_meta, f, indent=2)
+        except Exception:
+            pass
+
+    def _update_official_meta(self, official_id: Any, data: dict[str, Any]) -> None:
+        if official_id is None:
+            return
+        self._official_meta = self._load_official_meta()
+        updates = {k: data[k] for k in ("status", "phone", "position", "department") if k in data and data[k] is not None}
+        if not updates:
+            return
+        key = str(official_id)
+        entry = self._official_meta.get(key, {})
+        entry.update(updates)
+        self._official_meta[key] = entry
+        self._save_official_meta()
+
+    def is_official_archived(self, user_id: Any, email: str | None = None) -> bool:
+        meta = self._load_official_meta()
+        if user_id:
+            entry = meta.get(str(user_id), {})
+            if str(entry.get("status") or "Active").strip().lower() == "archived":
+                return True
+        if email:
+            em_key = f"email:{email.strip().lower()}"
+            entry = meta.get(em_key, {})
+            if str(entry.get("status") or "Active").strip().lower() == "archived":
+                return True
+        return False
 
     def _load_ann_meta(self) -> dict[str, dict[str, Any]]:
         if os.path.exists(self._ann_meta_path):
@@ -509,7 +556,10 @@ class SupabaseRepository:
                 "Server-side Supabase access is not configured. "
                 "Set SUPABASE_SERVICE_ROLE_KEY."
             )
-
+        try:
+            self.client.postgrest.auth(self.key)  # type: ignore[union-attr]
+        except Exception:
+            pass
         return self.client  # type: ignore[return-value]
 
     def list_residents(self) -> list[dict[str, Any]]:
@@ -562,16 +612,51 @@ class SupabaseRepository:
             return [self._apply_resident_meta(r) for r in self.offline_store.list_cached("residents")]
 
     def list_officials(self) -> list[dict[str, Any]]:
-        fields = "id,email,full_name,department,position,role,created_at"
+        fields = "id,email,full_name,department,position,phone,role,created_at"
+        meta = self._load_official_meta()
+
+        def _attach_meta(rows_in: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            enriched = []
+            seen_emails: set[str] = set()
+            # Prefer real UUID rows over stale offline temp IDs if both share the same email
+            ordered = sorted(
+                rows_in,
+                key=lambda r: 1 if self.offline_store.is_local_temp_id(r.get("id")) else 0,
+            )
+            for row in ordered:
+                item = dict(row)
+                em = str(item.get("email") or "").strip().lower()
+                if em and em in seen_emails and self.offline_store.is_local_temp_id(item.get("id")):
+                    continue
+                if em:
+                    seen_emails.add(em)
+                m = meta.get(str(item.get("id") or ""), {}) or (meta.get(f"email:{em}", {}) if em else {})
+                item["status"] = m.get("status") or item.get("status") or "Active"
+                if not item.get("phone") and m.get("phone"):
+                    item["phone"] = m["phone"]
+                enriched.append(item)
+            return enriched
+
         try:
             client = self._require_client()
-            response = (
-                client.table("profiles")
-                .select(fields)
-                .in_("role", ["barangay_official", "admin"])
-                .order("created_at")
-                .execute()
-            )
+            try:
+                response = (
+                    client.table("profiles")
+                    .select(fields)
+                    .in_("role", ["barangay_official", "admin"])
+                    .order("created_at")
+                    .execute()
+                )
+            except Exception as col_err:
+                if self._is_network_error(col_err):
+                    raise
+                response = (
+                    client.table("profiles")
+                    .select("id,email,full_name,department,position,role,created_at")
+                    .in_("role", ["barangay_official", "admin"])
+                    .order("created_at")
+                    .execute()
+                )
             self._mark_online()
             rows = response.data or []
             # Show all registered officials & Barangay Secretary (exclude the Super Admin / Barangay Captain account itself)
@@ -581,28 +666,107 @@ class SupabaseRepository:
                 pos = str(row.get("position") or "").strip().lower()
                 if r == "barangay_official" or (r == "admin" and "secretary" in pos):
                     result.append(row)
-            self.offline_store.save_table_snapshot("officials", result)
-            return self.offline_store.list_cached("officials")
+            enriched = _attach_meta(result)
+            self.offline_store.save_table_snapshot("officials", enriched)
+            return _attach_meta(self.offline_store.list_cached("officials"))
         except Exception as err:
             if not self._is_network_error(err):
                 try:
                     client = self._require_client()
                     response = (
                         client.table("profiles")
-                        .select("full_name,department,created_at")
+                        .select("id,full_name,department,position,role,created_at")
                         .eq("role", "barangay_official")
                         .order("created_at")
                         .execute()
                     )
                     self._mark_online()
-                    rows = response.data or []
+                    rows = _attach_meta(response.data or [])
                     self.offline_store.save_table_snapshot("officials", rows)
-                    return self.offline_store.list_cached("officials")
+                    return _attach_meta(self.offline_store.list_cached("officials"))
                 except Exception as inner_err:
                     self._mark_offline(str(inner_err))
             else:
                 self._mark_offline(str(err))
-            return self.offline_store.list_cached("officials")
+            return _attach_meta(self.offline_store.list_cached("officials"))
+
+    def update_official(self, official_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        oid = str(official_id).strip()
+        if not oid:
+            raise ValueError("Official ID is required")
+        meta_patch: dict[str, Any] = {}
+        if "status" in data:
+            status_val = "Archived" if str(data["status"]).strip().lower() == "archived" else "Active"
+            meta_patch["status"] = status_val
+        if "phone" in data and data["phone"] is not None:
+            meta_patch["phone"] = str(data["phone"]).strip()
+
+        db_patch = {
+            k: v
+            for k, v in data.items()
+            if k in ("full_name", "position", "department", "role", "phone") and v is not None
+        }
+
+        cached_row = self.offline_store.get_cached_row("officials", oid) or {}
+        cached_email = str(cached_row.get("email") or data.get("email") or "").strip().lower()
+        is_temp_id = self.offline_store.is_local_temp_id(oid) or not re.fullmatch(
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            oid,
+        )
+
+        target_uuid: str | None = None if is_temp_id else oid
+        if is_temp_id and cached_email:
+            try:
+                client = self._require_server()
+                lookup = client.table("profiles").select("id,email").eq("email", cached_email).limit(1).execute()
+                if lookup.data:
+                    target_uuid = str(lookup.data[0]["id"])
+            except Exception:
+                target_uuid = None
+
+        updated_row: dict[str, Any] = {**cached_row, "id": target_uuid or oid, **db_patch, **meta_patch}
+
+        if db_patch and target_uuid:
+            try:
+                client = self._require_server()
+                try:
+                    resp = client.table("profiles").update(db_patch).eq("id", target_uuid).execute()
+                except Exception as col_err:
+                    if self._is_network_error(col_err):
+                        raise
+                    fallback_patch = {k: v for k, v in db_patch.items() if k != "phone"}
+                    resp = client.table("profiles").update(fallback_patch).eq("id", target_uuid).execute() if fallback_patch else None
+                self._mark_online()
+                if resp and resp.data:
+                    updated_row = {**resp.data[0], **meta_patch}
+            except Exception as err:
+                if not self._is_network_error(err):
+                    raise
+                self._mark_offline(str(err))
+                self.offline_store.enqueue_update("profiles", target_uuid, db_patch, base_snapshot=updated_row)
+        elif db_patch and is_temp_id:
+            # Update local-only cached official cleanly without sending temp ID to Postgres UUID column
+            merged_local = {**cached_row, **db_patch, **meta_patch}
+            self.offline_store.upsert_cached_row("officials", merged_local, is_local_only=True)
+            updated_row = merged_local
+
+        if meta_patch:
+            self._update_official_meta(oid, meta_patch)
+            if target_uuid and target_uuid != oid:
+                self._update_official_meta(target_uuid, meta_patch)
+            if cached_email:
+                self._update_official_meta(f"email:{cached_email}", meta_patch)
+
+        # Keep cached_records updated immediately so reload reflects changes even offline
+        if cached_row or target_uuid:
+            self.offline_store.upsert_cached_row(
+                "officials",
+                {**cached_row, **updated_row, "id": target_uuid or cached_row.get("id") or oid},
+                is_local_only=bool(is_temp_id and not target_uuid),
+            )
+
+        updated_row["status"] = meta_patch.get("status") or self._load_official_meta().get(target_uuid or oid, {}).get("status", "Active")
+        return updated_row
 
     def sign_in(
         self,
@@ -611,14 +775,17 @@ class SupabaseRepository:
     ) -> dict[str, Any]:
         email_clean = email.strip().lower()
         try:
-            client = self._require_client()
-            response = client.auth.sign_in_with_password(
+            # Always authenticate using an isolated client so self.client keeps its service_role header
+            self._require_client()
+            auth_client = create_client(self.url, self.key)
+            response = auth_client.auth.sign_in_with_password(
                 {
                     "email": email_clean,
                     "password": password
                 }
             )
             self._mark_online()
+            client = self._require_server() if self.server_configured else self._require_client()
         except Exception as auth_err:
             if self._is_network_error(auth_err):
                 self._mark_offline(str(auth_err))
@@ -744,21 +911,54 @@ class SupabaseRepository:
             user_id = str(created.user.id)
 
             try:
-                profile = (
-                    client.table("profiles")
-                    .insert(
-                        {
-                            "id": user_id,
-                            "email": clean_email,
-                            "full_name": full_name,
-                            "role": role,
-                            "department": department,
-                            "position": position,
-                            "phone": phone,
-                        }
+                update_fields = {
+                    "email": clean_email,
+                    "full_name": full_name,
+                    "role": role,
+                    "department": department,
+                    "position": position,
+                    "phone": phone,
+                }
+                fallback_update = {k: v for k, v in update_fields.items() if k != "phone"}
+                profile = None
+
+                # 1. Try UPDATE first (Supabase auth trigger often auto-creates the profiles row on create_user)
+                try:
+                    profile = (
+                        client.table("profiles")
+                        .update(update_fields)
+                        .eq("id", user_id)
+                        .execute()
                     )
-                    .execute()
-                )
+                except Exception as upd_err:
+                    if self._is_network_error(upd_err):
+                        raise
+                    profile = (
+                        client.table("profiles")
+                        .update(fallback_update)
+                        .eq("id", user_id)
+                        .execute()
+                    )
+
+                # 2. If no trigger created the row yet, INSERT it
+                if not profile or not profile.data:
+                    insert_payload = {"id": user_id, **update_fields}
+                    fallback_insert = {"id": user_id, **fallback_update}
+                    try:
+                        profile = client.table("profiles").insert(insert_payload).execute()
+                    except Exception as ins_err:
+                        if self._is_network_error(ins_err):
+                            raise
+                        # If a race/trigger inserted in between, update instead
+                        if "23505" in str(ins_err) or "duplicate key" in str(ins_err).lower():
+                            profile = (
+                                client.table("profiles")
+                                .update(fallback_update)
+                                .eq("id", user_id)
+                                .execute()
+                            )
+                        else:
+                            profile = client.table("profiles").insert(fallback_insert).execute()
             except Exception:
                 client.auth.admin.delete_user(user_id)
                 raise
@@ -1105,7 +1305,12 @@ class SupabaseRepository:
             else:
                 raise update_err
         if not response.data:
-            raise RuntimeError("Record not found")
+            # Verify whether the row actually exists (in case PostgREST returned minimal representation)
+            check_resp = client.table(table_name).select("*").eq("id", row_id).execute()
+            if check_resp.data:
+                response = check_resp
+            else:
+                raise RuntimeError("Record not found")
         self._mark_online()
         enriched = self._apply_table_meta(table_name, response.data[0])
         self.offline_store.upsert_cached_row(table_name, enriched, is_local_only=False)
@@ -1572,7 +1777,11 @@ class SupabaseRepository:
         categories: set[str] | None = None
     ) -> dict[str, Any]:
 
-        residents = self.list_residents()
+        all_residents = self.list_residents()
+        residents = [
+            r for r in all_residents
+            if str(r.get("status") or "").strip().lower() != "inactive"
+        ]
 
         documents = self.list_table(
             "documents"

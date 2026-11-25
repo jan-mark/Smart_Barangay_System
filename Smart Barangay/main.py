@@ -18,13 +18,20 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Image as RLImage, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from flask import Flask
 
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "System is running!"
 from supabase_repository import (
     RepositoryConfigurationError,
     RepositoryConflictError,
     RepositoryRateLimitError,
     supabase_repository,
 )
+
 from time_utils import manila_now, manila_today
 
 
@@ -47,12 +54,134 @@ def add_no_cache_headers(response):
         response.headers["Expires"] = "0"
     return response
 
+ALL_RBAC_MODULES = [
+    "Dashboard",
+    "Residents",
+    "Manage Officials",
+    "Documents",
+    "Concerns",
+    "Announcements",
+    "Weather & Alerts",
+    "Reports",
+    "Settings",
+]
+ALL_RBAC_MODULES_SET = set(ALL_RBAC_MODULES)
+RBAC_ROLES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rbac_roles.json")
+
+DEFAULT_RBAC_ROLES = [
+    {
+        "id": "super-admin",
+        "name": "Super Admin (Barangay Captain)",
+        "description": "Full system control & registers Barangay Officials",
+        "modules": list(ALL_RBAC_MODULES),
+    },
+    {
+        "id": "admin",
+        "name": "Barangay Secretary",
+        "description": "Manage residents, documents, concerns & reports",
+        "modules": ["Dashboard", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports"],
+    },
+    {
+        "id": "barangay-official",
+        "name": "Barangay Officials",
+        "description": "Officials registered by the Super Admin",
+        "modules": ["Dashboard", "Residents", "Documents", "Concerns"],
+    },
+]
+
 ROLE_ACCESS = {
-    "super_admin": {"Dashboard", "Manage Officials", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports", "Settings"},
-    "admin": {"Dashboard", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports", "Settings"},
-    "barangay_official": {"Dashboard", "Residents", "Documents", "Concerns", "Announcements"},
-    "official": {"Dashboard", "Residents", "Documents", "Concerns", "Announcements"},
+    "super_admin": set(ALL_RBAC_MODULES),
+    "admin": {"Dashboard", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports"},
+    "barangay_official": {"Dashboard", "Residents", "Documents", "Concerns"},
+    "official": {"Dashboard", "Residents", "Documents", "Concerns"},
 }
+
+
+def _normalize_rbac_roles(raw_roles) -> list[dict]:
+    if not isinstance(raw_roles, list) or not raw_roles:
+        return [dict(r, modules=list(r["modules"])) for r in DEFAULT_RBAC_ROLES]
+    normalized: list[dict] = []
+    seen_ids: set[str] = set()
+    for idx, item in enumerate(raw_roles):
+        if not isinstance(item, dict):
+            continue
+        rid = str(item.get("id") or f"role-{idx + 1}").strip()
+        if not rid or rid in seen_ids:
+            continue
+        seen_ids.add(rid)
+        name = str(item.get("name") or "Custom Role").strip()[:80] or "Custom Role"
+        desc = str(item.get("description") or "").strip()[:200]
+        if rid == "super-admin":
+            mods = list(ALL_RBAC_MODULES)
+        else:
+            raw_mods = item.get("modules") if isinstance(item.get("modules"), list) else []
+            mods = [m for m in ALL_RBAC_MODULES if m in set(str(x).strip() for x in raw_mods)]
+        normalized.append({"id": rid, "name": name, "description": desc, "modules": mods})
+    if "super-admin" not in seen_ids:
+        normalized.insert(0, dict(DEFAULT_RBAC_ROLES[0], modules=list(ALL_RBAC_MODULES)))
+    return normalized
+
+
+def load_rbac_roles() -> list[dict]:
+    if os.path.exists(RBAC_ROLES_FILE):
+        try:
+            with open(RBAC_ROLES_FILE, "r", encoding="utf-8") as fh:
+                return _normalize_rbac_roles(json.load(fh))
+        except Exception:
+            app.logger.exception("Could not read rbac_roles.json; falling back to defaults")
+    return [dict(r, modules=list(r["modules"])) for r in DEFAULT_RBAC_ROLES]
+
+
+def save_rbac_roles(raw_roles) -> list[dict]:
+    cleaned = _normalize_rbac_roles(raw_roles)
+    tmp_path = f"{RBAC_ROLES_FILE}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as fh:
+        json.dump(cleaned, fh, indent=2, ensure_ascii=False)
+    os.replace(tmp_path, RBAC_ROLES_FILE)
+    return cleaned
+
+
+def resolve_user_rbac(user: dict | None) -> tuple[set[str], dict | None]:
+    if not user:
+        return set(), None
+    roles = load_rbac_roles()
+    by_id = {r["id"]: r for r in roles}
+    raw_role = str(user.get("role") or "").strip().lower()
+    pos = str(user.get("position") or "").strip().lower()
+    dept = str(user.get("department") or "").strip().lower()
+
+    if raw_role == "super_admin":
+        sa = by_id.get("super-admin") or DEFAULT_RBAC_ROLES[0]
+        return set(ALL_RBAC_MODULES), sa
+
+    # 1. Check custom roles added by Super Admin (matched against official's position or department)
+    built_in_ids = {"super-admin", "admin", "barangay-official"}
+    for r in roles:
+        if r["id"] in built_in_ids:
+            continue
+        rname = str(r.get("name") or "").strip().lower()
+        if not rname:
+            continue
+        if pos and (rname == pos or (len(rname) >= 4 and rname in pos) or (len(pos) >= 4 and pos in rname)):
+            return set(r.get("modules") or []), r
+        if dept and rname == dept:
+            return set(r.get("modules") or []), r
+
+    # 2. Barangay Secretary / Admin role
+    if raw_role == "admin" or "secretary" in pos:
+        sec_role = by_id.get("admin") or next((r for r in roles if "secretary" in r["name"].lower()), None)
+        if sec_role:
+            return set(sec_role.get("modules") or []), sec_role
+        return set(ROLE_ACCESS.get("admin", set())), None
+
+    # 3. Authorized Barangay Officials role
+    if raw_role in {"barangay_official", "official"}:
+        off_role = by_id.get("barangay-official") or next((r for r in roles if "official" in r["name"].lower()), None)
+        if off_role:
+            return set(off_role.get("modules") or []), off_role
+        return set(ROLE_ACCESS.get("barangay_official", set())), None
+
+    return set(ROLE_ACCESS.get(raw_role, set())), None
 DEPARTMENT_CATEGORIES = {
     "Health & Sanitation": {"Health & Sanitation"},
     "Peace & Order": {"Peace & Order"},
@@ -97,6 +226,9 @@ def current_user() -> dict | None:
     elif raw_role == "admin" and "secretary" not in pos:
         user = {**user, "role": "super_admin"}
         session["user"] = user
+    if user.get("role") != "super_admin" and supabase_repository.is_official_archived(user.get("id"), user.get("email")):
+        session.clear()
+        return None
     return user
 
 
@@ -124,6 +256,21 @@ def roles_required(*roles):
                 return jsonify({"error": "Authentication required"}), 401
             if user.get("role") not in allowed:
                 return jsonify({"error": "You do not have permission for this action"}), 403
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
+
+
+def module_required(module_name: str):
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            user = current_user()
+            if not user:
+                return jsonify({"error": "Authentication required"}), 401
+            allowed_modules, _ = resolve_user_rbac(user)
+            if module_name not in allowed_modules:
+                return jsonify({"error": f"Your role does not have permission to access {module_name}."}), 403
             return view(*args, **kwargs)
         return wrapped
     return decorator
@@ -189,6 +336,10 @@ def login_api():
             return jsonify({
                 "error": "This web portal is for authorized Barangay Officials only. Residents should use the SmartBarangay Mobile App."
             }), 403
+        if user.get("role") != "super_admin" and supabase_repository.is_official_archived(user.get("id"), user.get("email")):
+            return jsonify({
+                "error": "This official account has been archived. Please contact the Barangay Captain."
+            }), 403
         session["user"] = user
         session.permanent = True
         return jsonify({"data": user})
@@ -215,7 +366,34 @@ def me():
     user = current_user()
     if not user:
         return jsonify({"user": None}), 401
-    return jsonify({"user": user, "access": sorted(ROLE_ACCESS.get(user["role"], set()))})
+    allowed_modules, matched_role = resolve_user_rbac(user)
+    return jsonify({
+        "user": user,
+        "access": sorted(allowed_modules),
+        "matched_role": matched_role,
+    })
+
+
+@app.get("/api/rbac/roles")
+@login_required
+def get_rbac_roles():
+    user = current_user()
+    return jsonify({
+        "data": load_rbac_roles(),
+        "persisted": os.path.exists(RBAC_ROLES_FILE),
+        "can_edit": user.get("role") == "super_admin",
+    })
+
+
+@app.put("/api/rbac/roles")
+@roles_required("super_admin")
+def update_rbac_roles():
+    payload = request.get_json(silent=True) or {}
+    roles = payload.get("roles")
+    if not isinstance(roles, list) or not roles:
+        return jsonify({"error": "A non-empty roles list is required"}), 400
+    saved = save_rbac_roles(roles)
+    return jsonify({"data": saved, "persisted": True})
 
 
 @app.patch("/api/profile")
@@ -294,7 +472,7 @@ def residents():
 
 
 @app.get("/api/officials")
-@roles_required("super_admin")
+@module_required("Manage Officials")
 def officials():
     if not supabase_repository.server_configured:
         return server_data_unavailable()
@@ -305,6 +483,47 @@ def officials():
     except Exception as error:
         app.logger.exception("Could not load barangay officials")
         return jsonify({"error": str(error), "configured": True}), 502
+
+
+@app.patch("/api/officials/<official_id>")
+@module_required("Manage Officials")
+def update_official_endpoint(official_id: str):
+    if not supabase_repository.server_configured:
+        return server_data_unavailable()
+    payload = request.get_json(silent=True) or {}
+    updates: dict = {}
+    if "full_name" in payload:
+        name_val = str(payload.get("full_name") or "").strip()
+        if not name_val:
+            return jsonify({"error": "Full name cannot be empty"}), 400
+        updates["full_name"] = name_val
+    if "position" in payload:
+        pos_val = str(payload.get("position") or "").strip()
+        if not pos_val:
+            return jsonify({"error": "Position cannot be empty"}), 400
+        updates["position"] = pos_val
+        updates["role"] = "admin" if "secretary" in pos_val.lower() else "barangay_official"
+    if "department" in payload:
+        dept_val = str(payload.get("department") or "").strip()
+        if dept_val in DEPARTMENT_CATEGORIES:
+            updates["department"] = dept_val
+    if "phone" in payload:
+        updates["phone"] = str(payload.get("phone") or "").strip()
+    if "status" in payload:
+        st_val = str(payload.get("status") or "").strip().lower()
+        if st_val not in ("active", "archived"):
+            return jsonify({"error": "Status must be Active or Archived"}), 400
+        updates["status"] = "Archived" if st_val == "archived" else "Active"
+    if not updates:
+        return jsonify({"error": "No valid update fields provided"}), 400
+    try:
+        updated = supabase_repository.update_official(official_id, updates)
+        return jsonify({"data": updated})
+    except RepositoryConfigurationError as error:
+        return jsonify({"error": str(error), "configured": False}), 503
+    except Exception as error:
+        app.logger.exception("Could not update barangay official")
+        return jsonify({"error": str(error)}), 502
 
 
 @app.get("/api/dashboard")
@@ -355,7 +574,7 @@ def announcements():
 
 
 @app.post("/api/announcements")
-@roles_required("admin", "barangay_official")
+@module_required("Announcements")
 def create_announcement():
     payload = request.get_json(silent=True) or {}
     title = str(payload.get("title") or "").strip()
@@ -399,7 +618,7 @@ def create_announcement():
 
 
 @app.patch("/api/announcements/<int:announcement_id>")
-@roles_required("admin", "barangay_official")
+@module_required("Announcements")
 def update_announcement(announcement_id: int):
     payload = request.get_json(silent=True) or {}
     updates: dict[str, object] = {}
@@ -449,7 +668,7 @@ def weather_alerts():
 
 
 @app.post("/api/weather-alerts")
-@roles_required("admin", "barangay_official")
+@module_required("Weather & Alerts")
 def create_weather_alert():
     payload = request.get_json(silent=True) or {}
     required = ("alert_type", "title", "description", "severity")
@@ -482,7 +701,7 @@ def create_weather_alert():
 
 
 @app.post("/api/weather/auto-alert")
-@roles_required("admin", "barangay_official")
+@module_required("Weather & Alerts")
 def auto_weather_early_warning():
     if not supabase_repository.server_configured:
         return server_data_unavailable()
@@ -691,7 +910,7 @@ def _build_report_pdf(
 
 
 @app.get("/api/reports/<report_name>")
-@roles_required("admin", "barangay_official")
+@module_required("Reports")
 def download_report(report_name: str):
     if not supabase_repository.server_configured:
         return server_data_unavailable()
@@ -1544,7 +1763,7 @@ def _build_resident_sector_string(
 
 
 @app.post("/api/residents")
-@roles_required("admin", "barangay_official")
+@module_required("Residents")
 def create_resident():
     payload = request.get_json(silent=True) or {}
     if "sex" in payload and not payload.get("gender"):
@@ -1658,7 +1877,7 @@ def create_resident():
 
 
 @app.patch("/api/residents/<int:resident_id>")
-@roles_required("admin", "barangay_official")
+@module_required("Residents")
 def update_resident(resident_id: int):
     payload = request.get_json(silent=True) or {}
     if "sex" in payload and "gender" not in payload:
@@ -1791,7 +2010,7 @@ def update_resident(resident_id: int):
 
 
 @app.delete("/api/residents/<int:resident_id>")
-@roles_required("admin", "barangay_official")
+@module_required("Residents")
 def delete_resident(resident_id: int):
     try:
         supabase_repository.delete_row("residents", resident_id)
@@ -1999,7 +2218,7 @@ def _send_gmail_notification(
 
 
 @app.get("/api/settings/smtp")
-@roles_required("admin", "barangay_official")
+@module_required("Settings")
 def get_smtp_settings():
     smtp_user = os.getenv("SMTP_EMAIL", "").strip()
     smtp_pass = os.getenv("SMTP_PASSWORD", "").replace(" ", "").strip()
@@ -2010,7 +2229,7 @@ def get_smtp_settings():
 
 
 @app.post("/api/settings/smtp")
-@roles_required("admin", "barangay_official")
+@module_required("Settings")
 def save_smtp_settings():
     import smtplib
 
@@ -2106,7 +2325,7 @@ def _evaluate_receipt_auto_checks(
 
 
 @app.post("/api/documents/<int:document_id>/send-payment-instructions")
-@roles_required("admin", "barangay_official")
+@module_required("Documents")
 def send_document_payment_instructions(document_id: int):
     payload = request.get_json(silent=True) or {}
     try:
@@ -2243,7 +2462,7 @@ def upload_document_receipt(document_id: int):
 
 
 @app.patch("/api/documents/<int:document_id>")
-@roles_required("admin", "barangay_official")
+@module_required("Documents")
 def update_document(document_id):
     payload = request.get_json(silent=True) or {}
     status = payload.get("status")
@@ -3005,7 +3224,7 @@ def _certificate_pdf(document: dict) -> bytes:
 
 
 @app.post("/api/documents/<int:document_id>/send-document-email")
-@roles_required("admin", "barangay_official")
+@module_required("Documents")
 def send_released_document_email(document_id: int):
     try:
         doc = supabase_repository.get_row("documents", document_id)
@@ -3168,7 +3387,7 @@ def create_concern():
 
 
 @app.patch("/api/concerns/<int:concern_id>")
-@roles_required("admin", "barangay_official")
+@module_required("Concerns")
 def update_concern(concern_id):
     payload = request.get_json(silent=True) or {}
     status = payload.get("status")
@@ -3240,7 +3459,7 @@ def respond_concern_appointment(concern_id: int):
 
 
 @app.post("/api/admin/register")
-@roles_required("super_admin")
+@module_required("Manage Officials")
 def register_account():
     payload = request.get_json(silent=True) or {}
     required = ("email", "password", "full_name")

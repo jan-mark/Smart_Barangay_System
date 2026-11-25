@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SmartBarangay | Sign In</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='municipality_logo.png') }}?v=2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -41,10 +42,10 @@
                             <span>REPUBLIC OF THE PHILIPPINES &middot; CITY OF ORMOC</span>
                         </div>
 
-                        <!-- Stylized Modern Civic Brand Mark (SDIP/SBS Style) -->
+                        <!-- Stylized Modern Civic Brand Mark -->
                         <div class="brand-monogram-box">
-                            <div class="monogram-emblem">
-                                <i data-lucide="shield-check"></i>
+                            <div class="monogram-emblem is-logo">
+                                <img src="{{ url_for('static', filename='municipality_logo.png') }}?v=2" alt="SmartBarangay Logo" class="login-brand-logo">
                             </div>
                             <div class="monogram-text">SBS</div>
                         </div>
