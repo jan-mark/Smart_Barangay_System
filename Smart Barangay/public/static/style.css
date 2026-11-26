@@ -8083,7 +8083,7 @@ body:not(.theme-light) .brand-secondary-desc {
     }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
     .sidebar {
         position: fixed;
         z-index: 50;
@@ -10703,7 +10703,7 @@ body:not(.theme-light) .brand-secondary-desc {
 img, video, canvas { max-width: 100%; }
 .main-content { min-width: 0; }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
     .mobile-menu-btn { display: grid; width: 40px; height: 40px; }
     .sidebar { z-index: 1001; }
     .sidebar-collapse-btn { display: none; }
@@ -10774,8 +10774,8 @@ html, body { max-width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; 
     .search { width: 220px; }
 }
 
-/* ---------- Phone (<= 700px) ---------- */
-@media (max-width: 700px) {
+/* ---------- Phone & Portrait Tablet (<= 900px) ---------- */
+@media (max-width: 900px) {
     :root { --mobile-pad: 12px; }
 
     /* Top bar */
@@ -10975,9 +10975,9 @@ html, body { max-width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; 
 }
 
 /* =========================================================================
-   RESPONSIVE LAYER v3 - organized cards on phones (Household, concerns, etc.)
+   RESPONSIVE LAYER v3 - organized cards on phones & tablets (<= 900px)
    ========================================================================= */
-@media (max-width: 700px) {
+@media (max-width: 900px) {
     /* ---- Household Profile modal ---- */
     #family-modal .modal-card { padding: 16px !important; overflow-x: hidden !important; }
     .family-profile-hero-grid {
@@ -11054,4 +11054,16 @@ html, body { max-width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; 
 @media (max-width: 400px) {
     .family-roster-right { grid-template-columns: minmax(0, 1fr); }
     .family-bg-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- Tablet 2-column card grid (640px - 900px) ---------- */
+@media (min-width: 640px) and (max-width: 900px) {
+    #resident-rows, #official-rows {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+        align-items: stretch !important;
+    }
+    #resident-rows tr, #official-rows tr { margin: 0 !important; align-content: space-between !important; }
+    #resident-rows tr:has(.empty-state), #official-rows tr:has(.empty-state) { grid-column: 1 / -1; }
 }
