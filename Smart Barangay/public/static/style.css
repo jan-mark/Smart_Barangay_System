@@ -10759,6 +10759,8 @@ html, body { max-width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; 
 .app-shell, .main-content, .page-content, .app-view { min-width: 0; max-width: 100%; }
 .page-content img, .page-content svg:not(.lucide), .page-content canvas { max-width: 100%; height: auto; }
 .record-row > *, .metric-card, .card, .panel { min-width: 0; overflow-wrap: break-word; }
+.doc-status-cell { min-width: 0; }
+.doc-status-cell .status { max-width: 100%; white-space: normal; line-height: 1.25; }
 
 /* ---------- Tablet / small laptop (<= 1024px) ---------- */
 @media (max-width: 1024px) {
@@ -10768,9 +10770,12 @@ html, body { max-width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; 
     .profile-page-grid, .settings-two-col { grid-template-columns: minmax(0, 1fr) !important; }
     .rpt-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .family-cards-container { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important; }
-    .doc-table-head, .record-row.doc-record-row { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
     .doc-table-head { display: none !important; }
-    .record-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .record-row.doc-record-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px 16px !important; }
+    .record-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .doc-status-cell { min-width: 0; }
+    .doc-status-cell .status { white-space: normal !important; max-width: 100%; line-height: 1.25; text-align: left; }
+    .doc-proc-cell strong { white-space: normal !important; overflow: visible !important; text-overflow: unset !important; }
     .search { width: 220px; }
 }
 
