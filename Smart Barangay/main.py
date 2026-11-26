@@ -29,6 +29,8 @@ from supabase_repository import (
     RepositoryConfigurationError,
     RepositoryConflictError,
     RepositoryRateLimitError,
+    add_calendar_months,
+    get_document_policy,
     supabase_repository,
 )
 
@@ -336,7 +338,7 @@ def login_api():
             }), 403
         if user.get("role") != "super_admin" and supabase_repository.is_official_archived(user.get("id"), user.get("email")):
             return jsonify({
-                "error": "This official account has been archived. Please contact the Barangay Captain."
+                "error": "This official account has been deactivated because you are no longer serving as a barangay official. Please contact the Barangay Captain for assistance."
             }), 403
         session["user"] = user
         session.permanent = True
@@ -2121,6 +2123,7 @@ def create_document():
             or (str(user.get("email") or "").strip() if is_resident and user.get("email") else "")
             or supabase_repository._resolve_account_email(None, resident_name)
         )
+        doc_policy = get_document_policy(document_type)
         data = {
             "document_type": document_type,
             "resident_name": resident_name,
@@ -2135,6 +2138,7 @@ def create_document():
             "business_name": business_name,
             "business_address": business_address,
             "supporting_doc_type": supporting_doc_type,
+            "amount_due": float(doc_policy["fee"]),
             "date_requested": manila_today().isoformat(),
             "status": "Pending",
         }
@@ -2303,7 +2307,7 @@ def _evaluate_receipt_auto_checks(
     has_file: bool,
 ) -> dict:
     expected_ref = str(doc.get("tx_ref") or "").strip()
-    expected_amt = float(doc.get("amount_due") if doc.get("amount_due") is not None else 50.0)
+    expected_amt = float(get_document_policy(doc.get("document_type"))["fee"])
     ref_clean = (receipt_ref or "").strip()
 
     ref_ok = len(ref_clean) >= 6
@@ -2362,11 +2366,9 @@ def send_document_payment_instructions(document_id: int):
             return jsonify({"error": "Document request not found"}), 404
         official_name = current_user().get("full_name", current_user()["email"])
         doc_type = doc.get("document_type", "Barangay Certificate")
-        default_amt = 0.0 if doc_type == "Certificate of Indigency" else (150.0 if doc_type == "Business Clearance" else 50.0)
-        try:
-            amount_due = float(payload.get("amount_due", doc.get("amount_due", default_amt)))
-        except (ValueError, TypeError):
-            amount_due = default_amt
+        doc_policy = get_document_policy(doc_type)
+        amount_due = float(doc_policy["fee"])
+        validity_label = str(doc_policy["validity_label"])
 
         tx_ref = doc.get("tx_ref") or f"TXN-SB-{manila_today().year}-{document_id:04d}"
         resident_name = str(doc.get("resident_name") or "Resident").strip()
@@ -2374,6 +2376,7 @@ def send_document_payment_instructions(document_id: int):
         if not to_email:
             return jsonify({"error": "No resident email address is associated with this document request."}), 400
 
+        fee_line = "FREE (PHP 0.00)" if amount_due == 0 else f"PHP {amount_due:.2f} (Fixed Barangay Fee)"
         subject = f"[SmartBarangay] Payment Instructions for {resident_name} — {doc_type} ({tx_ref})"
         body = (
             f"Dear {resident_name},\n\n"
@@ -2382,7 +2385,8 @@ def send_document_payment_instructions(document_id: int):
             f"• Applicant / Resident Name: {resident_name}\n"
             f"• Transaction Reference No.: {tx_ref}\n"
             f"• Document Requested: {doc_type}\n"
-            f"• Required Fee Amount: PHP {amount_due:.2f}\n"
+            f"• Required Fee Amount: {fee_line}\n"
+            f"• Document Validity: {validity_label} from date of approval\n"
             f"• Accepted Payment Methods:\n"
             f"   1. GCash: 0917-123-4567 (Brgy. Don Felipe Larrazabal Treasury)\n"
             f"   2. Maya: 0918-765-4321 (Brgy. Don Felipe Larrazabal)\n"
@@ -2540,16 +2544,24 @@ def update_document(document_id):
 
     resident_name = str(doc.get("resident_name") or "Resident").strip()
     if status == "Approved" or payload.get("payment_status") == "Verified":
+        doc_type = str(doc.get("document_type") or "Barangay Certificate")
+        doc_policy = get_document_policy(doc_type)
+        paid_float = float(doc_policy["fee"])
+        validity_months = int(doc_policy["validity_months"])
+        validity_label = str(doc_policy["validity_label"])
+        issued_date = manila_today()
+        expires_date = add_calendar_months(issued_date, validity_months)
+        valid_until_str = expires_date.strftime("%B %d, %Y")
+
         updates["payment_status"] = "Verified"
         updates["status"] = "Approved"
-        paid_val = updates.get("amount_paid", doc.get("receipt_amount", doc.get("amount_due", 50.0)))
-        try:
-            paid_float = float(paid_val or 0.0)
-        except (ValueError, TypeError):
-            paid_float = 50.0
+        updates["amount_due"] = paid_float
         updates["amount_paid"] = paid_float
+        updates["issued_at"] = issued_date.isoformat()
+        updates["expires_at"] = expires_date.isoformat()
+        updates["validity_months"] = validity_months
+        updates["validity_label"] = validity_label
 
-        doc_type = str(doc.get("document_type") or "Barangay Certificate")
         merged_for_pdf = {**doc, **updates}
         pdf_bytes = None
         pdf_filename = ""
@@ -2561,18 +2573,19 @@ def update_document(document_id):
         except Exception:
             app.logger.exception("Could not generate PDF attachment for approval email")
 
+        fee_summary_str = "FREE (PHP 0.00)" if paid_float == 0 else f"PHP {paid_float:.2f}"
         subject = f"[SmartBarangay] Official {doc_type} Released for {resident_name} ({tx_ref})"
         body = (
             f"Dear {resident_name},\n\n"
-            f"We are pleased to inform you that your payment has been verified and your requested {doc_type} has been officially approved and released by {official_name}.\n\n"
-            f"RELEASE & PAYMENT SUMMARY:\n"
+            f"We are pleased to inform you that your requested {doc_type} has been officially approved and released by {official_name}.\n\n"
+            f"RELEASE & VALIDITY SUMMARY:\n"
             f"• Applicant / Resident Name: {resident_name}\n"
             f"• Document Type: {doc_type}\n"
             f"• Transaction Reference: {tx_ref}\n"
-            f"• Receipt Reference: {doc.get('receipt_ref_no') or 'Verified'}\n"
-            f"• Amount Verified: PHP {paid_float:.2f}\n"
+            f"• Fee Amount: {fee_summary_str}\n"
+            f"• Valid Until: {valid_until_str} (Valid for {validity_label})\n"
             f"• Status: APPROVED & RELEASED\n\n"
-            f"Attached to this email is your official {doc_type} PDF issued by Barangay Don Felipe Larrazabal, Ormoc City. You may also access it anytime on the SmartBarangay Mobile App.\n\n"
+            f"Attached to this email is your official {doc_type} PDF issued by Barangay Don Felipe Larrazabal, Ormoc City. Please note that once this document expires on {valid_until_str}, it can no longer be downloaded and you will need to submit a new request.\n\n"
             f"Thank you,\n"
             f"Office of the Punong Barangay — Hon. Nenito S. Anonat\n"
             f"Barangay Don Felipe Larrazabal, Ormoc City, Leyte"
@@ -2804,6 +2817,26 @@ def _certificate_pdf(document: dict) -> bytes:
     since_year = resident_since_raw[:4] if len(resident_since_raw) >= 4 and resident_since_raw[:4].isdigit() else ""
 
     today = manila_today()
+    raw_issued = str(document.get("issued_at") or document.get("verified_at") or "").strip()
+    if len(raw_issued) >= 10:
+        try:
+            today = date.fromisoformat(raw_issued[:10])
+        except ValueError:
+            today = manila_today()
+    doc_policy = get_document_policy(document_type)
+    validity_months = int(document.get("validity_months") or doc_policy["validity_months"])
+    validity_label = str(document.get("validity_label") or doc_policy["validity_label"])
+    raw_expires = str(document.get("expires_at") or "").strip()
+    expires_date = None
+    if len(raw_expires) >= 10:
+        try:
+            expires_date = date.fromisoformat(raw_expires[:10])
+        except ValueError:
+            expires_date = None
+    if expires_date is None:
+        expires_date = add_calendar_months(today, validity_months)
+    valid_until_label = f"{expires_date.strftime('%B')} {expires_date.day}, {expires_date.year}"
+
     day = today.day
     ord_suffix = "th" if 11 <= (day % 100) <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
     month_upper = today.strftime("%B").upper()
@@ -3051,6 +3084,7 @@ def _certificate_pdf(document: dict) -> bytes:
                 Paragraph(
                     f"Comm. Tax : ________________<br/>"
                     f"Issued On : {month_title} {day}, {today.year}<br/>"
+                    f"Valid Until : {valid_until_label} ({validity_label})<br/>"
                     f"Issued At : Ormoc City<br/>"
                     f"O.R Number : {tx_ref or '________________'}",
                     meta_style,
@@ -3123,6 +3157,8 @@ def _certificate_pdf(document: dict) -> bytes:
             ),
             Spacer(1, 56),
             _signature_block("NENITO S. ANONAT", "Punong Barangay"),
+            Spacer(1, 24),
+            Paragraph(f"<b>Valid Until:</b> {valid_until_label} ({validity_label} from date of issuance)", meta_style),
         ]
 
     elif document_type == "Certificate of Indigency":
@@ -3158,6 +3194,8 @@ def _certificate_pdf(document: dict) -> bytes:
             ),
             Spacer(1, 44),
             _signature_block("Hon. Nenito S. Anonat", "Punong Barangay", attested_by=attested_name),
+            Spacer(1, 24),
+            Paragraph(f"<b>Fee:</b> FREE (PHP 0.00) &nbsp;|&nbsp; <b>Valid Until:</b> {valid_until_label} ({validity_label} from date of issuance)", meta_style),
         ]
 
     elif document_type == "Business Clearance":
@@ -3189,7 +3227,7 @@ def _certificate_pdf(document: dict) -> bytes:
             f"<b>OR No.:</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{tx_ref or '________________'}<br/>"
             f"<b>CTC No.:</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;________________<br/>"
             f"<b>Date Issued:</b> &nbsp;{month_upper} {day}, {today.year}<br/>"
-            f"<b>Valid until:</b> &nbsp;&nbsp;December 31, {today.year}",
+            f"<b>Valid until:</b> &nbsp;&nbsp;{valid_until_label} ({validity_label})",
             meta_style,
         )
         story = [
@@ -3260,6 +3298,12 @@ def send_released_document_email(document_id: int):
             return jsonify({"error": "Document request not found"}), 404
         if doc.get("status") not in {"Approved", "Resolved"}:
             return jsonify({"error": "Only approved/released documents can be emailed to residents"}), 409
+        if doc.get("is_expired"):
+            return jsonify({
+                "error": f"This document expired on {doc.get('expires_at')}. The resident must submit a new document request.",
+                "expired": True,
+                "expires_at": doc.get("expires_at"),
+            }), 410
 
         official_name = current_user().get("full_name", current_user()["email"])
         resident_name = str(doc.get("resident_name") or "Resident").strip()
@@ -3344,6 +3388,12 @@ def download_certificate(document_id: int):
                 return jsonify({"error": "Forbidden"}), 403
         if document.get("status") not in {"Approved", "Resolved"}:
             return jsonify({"error": "The certificate can only be downloaded after payment is verified and approved"}), 409
+        if document.get("is_expired"):
+            return jsonify({
+                "error": f"This document expired on {document.get('expires_at')}. It can no longer be downloaded — please submit a new document request.",
+                "expired": True,
+                "expires_at": document.get("expires_at"),
+            }), 410
         pdf_bytes = _certificate_pdf(document)
         request_id = re.sub(r"[^A-Za-z0-9_-]+", "-", str(document.get("request_id") or document_id))
         document_slug = re.sub(r"[^A-Za-z0-9_-]+", "-", str(document.get("document_type") or "certificate").lower())

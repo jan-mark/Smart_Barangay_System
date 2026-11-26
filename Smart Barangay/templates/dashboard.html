@@ -1480,7 +1480,7 @@
                     </div>
                     <div class="doc-v2-amount-block">
                         <span class="doc-v2-label">Required Payment</span>
-                        <div class="doc-v2-amount-val" id="doc-step2-amount-display">₱50.00</div>
+                        <div class="doc-v2-amount-val" id="doc-step2-amount-display">₱100.00</div>
                     </div>
                     <button type="button" class="doc-v2-resend-btn" id="doc-send-payment-email-btn"><i data-lucide="mail"></i> <span>Resend Email</span></button>
                 </div>
@@ -2479,10 +2479,24 @@
         };
         const canManageRecords = () => ['super_admin', 'admin', 'barangay_official'].includes(currentRole);
         const documentStatusClass = (status) => String(status || 'Pending').toLowerCase().replaceAll(' ', '-');
-        const getDefaultDocumentFee = (docType) => {
-            if (docType === 'Certificate of Indigency') return '0.00';
-            if (docType === 'Business Clearance') return '150.00';
-            return '50.00';
+        const DOCUMENT_FEE_POLICY = {
+            'Barangay Clearance': { fee: 100, validityMonths: 6, validityLabel: '6 months' },
+            'Certificate of Indigency': { fee: 0, validityMonths: 6, validityLabel: '6 months' },
+            'Certificate of Residency': { fee: 100, validityMonths: 6, validityLabel: '6 months' },
+            'Business Clearance': { fee: 500, validityMonths: 12, validityLabel: '1 year' }
+        };
+        const getDocumentPolicy = (docType) => DOCUMENT_FEE_POLICY[String(docType || '').trim()] || { fee: 100, validityMonths: 6, validityLabel: '6 months' };
+        const getDefaultDocumentFee = (docType) => getDocumentPolicy(docType).fee.toFixed(2);
+        const isDocumentExpired = (record) => {
+            if (!record) return false;
+            if (record.is_expired === true) return true;
+            const rawStatus = String(record.status || '').trim();
+            if (!['Approved', 'Resolved'].includes(rawStatus)) return false;
+            if (record.expires_at) {
+                const expDate = new Date(`${String(record.expires_at).slice(0, 10)}T23:59:59+08:00`);
+                if (!Number.isNaN(expDate.getTime()) && Date.now() > expDate.getTime()) return true;
+            }
+            return false;
         };
         const evaluateDocumentChecklist = (docRecord, manualOverrides = []) => {
             const overridesSet = new Set(Array.isArray(manualOverrides) ? manualOverrides : (docRecord.manual_checks || []));
@@ -2586,6 +2600,7 @@
         };
 
         const getEffectiveDocStatus = (record) => {
+            if (isDocumentExpired(record)) return 'Expired';
             const raw = String(record?.status || 'Pending').trim();
             if (['Approved', 'Resolved'].includes(raw)) return 'Approved';
             if (raw === 'Rejected' || String(record?.verification_status || '').trim() === 'Rejected') return 'Rejected';
@@ -2594,24 +2609,28 @@
 
         const renderDocumentRecord = (record) => {
             const status = getEffectiveDocStatus(record);
+            const isExpired = status === 'Expired';
             const readyForDownload = ['Approved', 'Resolved'].includes(status);
             const isRejected = status === 'Rejected';
-            const payStatus = isRejected ? '' : (record.payment_status || (readyForDownload ? 'Verified' : ''));
-            const paidAmountText = (record.amount_paid !== undefined && record.amount_paid !== null && record.amount_paid !== '')
-                ? `₱${Number(record.amount_paid).toFixed(2)}`
-                : (record.receipt_amount !== undefined && record.receipt_amount !== null && record.receipt_amount !== '' ? `₱${Number(record.receipt_amount).toFixed(2)}` : '');
-            const statusLabel = readyForDownload
-                ? (paidAmountText ? `Paid (${paidAmountText}) · Approved` : 'Paid & Approved')
-                : (isRejected
-                    ? 'Rejected'
-                    : (payStatus === 'Pending Verification' && record.receipt_submitted_at
-                        ? 'Receipt Submitted · Pending Verification'
-                        : (payStatus === 'Rejected'
-                            ? 'Payment Receipt Rejected'
-                            : (payStatus === 'Awaiting Payment'
-                                ? 'Awaiting Resident Payment'
-                                : (record.verification_status === 'Needs Info' ? 'Needs Additional Info' : 'Pending Verification')))));
-            const statusClass = readyForDownload ? 'approved' : (isRejected || payStatus === 'Rejected' ? 'rejected' : 'pending');
+            const policy = getDocumentPolicy(record.document_type);
+            const isFreeDoc = policy.fee === 0;
+            const payStatus = isRejected ? '' : (record.payment_status || (readyForDownload || isExpired ? 'Verified' : ''));
+            const paidAmountText = isFreeDoc ? 'FREE' : `₱${policy.fee.toFixed(2)}`;
+            const expiryText = record.expires_at ? smartBarangayTime.formatDate(record.expires_at) : '';
+            const statusLabel = isExpired
+                ? `Expired${expiryText ? ` (${expiryText})` : ''} · Re-request`
+                : (readyForDownload
+                    ? (isFreeDoc ? 'FREE · Approved' : `Paid (${paidAmountText}) · Approved`)
+                    : (isRejected
+                        ? 'Rejected'
+                        : (payStatus === 'Pending Verification' && record.receipt_submitted_at
+                            ? 'Receipt Submitted · Pending Verification'
+                            : (payStatus === 'Rejected'
+                                ? 'Payment Receipt Rejected'
+                                : (payStatus === 'Awaiting Payment'
+                                    ? 'Awaiting Resident Payment'
+                                    : (record.verification_status === 'Needs Info' ? 'Needs Additional Info' : 'Pending Verification'))))));
+            const statusClass = readyForDownload ? 'approved' : (isExpired || isRejected || payStatus === 'Rejected' ? 'rejected' : 'pending');
 
             const checkEval = evaluateDocumentChecklist(record);
             const hasRed = checkEval.items.some((i) => !i.passed && i.autoState === 'red');
@@ -2632,14 +2651,18 @@
             }
 
             const actions = (canManageRecords() && !isRejected)
-                ? (readyForDownload
-                    ? `<button class="status-edit" data-kind="document" data-id="${escapeHtml(record.id)}" data-status="${escapeHtml(status)}" type="button">View Details</button>`
+                ? (readyForDownload || isExpired
+                    ? `<button class="status-edit" data-kind="document" data-id="${escapeHtml(record.id)}" data-status="${escapeHtml(status)}" type="button">${isExpired ? 'View Expired' : 'View Details'}</button>`
                     : `<button class="status-edit" data-kind="document" data-id="${escapeHtml(record.id)}" data-status="${escapeHtml(status)}" type="button">${record.receipt_submitted_at ? 'Review Receipt' : 'Verify &amp; Process'}</button>`)
                 : '';
 
             const officialName = String(record.verified_by || record.processor || '').trim();
             let processedHtml = '<span class="doc-proc-muted">Pending review</span>';
-            if (readyForDownload) {
+            if (isExpired) {
+                processedHtml = officialName
+                    ? `<div class="doc-proc-cell"><span class="doc-proc-tag is-rej">Expired</span><strong>${escapeHtml(officialName)}</strong></div>`
+                    : `<span class="doc-proc-muted">Expired</span>`;
+            } else if (readyForDownload) {
                 processedHtml = officialName
                     ? `<div class="doc-proc-cell"><span class="doc-proc-tag">Approved by</span><strong>${escapeHtml(officialName)}</strong></div>`
                     : `<span class="doc-proc-muted">Approved</span>`;
@@ -3092,12 +3115,10 @@
 
                 const docsList = pageData.Documents || [];
                 const docRecord = docsList.find((d) => String(d.id) === String(button.dataset.id)) || {};
-                const isAlreadyApproved = ['Approved', 'Resolved'].includes(String(docRecord.status || button.dataset.status || ''));
-                const initialFee = (docRecord.amount_paid !== undefined && docRecord.amount_paid !== null && docRecord.amount_paid !== '')
-                    ? Number(docRecord.amount_paid).toFixed(2)
-                    : (docRecord.amount_due !== undefined && docRecord.amount_due !== null && docRecord.amount_due !== ''
-                        ? Number(docRecord.amount_due).toFixed(2)
-                        : getDefaultDocumentFee(docRecord.document_type));
+                const docPolicy = getDocumentPolicy(docRecord.document_type);
+                const isFreeDoc = docPolicy.fee === 0;
+                const isAlreadyApproved = ['Approved', 'Resolved'].includes(String(docRecord.status || button.dataset.status || '')) || isDocumentExpired(docRecord);
+                const initialFee = getDefaultDocumentFee(docRecord.document_type);
 
                 let currentOverrides = Array.isArray(docRecord.manual_checks) ? [...docRecord.manual_checks] : [];
                 let docReleasedFlag = isAlreadyApproved;
@@ -3114,15 +3135,23 @@
                 const renderStep3ReleasedState = () => {
                     const summaryGrid = document.querySelector('#doc-step3-summary-grid');
                     if (!summaryGrid) return;
-                    const paidAmt = docRecord.amount_paid != null && docRecord.amount_paid !== ''
-                        ? Number(docRecord.amount_paid).toFixed(2)
-                        : Number(feeInput?.value || initialFee || 0).toFixed(2);
+                    const expiredNow = isDocumentExpired(docRecord);
+                    const paidAmt = getDefaultDocumentFee(docRecord.document_type);
+                    const feeDisplayStr = isFreeDoc ? 'FREE (₱0.00)' : `₱${paidAmt}`;
+                    const validityLabel = docRecord.validity_label || docPolicy.validityLabel;
+                    const expiresDateStr = docRecord.expires_at ? smartBarangayTime.formatDate(docRecord.expires_at) : `Valid for ${validityLabel}`;
                     const txRefVal = docRecord.tx_ref || `TXN-SB-${new Date().getFullYear()}-${String(docRecord.id || 1).padStart(4, '0')}`;
                     const resEmail = String(docRecord.resident_email || docRecord.email || '').trim();
                     const logs = Array.isArray(docRecord.email_logs) ? docRecord.email_logs : [];
                     const pdfSentLog = logs.find((l) => l && l.smtp_delivered && Array.isArray(l.attachments) && l.attachments.length > 0);
                     const anySentLog = logs.find((l) => l && l.smtp_delivered);
                     const latestErrLog = logs.find((l) => l && l.smtp_error);
+
+                    const heroHeading = step3Panel?.querySelector('.doc-released-hero h3');
+                    if (heroHeading) {
+                        heroHeading.textContent = expiredNow ? 'Document Expired — Re-request Required' : 'Document Released to Resident';
+                        heroHeading.style.color = expiredNow ? '#DC2626' : '';
+                    }
 
                     let emailStatusBadge = `<span class="status pending" style="font-size:10.5px;">Not yet emailed</span>`;
                     if (pdfSentLog) {
@@ -3133,29 +3162,41 @@
                         emailStatusBadge = `<span class="status rejected" style="font-size:10.5px;" title="${escapeHtml(latestErrLog.smtp_error)}">Delivery Failed</span>`;
                     }
 
+                    const validityHtml = expiredNow
+                        ? `<strong style="color:#DC2626;">Expired on ${escapeHtml(expiresDateStr)} (${escapeHtml(validityLabel)})</strong>`
+                        : `<strong style="color:#059669;">Valid until ${escapeHtml(expiresDateStr)} (${escapeHtml(validityLabel)})</strong>`;
+                    const availabilityBadge = expiredNow
+                        ? `<span class="status rejected" style="font-size:10.5px;">Expired — Resident Must Request Again</span>`
+                        : `<span class="status approved" style="font-size:10.5px;">✓ Available to Resident</span>`;
+
                     summaryGrid.innerHTML = `
                         <div><small>Resident / Recipient</small><strong>${escapeHtml(docRecord.resident_name || '—')}</strong></div>
                         <div><small>Document Type</small><strong style="color:#1D4ED8;">${escapeHtml(docRecord.document_type || '—')}</strong></div>
                         <div><small>Resident Email</small><strong style="word-break:break-all;">${escapeHtml(resEmail || 'No email on record')}</strong></div>
                         <div><small>Email PDF Delivery</small>${emailStatusBadge}</div>
                         <div><small>Transaction Ref</small><strong style="font-family:monospace;">${escapeHtml(txRefVal)}</strong></div>
-                        <div><small>Verified Fee Paid</small><strong style="color:#059669;">₱${escapeHtml(paidAmt)}</strong></div>
-                        <div><small>Mobile App Status</small><span class="status approved" style="font-size:10.5px;">✓ Available to Resident</span></div>
-                        <div><small>Released Date</small><strong>${escapeHtml(smartBarangayTime.formatDate(docRecord.verified_at || docRecord.date_requested || new Date().toISOString()))}</strong></div>
+                        <div><small>Fixed Document Fee</small><strong style="color:#059669;">${escapeHtml(feeDisplayStr)}</strong></div>
+                        <div><small>Document Validity</small>${validityHtml}</div>
+                        <div><small>Download / App Access</small>${availabilityBadge}</div>
                     `;
                     const step3PdfBtn = document.querySelector('#doc-step3-download-pdf-btn');
                     if (step3PdfBtn) {
+                        step3PdfBtn.disabled = expiredNow;
+                        step3PdfBtn.style.opacity = expiredNow ? '0.45' : '1';
+                        step3PdfBtn.title = expiredNow ? 'This document has expired and can no longer be downloaded.' : '';
                         step3PdfBtn.onclick = () => {
+                            if (expiredNow) return showToast('This document has expired. The resident must submit a new request.');
                             window.open(`/api/documents/${encodeURIComponent(button.dataset.id)}/pdf?_t=${Date.now()}`, '_blank', 'noopener');
                         };
                     }
                     const step3EmailBtn = document.querySelector('#doc-step3-send-email-btn');
                     if (step3EmailBtn) {
                         const btnSpan = step3EmailBtn.querySelector('span');
-                        if (btnSpan) btnSpan.textContent = pdfSentLog ? 'Resend PDF to Email' : 'Send PDF to Email';
-                        step3EmailBtn.disabled = !resEmail;
-                        step3EmailBtn.style.opacity = resEmail ? '1' : '0.5';
+                        if (btnSpan) btnSpan.textContent = expiredNow ? 'Expired (Cannot Email)' : (pdfSentLog ? 'Resend PDF to Email' : 'Send PDF to Email');
+                        step3EmailBtn.disabled = expiredNow || !resEmail;
+                        step3EmailBtn.style.opacity = (!expiredNow && resEmail) ? '1' : '0.45';
                         step3EmailBtn.onclick = async () => {
+                            if (expiredNow) return showToast('This document has expired. The resident must submit a new request.');
                             if (!resEmail) return showToast('No resident email on record.');
                             step3EmailBtn.disabled = true;
                             if (btnSpan) btnSpan.textContent = 'Sending PDF...';
@@ -3406,9 +3447,14 @@
                     const emailDisplayEl = document.querySelector('#doc-step2-email-display');
                     if (emailDisplayEl) emailDisplayEl.textContent = resolvedResidentEmail || 'No email on record';
 
-                    const amtNum = Number(feeInput?.value || docRecord.amount_due || initialFee || 0);
+                    const amtNum = Number(initialFee || 0);
+                    if (feeInput) feeInput.value = initialFee;
                     const amountDisplayEl = document.querySelector('#doc-step2-amount-display');
-                    if (amountDisplayEl) amountDisplayEl.textContent = `₱${amtNum.toFixed(2)}`;
+                    if (amountDisplayEl) {
+                        amountDisplayEl.innerHTML = isFreeDoc
+                            ? `FREE <small style="display:block;font-size:11px;font-weight:600;color:#059669;">Valid for ${escapeHtml(docPolicy.validityLabel)}</small>`
+                            : `₱${amtNum.toFixed(2)} <small style="display:block;font-size:11px;font-weight:600;color:#64748B;">Fixed · Valid for ${escapeHtml(docPolicy.validityLabel)}</small>`;
+                    }
 
                     if (sendEmailBtn) {
                         const span = sendEmailBtn.querySelector('span');
@@ -3469,13 +3515,17 @@
                         }
                     } else {
                         if (receiptCheckPill) {
-                            receiptCheckPill.className = `doc-v2-status-pill ${pStatus === 'Verified' ? 'all-good' : 'awaiting'}`;
-                            receiptCheckPill.innerHTML = pStatus === 'Verified'
-                                ? '<i data-lucide="check-circle-2" style="width:14px;height:14px;"></i> Verified'
-                                : '<i data-lucide="clock" style="width:14px;height:14px;"></i> Awaiting Upload';
+                            receiptCheckPill.className = `doc-v2-status-pill ${isFreeDoc || pStatus === 'Verified' ? 'all-good' : 'awaiting'}`;
+                            receiptCheckPill.innerHTML = isFreeDoc
+                                ? '<i data-lucide="check-circle-2" style="width:14px;height:14px;"></i> No Payment Required'
+                                : (pStatus === 'Verified'
+                                    ? '<i data-lucide="check-circle-2" style="width:14px;height:14px;"></i> Verified'
+                                    : '<i data-lucide="clock" style="width:14px;height:14px;"></i> Awaiting Upload');
                         }
                         if (receiptPreviewBox) {
-                            receiptPreviewBox.innerHTML = `<div style="padding: 24px 16px; text-align: center; border: 1.5px dashed #CBD5E1; border-radius: 12px; background: #F8FAFC; color: #64748B; font-size: 12.5px;">No payment receipt uploaded by the resident yet.</div>`;
+                            receiptPreviewBox.innerHTML = isFreeDoc
+                                ? `<div style="padding: 20px 16px; text-align: center; border: 1.5px solid #BBF7D0; border-radius: 12px; background: #F0FDF4; color: #166534; font-size: 12.5px; font-weight: 600;">Certificate of Indigency is FREE (₱0.00) and valid for ${escapeHtml(docPolicy.validityLabel)}. No payment receipt is required — you may approve and release this document directly.</div>`
+                                : `<div style="padding: 24px 16px; text-align: center; border: 1.5px dashed #CBD5E1; border-radius: 12px; background: #F8FAFC; color: #64748B; font-size: 12.5px;">No payment receipt uploaded by the resident yet.</div>`;
                         }
                     }
                     lucide.createIcons();
@@ -3532,7 +3582,7 @@
                     if (feeInput) {
                         feeInput.value = initialFee;
                     }
-                    if (!docRecord.tx_ref) {
+                    if (!isFreeDoc && !docRecord.tx_ref) {
                         await triggerSendPaymentInstructions(true);
                     } else {
                         renderStep2PaymentState();
@@ -3635,7 +3685,7 @@
 
                 const syncStep2ActionButtons = () => {
                     const hasReceipt = Boolean(docRecord.receipt_submitted_at || docRecord.receipt_file_url || docRecord.receipt_ref_no);
-                    const canProceedRelease = hasReceipt || isAlreadyApproved || docReleasedFlag;
+                    const canProceedRelease = isFreeDoc || hasReceipt || isAlreadyApproved || docReleasedFlag;
                     if (approveBtn) {
                         approveBtn.disabled = !canProceedRelease;
                         approveBtn.style.opacity = canProceedRelease ? '1' : '0.48';
@@ -3645,11 +3695,11 @@
                         if (span) {
                             span.textContent = (isAlreadyApproved || docReleasedFlag)
                                 ? 'View Released Document'
-                                : 'Confirm Payment';
+                                : (isFreeDoc ? 'Approve & Release (Free)' : 'Confirm Payment');
                         }
                     }
                     if (rejectReceiptBtn) {
-                        rejectReceiptBtn.style.display = hasReceipt && !isAlreadyApproved && !docReleasedFlag ? 'inline-flex' : 'none';
+                        rejectReceiptBtn.style.display = !isFreeDoc && hasReceipt && !isAlreadyApproved && !docReleasedFlag ? 'inline-flex' : 'none';
                         rejectReceiptBtn.disabled = !hasReceipt;
                     }
                 };
@@ -3681,7 +3731,7 @@
 
                 approveBtn.onclick = async () => {
                     const hasReceipt = Boolean(docRecord.receipt_submitted_at || docRecord.receipt_file_url || docRecord.receipt_ref_no);
-                    if (!hasReceipt && !isAlreadyApproved && !docReleasedFlag) {
+                    if (!isFreeDoc && !hasReceipt && !isAlreadyApproved && !docReleasedFlag) {
                         showToast('Waiting for resident to upload payment receipt first.');
                         return;
                     }
@@ -3689,15 +3739,11 @@
                         setDocWizardStep(3);
                         return;
                     }
-                    const enteredFee = feeInput ? feeInput.value.trim() : '';
-                    if (enteredFee === '') {
-                        showToast('Please enter the verified document fee amount first');
-                        if (feeInput) feeInput.focus();
-                        return;
-                    }
+                    const enteredFee = initialFee;
+                    const feeMsg = isFreeDoc ? 'FREE (₱0.00)' : `₱${Number(enteredFee).toFixed(2)}`;
                     const confirmed = await showConfirmModal({
                         title: 'Approve & Release Document?',
-                        message: `Do you want to confirm payment (₱${Number(enteredFee).toFixed(2)}) and release this ${docRecord.document_type || 'document'} to ${requesterName}?`,
+                        message: `Do you want to approve (${feeMsg}, valid for ${docPolicy.validityLabel}) and release this ${docRecord.document_type || 'document'} to ${requesterName}?`,
                         confirmText: 'Yes, Approve',
                         cancelText: 'No',
                         tone: 'primary',

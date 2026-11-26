@@ -1,3 +1,4 @@
+import calendar
 import json
 import os
 import re
@@ -10,6 +11,26 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 from offline_sync_store import OfflineSyncStore
 from time_utils import manila_month_key, manila_today
+
+DOCUMENT_POLICY: dict[str, dict[str, Any]] = {
+    "Barangay Clearance": {"fee": 100.0, "validity_months": 6, "validity_label": "6 months"},
+    "Certificate of Indigency": {"fee": 0.0, "validity_months": 6, "validity_label": "6 months"},
+    "Certificate of Residency": {"fee": 100.0, "validity_months": 6, "validity_label": "6 months"},
+    "Business Clearance": {"fee": 500.0, "validity_months": 12, "validity_label": "1 year"},
+}
+
+
+def get_document_policy(document_type: str | None) -> dict[str, Any]:
+    key = str(document_type or "").strip()
+    return dict(DOCUMENT_POLICY.get(key, {"fee": 100.0, "validity_months": 6, "validity_label": "6 months"}))
+
+
+def add_calendar_months(base_date: date, months: int) -> date:
+    m0 = base_date.month - 1 + int(months)
+    year = base_date.year + m0 // 12
+    month = (m0 % 12) + 1
+    day = min(base_date.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
 
 env_path = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv(env_path)
@@ -302,6 +323,10 @@ class SupabaseRepository:
             "checklist_summary",
             "verified_by",
             "verified_at",
+            "issued_at",
+            "expires_at",
+            "validity_months",
+            "validity_label",
             "action_performed",
             "verification_remarks",
             "manual_checks",
@@ -418,6 +443,54 @@ class SupabaseRepository:
             enriched[k] = v
         if enriched.get("verification_status") == "Rejected" and enriched.get("status") not in ("Approved", "Resolved"):
             enriched["status"] = "Rejected"
+
+        # Enforce fixed document fee and automatic expiration policy
+        policy = get_document_policy(enriched.get("document_type"))
+        fixed_fee = float(policy["fee"])
+        validity_months = int(policy["validity_months"])
+        validity_label = str(policy["validity_label"])
+        enriched["fixed_fee"] = fixed_fee
+        enriched["amount_due"] = fixed_fee
+        enriched["validity_months"] = validity_months
+        enriched["validity_label"] = validity_label
+
+        is_approved = str(enriched.get("status") or "").strip() in ("Approved", "Resolved")
+        if is_approved:
+            if enriched.get("amount_paid") in (None, ""):
+                enriched["amount_paid"] = fixed_fee
+            issued_date: date | None = None
+            for date_key in ("issued_at", "verified_at", "date_requested", "created_at"):
+                raw_dt = str(enriched.get(date_key) or "").strip()
+                if len(raw_dt) >= 10:
+                    try:
+                        issued_date = date.fromisoformat(raw_dt[:10])
+                        break
+                    except ValueError:
+                        continue
+            if issued_date is None:
+                issued_date = manila_today()
+
+            expires_date: date | None = None
+            raw_exp = str(enriched.get("expires_at") or "").strip()
+            if len(raw_exp) >= 10:
+                try:
+                    expires_date = date.fromisoformat(raw_exp[:10])
+                except ValueError:
+                    expires_date = None
+            if expires_date is None:
+                expires_date = add_calendar_months(issued_date, validity_months)
+
+            today = manila_today()
+            is_expired = today > expires_date
+            enriched["issued_at"] = issued_date.isoformat()
+            enriched["expires_at"] = expires_date.isoformat()
+            enriched["is_expired"] = is_expired
+            enriched["days_remaining"] = (expires_date - today).days
+        else:
+            enriched["is_expired"] = False
+            enriched["expires_at"] = None
+            enriched["days_remaining"] = None
+
         # Prioritize any email column sent by the Resident Mobile App on the document request row itself
         row_email = ""
         for email_key in ("resident_email", "email", "applicant_email", "requester_email", "contact_email"):
@@ -1287,6 +1360,10 @@ class SupabaseRepository:
             "checklist_summary",
             "verified_by",
             "verified_at",
+            "issued_at",
+            "expires_at",
+            "validity_months",
+            "validity_label",
             "action_performed",
             "verification_remarks",
             "manual_checks",
@@ -1755,7 +1832,7 @@ class SupabaseRepository:
             rows = (
                 client.table("documents")
                 .select(
-                    "id,status,date_requested"
+                    "id,status,document_type,date_requested,created_at"
                 )
                 .eq(
                     "requester_id",
@@ -1774,25 +1851,19 @@ class SupabaseRepository:
                 "Pending",
                 "In Progress",
                 "Processing",
-                "Approved"
+                "Approved",
+                "Resolved",
             }
 
             for row in rows:
-                requested = str(
-                    row.get("date_requested", "")
-                )[:10]
-
-                if row.get("status") in active_statuses:
-                    return False
-
-                try:
-                    if (
-                        date.fromisoformat(requested)
-                        >= cutoff
-                    ):
-                        return False
-                except ValueError:
+                enriched = self._apply_doc_meta(row)
+                # Expired or Rejected documents allow the resident to submit a new request
+                if enriched.get("is_expired"):
                     continue
+                if str(enriched.get("status") or "").strip() == "Rejected":
+                    continue
+                if str(enriched.get("status") or "").strip() in active_statuses:
+                    return False
 
             return True
         except Exception:
