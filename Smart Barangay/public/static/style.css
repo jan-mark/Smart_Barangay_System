@@ -10728,3 +10728,125 @@ img, video, canvas { max-width: 100%; }
 @media (max-width: 800px) {
     .resident-sidebar { z-index: 1001; }
 }
+
+/* =========================================================================
+   RESPONSIVE LAYER v2  (phones, tablets, small laptops)
+   Keep this block LAST so it overrides earlier rules.
+   ========================================================================= */
+html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+.app-shell, .main-content, .page-content, .app-view { min-width: 0; max-width: 100%; }
+.page-content img, .page-content svg:not(.lucide), .page-content canvas { max-width: 100%; height: auto; }
+.record-row > *, .metric-card, .card, .panel { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- Tablet / small laptop (<= 1024px) ---------- */
+@media (max-width: 1024px) {
+    .page-content { padding-left: 18px; padding-right: 18px; }
+    .metric-grid, .official-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .visual-grid, .wx-top-grid, .wx-lower-grid, .wx-mid-row,
+    .profile-page-grid, .settings-two-col { grid-template-columns: minmax(0, 1fr) !important; }
+    .rpt-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .family-cards-container { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important; }
+    .doc-table-head, .record-row.doc-record-row { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    .doc-table-head { display: none !important; }
+    .record-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .search { width: 220px; }
+}
+
+/* ---------- Phone (<= 700px) ---------- */
+@media (max-width: 700px) {
+    :root { --mobile-pad: 12px; }
+
+    /* Top bar */
+    .topbar { height: 56px; padding: 0 10px; gap: 6px; position: sticky; top: 0; z-index: 900; }
+    .topbar .search, .topbar .signal, .topbar .sync-status-label { display: none !important; }
+    .top-actions { margin-left: auto; gap: 8px; flex-wrap: nowrap; min-width: 0; }
+    .topbar-page-title { flex: 1 1 auto; min-width: 0; font-size: 16px; }
+    .sync-status-popover { position: fixed !important; left: 10px !important; right: 10px !important; top: 60px !important; width: auto !important; max-width: none !important; }
+    .profile-menu { position: fixed !important; top: 60px !important; right: 10px !important; left: auto; max-width: calc(100vw - 20px); }
+
+    /* Page spacing */
+    .page-content { padding: 12px var(--mobile-pad) 32px !important; }
+    .page-heading { flex-direction: column; align-items: stretch !important; gap: 10px; }
+    .page-heading > *, .page-heading .heading-actions, .page-heading .actions { max-width: 100%; }
+    .page-heading .primary-button, .page-heading .outline-button, .page-heading button { width: 100%; justify-content: center; }
+
+    /* Every multi-column grid becomes 1 column (or 2 for small stat tiles) */
+    .visual-grid, .wx-top-grid, .wx-lower-grid, .wx-mid-row, .wx-bot-row,
+    .profile-page-grid, .settings-two-col, .settings-hub-grid, .report-grid, .settings-grid,
+    .official-form-grid, .request-form-grid, #workflow-form, .doc-released-grid,
+    .res-view-grid, .role-perm-fields, .role-perm-checklist-grid, .pw-rules-list,
+    .rpt-cards-grid, .ann-toggles-row, .form-row, .concern-grid-2col,
+    .family-cards-container { grid-template-columns: minmax(0, 1fr) !important; }
+    .metric-grid, .official-metrics, .compact-metrics, .profile-quick-stats-grid,
+    .wx-three-metrics, .rpt-preview-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+    .wx-hourly-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    .profile-kv-row { grid-template-columns: minmax(0, 1fr) !important; gap: 2px; }
+    .aligned-bar-row { grid-template-columns: 72px minmax(0, 1fr) 48px !important; }
+    .metric-card strong, .metric-card h2, .metric-card .value { font-size: 22px; }
+
+    /* Table-like rows become stacked cards */
+    .doc-table-head, .record-head, .table-head { display: none !important; }
+    .record-row, .record-row.doc-record-row, .overview-table > div, .department-row {
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 6px !important;
+        padding: 12px 14px !important;
+        align-items: start !important;
+    }
+    .record-row > * { text-align: left !important; }
+    .record-row .actions, .record-row .row-actions, .record-row .doc-actions, .record-row [class*="action"] {
+        display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start !important;
+    }
+
+    /* Real <table>s scroll sideways inside their card instead of overflowing the page */
+    .page-content table { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table-wrap, .table-responsive, .table-card, .records-card, .panel-body { overflow-x: auto; max-width: 100%; }
+
+    /* Filters / toolbars wrap */
+    .filter-tabs, .toolbar, .filters, .table-toolbar, .section-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+    .filter-tabs input, .filter-tabs select, .toolbar input, .toolbar select, .filters input, .filters select { width: 100% !important; flex: 1 1 100%; }
+    .filter-tabs button { flex: 1 1 auto; }
+
+    /* Modals fit the screen and scroll internally */
+    .modal { padding: 8px !important; align-items: flex-end; }
+    .modal-card, .modal-card.ann-modal-card, .modal-card.concern-view-card, .modal-card.doc-v2-modal-card,
+    .modal-card.official-modal-card, .modal-card.res-view-modal-card, .modal-card.role-perm-modal-card,
+    .modal-card.rpt-modal-card, .modal-card.rpt-preview-card, .modal-card.sb-confirm-card {
+        width: 100% !important; max-width: 100% !important; min-width: 0 !important;
+        max-height: 92vh !important; margin: 0 !important; overflow-y: auto !important;
+        border-radius: 16px !important; -webkit-overflow-scrolling: touch;
+    }
+    .modal-card .sb-confirm-actions, .modal-footer, .ann-modal-footer, .rpt-modal-footer { grid-template-columns: minmax(0, 1fr) !important; flex-wrap: wrap; gap: 8px; }
+    .modal-footer button, .ann-modal-footer button, .rpt-modal-footer button { flex: 1 1 100%; }
+
+    /* Forms: 16px inputs stop iOS auto-zoom, buttons are finger sized */
+    input, select, textarea { font-size: 16px !important; max-width: 100%; }
+    button, .primary-button, .outline-button, .nav-item { min-height: 40px; }
+    .nav-item { padding-top: 12px; padding-bottom: 12px; }
+
+    /* Long text never pushes the layout wider */
+    h1, h2, h3, p, td, th, strong, small, span, a, label { overflow-wrap: anywhere; }
+}
+
+/* ---------- Very small phones (<= 380px) ---------- */
+@media (max-width: 380px) {
+    .metric-grid, .official-metrics, .compact-metrics, .profile-quick-stats-grid,
+    .wx-three-metrics, .rpt-preview-kpis { grid-template-columns: minmax(0, 1fr) !important; }
+    .wx-hourly-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .topbar-page-title { font-size: 15px; }
+}
+
+/* ---------- Resident portal ---------- */
+@media (max-width: 800px) {
+    .resident-main-shell, .resident-main { min-width: 0; max-width: 100%; }
+    .resident-topbar { position: sticky; top: 0; z-index: 900; padding: 0 10px; gap: 8px; }
+    .resident-sidebar { width: 260px; max-width: 85vw; z-index: 1001; height: 100vh; top: 0; left: 0; }
+    .resident-page-content { padding: 14px 12px 36px !important; }
+    .resident-stat-grid, .resident-weather-grid, .resident-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
+    .resident-page-content table { display: block; max-width: 100%; overflow-x: auto; }
+    .resident-page-content input, .resident-page-content select, .resident-page-content textarea { font-size: 16px; max-width: 100%; }
+}
+@media (max-width: 520px) {
+    .resident-stat-grid, .resident-weather-grid, .resident-metrics { grid-template-columns: minmax(0, 1fr) !important; }
+    .resident-page-content [class*="grid"] { grid-template-columns: minmax(0, 1fr) !important; }
+    .resident-location { display: none; }
+}
