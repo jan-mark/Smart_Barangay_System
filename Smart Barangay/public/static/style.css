@@ -10908,6 +10908,21 @@ html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%
    ========================================================================= */
 @media (max-width: 700px) {
     /* ---- Household Profile modal ---- */
+    #family-modal .modal-card { padding: 16px !important; overflow-x: hidden !important; }
+    .family-profile-hero-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 10px !important;
+        margin-bottom: 14px !important;
+    }
+    .family-profile-hero-grid > div:first-child { padding: 14px !important; gap: 12px !important; }
+    #family-banner-address { white-space: normal !important; overflow: visible !important; text-overflow: unset !important; line-height: 1.35; }
+    #family-banner-stats {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+    #family-banner-stats > div { padding: 10px 6px !important; min-width: 0; }
     .family-bg-header { flex-direction: row; align-items: center; gap: 12px; padding: 14px !important; }
     .family-bg-title { min-width: 0; flex: 1; }
     .family-bg-title h3 { font-size: 19px; }
