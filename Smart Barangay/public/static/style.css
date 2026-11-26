@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    SMARTBARANGAY DESIGN SYSTEM & THEME
    Authentic Philippine Barangay / LGU Visual Identity & Accessible UI
    Colors: Civic Philippine Navy (#0B2545), Sun Gold (#F59E0B), Emerald Green (#10B981)
@@ -10829,20 +10829,52 @@ html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%
     /* Generic tables: keep columns readable and scroll sideways */
     .page-content table th, .page-content table td { min-width: 96px; overflow-wrap: normal; word-break: normal; }
 
-    /* Resident / Officials tables -> one card per person */
+    /* Resident / Officials tables -> organized cards */
     .resident-table, .resident-table tbody { display: block !important; width: 100% !important; overflow: visible !important; }
     .resident-table thead { display: none !important; }
-    .resident-table tr {
-        display: grid !important; grid-template-columns: minmax(0, 1fr) !important;
-        gap: 8px; padding: 14px; margin-bottom: 12px;
-        border: 1px solid #E2E8F0; border-radius: 14px; background: #fff;
+    .resident-table tbody tr {
+        display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px 12px !important; padding: 14px !important; margin: 0 0 12px !important;
+        border: 1px solid rgba(148, 163, 184, .28) !important; border-radius: 16px !important;
+        background: var(--card-bg, #fff); box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
+        align-items: start !important; height: auto !important;
     }
-    .resident-table td {
+    .resident-table tbody td {
         display: block !important; width: auto !important; min-width: 0 !important;
+        height: auto !important; min-height: 0 !important; margin: 0 !important;
         padding: 0 !important; border: 0 !important; text-align: left !important;
         white-space: normal !important; word-break: normal !important; overflow-wrap: break-word !important;
+        font-size: 14px; line-height: 1.35;
     }
-    .resident-table td:last-child { display: flex !important; flex-wrap: wrap; gap: 8px; padding-top: 8px !important; border-top: 1px solid #F1F5F9 !important; }
+    /* small caption above each value */
+    .resident-table tbody td::before {
+        display: block; margin-bottom: 4px; font-size: 10.5px; font-weight: 700;
+        letter-spacing: .06em; text-transform: uppercase; opacity: .6;
+    }
+    /* RESIDENTS: name | household | role | age/sex | sector | status | actions */
+    #resident-rows td:nth-child(1), #resident-rows td:nth-child(2),
+    #resident-rows td:nth-child(5), #resident-rows td:nth-child(7) { grid-column: 1 / -1; }
+    #resident-rows td:nth-child(1) { font-size: 15px; font-weight: 700; }
+    #resident-rows td:nth-child(2)::before { content: "Household"; }
+    #resident-rows td:nth-child(3)::before { content: "Role"; }
+    #resident-rows td:nth-child(4)::before { content: "Age / Sex"; }
+    #resident-rows td:nth-child(5)::before { content: "Sector / Demographic"; }
+    #resident-rows td:nth-child(6)::before { content: "Status"; }
+    #resident-rows td:nth-child(5):empty, #resident-rows td:nth-child(5):has(:empty:only-child) { display: none !important; }
+    /* OFFICIALS: name | position | status | actions */
+    #official-rows td:nth-child(1), #official-rows td:nth-child(4) { grid-column: 1 / -1; }
+    #official-rows td:nth-child(1) { font-size: 15px; font-weight: 700; }
+    #official-rows td:nth-child(2)::before { content: "Position"; }
+    #official-rows td:nth-child(3)::before { content: "Status"; }
+    /* action buttons: full-width row, evenly spaced */
+    #resident-rows td:last-child, #official-rows td:last-child {
+        display: flex !important; flex-wrap: wrap; gap: 8px;
+        padding-top: 12px !important; border-top: 1px solid rgba(148, 163, 184, .22) !important;
+    }
+    #resident-rows td:last-child::before, #official-rows td:last-child::before { display: none; }
+    #resident-rows td:last-child > *, #official-rows td:last-child > * { flex: 1 1 0; min-width: 44px; min-height: 42px; }
+    #resident-rows td:last-child .actions, #official-rows td:last-child .actions,
+    #resident-rows td:last-child > div, #official-rows td:last-child > div { display: flex; gap: 8px; width: 100%; }
 }
 
 /* ---------- Very small phones (<= 380px) ---------- */
@@ -10851,6 +10883,8 @@ html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%
     .wx-three-metrics, .rpt-preview-kpis { grid-template-columns: minmax(0, 1fr) !important; }
     .wx-hourly-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .topbar-page-title { font-size: 15px; }
+    .resident-table tbody tr { grid-template-columns: minmax(0, 1fr) !important; }
+    #resident-rows td, #official-rows td { grid-column: 1 / -1; }
 }
 
 /* ---------- Resident portal ---------- */
