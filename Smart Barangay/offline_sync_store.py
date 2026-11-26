@@ -30,6 +30,9 @@ class OfflineSyncStore:
 
     def __init__(self, db_path: str | None = None) -> None:
         base_dir = os.path.dirname(os.path.abspath(__file__))
+        if os.getenv("VERCEL"):
+            # Vercel's project folder is read-only; /tmp is the only writable place.
+            base_dir = "/tmp"
         self.db_path = db_path or os.path.join(base_dir, "offline_sync.db")
         self._lock = threading.RLock()
         self._init_db()

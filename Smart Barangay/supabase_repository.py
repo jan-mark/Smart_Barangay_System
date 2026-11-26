@@ -123,16 +123,31 @@ class SupabaseRepository:
         if reason:
             self.offline_store.set_meta("last_sync_error", str(reason)[:300])
 
+    @staticmethod
+    def _local_path(filename: str) -> str:
+        src = os.path.join(os.path.dirname(__file__), filename)
+        if not os.getenv("VERCEL"):
+            return src
+        # Read-only deployment folder: keep a writable copy in /tmp.
+        dst = os.path.join("/tmp", filename)
+        try:
+            if not os.path.exists(dst) and os.path.exists(src):
+                import shutil
+                shutil.copyfile(src, dst)
+        except OSError:
+            pass
+        return dst
+
     def _init_local_storage(self) -> None:
-        self._meta_path = os.path.join(os.path.dirname(__file__), "residents_metadata.json")
+        self._meta_path = self._local_path("residents_metadata.json")
         self._resident_meta: dict[str, dict[str, Any]] = self._load_resident_meta()
-        self._doc_meta_path = os.path.join(os.path.dirname(__file__), "documents_metadata.json")
+        self._doc_meta_path = self._local_path("documents_metadata.json")
         self._doc_meta: dict[str, dict[str, Any]] = self._load_doc_meta()
-        self._concern_meta_path = os.path.join(os.path.dirname(__file__), "concerns_metadata.json")
+        self._concern_meta_path = self._local_path("concerns_metadata.json")
         self._concern_meta: dict[str, dict[str, Any]] = self._load_concern_meta()
-        self._ann_meta_path = os.path.join(os.path.dirname(__file__), "announcements_metadata.json")
+        self._ann_meta_path = self._local_path("announcements_metadata.json")
         self._ann_meta: dict[str, dict[str, Any]] = self._load_ann_meta()
-        self._official_meta_path = os.path.join(os.path.dirname(__file__), "officials_metadata.json")
+        self._official_meta_path = self._local_path("officials_metadata.json")
         self._official_meta: dict[str, dict[str, Any]] = self._load_official_meta()
 
     def _load_official_meta(self) -> dict[str, dict[str, Any]]:
