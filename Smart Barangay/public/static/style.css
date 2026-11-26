@@ -10733,7 +10733,29 @@ img, video, canvas { max-width: 100%; }
    RESPONSIVE LAYER v2  (phones, tablets, small laptops)
    Keep this block LAST so it overrides earlier rules.
    ========================================================================= */
-html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+html, body { max-width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; }
+.resident-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-pagination {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 14px 18px; border-top: 1px solid rgba(148, 163, 184, .22);
+    font-size: 13px; color: #475569;
+}
+.table-pagination[hidden] { display: none !important; }
+.table-pagination-left, .table-pagination-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.entries-select-wrap { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; margin: 0; }
+.entries-select-wrap select {
+    height: 34px; padding: 0 8px; border-radius: 8px; border: 1px solid #CBD5E1;
+    background: #FFFFFF; color: #0F172A; font-size: 13px; font-weight: 600; width: auto;
+}
+.pagination-summary, .pagination-page-label { font-size: 12.5px; font-weight: 600; color: #64748B; }
+.pagination-btn { height: 34px !important; min-height: 34px !important; padding: 0 12px !important; font-size: 12.5px !important; border-radius: 8px !important; }
+.pagination-btn:disabled { opacity: .45; cursor: not-allowed; }
+@media (max-width: 700px) {
+    .table-pagination { padding: 12px 4px; flex-direction: column; align-items: stretch; gap: 10px; }
+    .table-pagination-left { justify-content: space-between; }
+    .table-pagination-controls { display: grid; grid-template-columns: 1fr auto 1fr; width: 100%; align-items: center; text-align: center; }
+    .table-pagination-controls .pagination-btn { width: 100%; justify-content: center; height: 38px !important; }
+}
 .app-shell, .main-content, .page-content, .app-view { min-width: 0; max-width: 100%; }
 .page-content img, .page-content svg:not(.lucide), .page-content canvas { max-width: 100%; height: auto; }
 .record-row > *, .metric-card, .card, .panel { min-width: 0; overflow-wrap: break-word; }

@@ -238,6 +238,26 @@
                                 <tbody id="resident-rows"></tbody>
                             </table>
                         </div>
+                        <div class="table-pagination" id="resident-pagination" hidden>
+                            <div class="table-pagination-left">
+                                <label class="entries-select-wrap">
+                                    <span>Show</span>
+                                    <select id="resident-page-size" aria-label="Entries per page">
+                                        <option value="10" selected>10</option>
+                                        <option value="25">25</option>
+                                        <option value="50">50</option>
+                                        <option value="all">All</option>
+                                    </select>
+                                    <span>entries</span>
+                                </label>
+                                <span class="pagination-summary" id="resident-pagination-summary"></span>
+                            </div>
+                            <div class="table-pagination-controls">
+                                <button type="button" class="outline-button pagination-btn" id="resident-prev-page" disabled>&lsaquo; Prev</button>
+                                <span class="pagination-page-label" id="resident-page-label">Page 1 of 1</span>
+                                <button type="button" class="outline-button pagination-btn" id="resident-next-page" disabled>Next &rsaquo;</button>
+                            </div>
+                        </div>
                         <div id="family-cards-wrap" class="family-cards-container" hidden></div>
                     </section>
                 </div>
@@ -6054,12 +6074,21 @@
             }));
         };
 
+        let residentCurrentPage = 1;
+        let residentPageSize = 10;
+        let lastResidentFilterKey = '';
+
         const renderResidents = () => {
             recomputeFamilyKeys();
             const query = (document.querySelector('#resident-search')?.value || '').trim().toLowerCase();
             const status = document.querySelector('#status-filter')?.value || 'all';
             const sector = activeSectorFilter;
             const household = document.querySelector('#household-filter')?.value || 'all';
+            const filterKey = `${query}|${status}|${sector}|${household}`;
+            if (filterKey !== lastResidentFilterKey) {
+                residentCurrentPage = 1;
+                lastResidentFilterKey = filterKey;
+            }
 
             const matchesPersonSector = (person) => {
                 if (sector === 'all') return true;
@@ -6142,8 +6171,31 @@
             if (tableWrap) { tableWrap.hidden = false; tableWrap.style.display = ''; }
             if (familyWrap) { familyWrap.hidden = true; familyWrap.style.display = 'none'; }
 
+            const totalEntries = displayRows.length;
+            const perPage = residentPageSize === 'all' ? Math.max(1, totalEntries) : Number(residentPageSize) || 10;
+            const totalPages = Math.max(1, Math.ceil(totalEntries / perPage));
+            if (residentCurrentPage > totalPages) residentCurrentPage = totalPages;
+            if (residentCurrentPage < 1) residentCurrentPage = 1;
+            const startIdx = (residentCurrentPage - 1) * perPage;
+            const pageRows = residentPageSize === 'all' ? displayRows : displayRows.slice(startIdx, startIdx + perPage);
+
+            const pagBar = document.querySelector('#resident-pagination');
+            if (pagBar) {
+                pagBar.hidden = totalEntries === 0;
+                const sumEl = document.querySelector('#resident-pagination-summary');
+                const labelEl = document.querySelector('#resident-page-label');
+                const prevBtn = document.querySelector('#resident-prev-page');
+                const nextBtn = document.querySelector('#resident-next-page');
+                const shownStart = totalEntries ? startIdx + 1 : 0;
+                const shownEnd = Math.min(startIdx + pageRows.length, totalEntries);
+                if (sumEl) sumEl.textContent = `Showing ${shownStart}–${shownEnd} of ${totalEntries}`;
+                if (labelEl) labelEl.textContent = `Page ${residentCurrentPage} of ${totalPages}`;
+                if (prevBtn) prevBtn.disabled = residentCurrentPage <= 1;
+                if (nextBtn) nextBtn.disabled = residentCurrentPage >= totalPages;
+            }
+
             const rows = document.querySelector('#resident-rows');
-            rows.innerHTML = displayRows.length ? displayRows.map((r) => {
+            rows.innerHTML = pageRows.length ? pageRows.map((r) => {
                     const hhMembers = getHouseholdMembers(r.family_key);
                     const familyName = getFamilyName(hhMembers, r.family_key);
                     const isUnassigned = (!r.family_key || r.family_key === 'UNASSIGNED');
@@ -6212,6 +6264,24 @@
             lucide.createIcons();
             attachResidentActionEvents();
         };
+
+        document.querySelector('#resident-page-size')?.addEventListener('change', (e) => {
+            residentPageSize = e.target.value === 'all' ? 'all' : Number(e.target.value) || 10;
+            residentCurrentPage = 1;
+            renderResidents();
+        });
+        document.querySelector('#resident-prev-page')?.addEventListener('click', () => {
+            if (residentCurrentPage > 1) {
+                residentCurrentPage -= 1;
+                renderResidents();
+                document.querySelector('.resident-table-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+        document.querySelector('#resident-next-page')?.addEventListener('click', () => {
+            residentCurrentPage += 1;
+            renderResidents();
+            document.querySelector('.resident-table-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
 
         const formatResidentFromApi = (r) => {
             const isHead = Boolean(r.is_head || r.household_role === 'Head');
