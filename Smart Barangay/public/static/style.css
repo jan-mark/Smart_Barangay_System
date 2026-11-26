@@ -10829,52 +10829,103 @@ html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%
     /* Generic tables: keep columns readable and scroll sideways */
     .page-content table th, .page-content table td { min-width: 96px; overflow-wrap: normal; word-break: normal; }
 
-    /* Resident / Officials tables -> organized cards */
+    /* Resident / Officials tables -> sleek mobile cards (matching Household Profile) */
     .resident-table, .resident-table tbody { display: block !important; width: 100% !important; overflow: visible !important; }
     .resident-table thead { display: none !important; }
     .resident-table tbody tr {
-        display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        gap: 10px 12px !important; padding: 14px !important; margin: 0 0 12px !important;
+        display: flex !important; flex-wrap: wrap !important; align-items: center !important;
+        gap: 10px 8px !important; padding: 14px !important; margin: 0 0 12px !important;
         border: 1px solid rgba(148, 163, 184, .28) !important; border-radius: 16px !important;
-        background: var(--card-bg, #fff); box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
-        align-items: start !important; height: auto !important;
+        background: var(--card-bg, #FFFFFF); box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
+        height: auto !important;
     }
     .resident-table tbody td {
         display: block !important; width: auto !important; min-width: 0 !important;
         height: auto !important; min-height: 0 !important; margin: 0 !important;
         padding: 0 !important; border: 0 !important; text-align: left !important;
         white-space: normal !important; word-break: normal !important; overflow-wrap: break-word !important;
-        font-size: 14px; line-height: 1.35;
+        font-size: 13.5px; line-height: 1.35;
     }
-    /* small caption above each value */
-    .resident-table tbody td::before {
-        display: block; margin-bottom: 4px; font-size: 10.5px; font-weight: 700;
-        letter-spacing: .06em; text-transform: uppercase; opacity: .6;
+    .resident-table tbody td::before { display: none !important; content: none !important; }
+    .resident-table tbody td.empty-state {
+        flex: 1 1 100% !important; text-align: center !important; padding: 18px 8px !important; border: 0 !important;
     }
-    /* RESIDENTS: name | household | role | age/sex | sector | status | actions */
-    #resident-rows td:nth-child(1), #resident-rows td:nth-child(2),
-    #resident-rows td:nth-child(5), #resident-rows td:nth-child(7) { grid-column: 1 / -1; }
-    #resident-rows td:nth-child(1) { font-size: 15px; font-weight: 700; }
-    #resident-rows td:nth-child(2)::before { content: "Household"; }
-    #resident-rows td:nth-child(3)::before { content: "Role"; }
-    #resident-rows td:nth-child(4)::before { content: "Age / Sex"; }
-    #resident-rows td:nth-child(5)::before { content: "Sector / Demographic"; }
-    #resident-rows td:nth-child(6)::before { content: "Status"; }
-    #resident-rows td:nth-child(5):empty, #resident-rows td:nth-child(5):has(:empty:only-child) { display: none !important; }
-    /* OFFICIALS: name | position | status | actions */
-    #official-rows td:nth-child(1), #official-rows td:nth-child(4) { grid-column: 1 / -1; }
-    #official-rows td:nth-child(1) { font-size: 15px; font-weight: 700; }
-    #official-rows td:nth-child(2)::before { content: "Position"; }
-    #official-rows td:nth-child(3)::before { content: "Status"; }
-    /* action buttons: full-width row, evenly spaced */
-    #resident-rows td:last-child, #official-rows td:last-child {
-        display: flex !important; flex-wrap: wrap; gap: 8px;
-        padding-top: 12px !important; border-top: 1px solid rgba(148, 163, 184, .22) !important;
+
+    /* RESIDENTS: [Name + Status] -> [Household Box] -> [Role · Age/Sex · Sector chips] -> [View | Edit | Archive] */
+    #resident-rows td:nth-child(1) { flex: 1 1 60%; order: 1; }
+    #resident-rows td:nth-child(6) { flex: 0 0 auto; order: 2; align-self: flex-start; }
+    #resident-rows td:nth-child(2) { flex: 1 1 100%; order: 3; }
+    #resident-rows td:nth-child(3) { flex: 0 0 auto; order: 4; }
+    #resident-rows td:nth-child(4) { flex: 0 0 auto; order: 5; }
+    #resident-rows td:nth-child(5) { flex: 0 1 auto; order: 6; display: flex !important; flex-wrap: wrap; gap: 6px; }
+    #resident-rows td:nth-child(5):empty { display: none !important; }
+    #resident-rows td:nth-child(7) { flex: 1 1 100%; order: 7; }
+
+    /* Name cell */
+    #resident-rows .resident-name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    #resident-rows .resident-row-avatar { width: 40px; height: 40px; flex: 0 0 40px; }
+    #resident-rows .resident-name-info { min-width: 0; flex: 1; }
+    #resident-rows .resident-name-link { font-size: 15px; font-weight: 700; text-align: left; padding: 0; }
+    #resident-rows .resident-name-info small { display: block; margin-top: 2px; font-size: 12px; opacity: .75; }
+
+    /* Household clickable pill box */
+    #resident-rows .household-pill {
+        display: flex !important; align-items: center !important; gap: 10px !important;
+        width: 100% !important; padding: 9px 12px !important; margin: 0 !important;
+        background: rgba(59, 130, 246, .06) !important;
+        border: 1px solid rgba(59, 130, 246, .18) !important;
+        border-radius: 11px !important; text-align: left !important; justify-content: flex-start !important;
     }
-    #resident-rows td:last-child::before, #official-rows td:last-child::before { display: none; }
-    #resident-rows td:last-child > *, #official-rows td:last-child > * { flex: 1 1 0; min-width: 44px; min-height: 42px; }
-    #resident-rows td:last-child .actions, #official-rows td:last-child .actions,
-    #resident-rows td:last-child > div, #official-rows td:last-child > div { display: flex; gap: 8px; width: 100%; }
+    #resident-rows .household-cell-icon { flex: 0 0 32px; width: 32px; height: 32px; }
+    #resident-rows .household-cell-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+    #resident-rows .household-cell-text strong { font-size: 13px; line-height: 1.3; }
+    #resident-rows .household-cell-text small { font-size: 11.5px; opacity: .75; }
+
+    /* Age / Sex styled as a clean chip next to Role & Sector */
+    #resident-rows td:nth-child(4) strong {
+        display: inline-flex; align-items: center; padding: 4px 10px;
+        border-radius: 999px; font-size: 12px !important; font-weight: 700 !important;
+        background: rgba(148, 163, 184, .14); border: 1px solid rgba(148, 163, 184, .25);
+    }
+
+    /* OFFICIALS: [Name + Status] -> [Position] -> [Edit | Archive] */
+    #official-rows td:nth-child(1) { flex: 1 1 60%; order: 1; }
+    #official-rows td:nth-child(3) { flex: 0 0 auto; order: 2; align-self: flex-start; }
+    #official-rows td:nth-child(2) { flex: 1 1 100%; order: 3; }
+    #official-rows td:nth-child(4) { flex: 1 1 100%; order: 4; }
+
+    /* Action buttons footer: full-width evenly spaced labeled buttons */
+    #resident-rows td:last-child:not(.empty-state),
+    #official-rows td:last-child:not(.empty-state) {
+        padding-top: 12px !important; margin-top: 2px !important;
+        border-top: 1px solid rgba(148, 163, 184, .22) !important;
+    }
+    #resident-rows .res-row-actions {
+        display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 8px !important; width: 100% !important; justify-content: stretch !important;
+    }
+    #resident-rows .res-action-btn {
+        width: 100% !important; height: 38px !important; padding: 0 8px !important;
+        border-radius: 10px !important; display: inline-flex !important;
+        align-items: center !important; justify-content: center !important; gap: 6px !important;
+        font-size: 12.5px !important; font-weight: 600 !important;
+    }
+    #resident-rows .res-action-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+    #resident-rows .res-action-btn.is-view::after { content: "View"; }
+    #resident-rows .res-action-btn.is-edit::after { content: "Edit"; }
+    #resident-rows .res-action-btn.is-archive::after { content: "Archive"; }
+    #resident-rows .res-action-btn.is-archive.is-inactive::after { content: "Restore"; }
+    #resident-rows .res-action-btn.is-edit { background: rgba(59, 130, 246, .08); border-color: rgba(59, 130, 246, .3); color: #1D4ED8; }
+    #resident-rows .res-action-btn.is-archive { background: rgba(245, 158, 11, .08); border-color: rgba(245, 158, 11, .35); color: #B45309; }
+    #resident-rows .res-action-btn.is-archive.is-inactive { background: rgba(16, 185, 129, .08); border-color: rgba(16, 185, 129, .35); color: #047857; }
+
+    #official-rows .settings-role-actions {
+        display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important; width: 100% !important; justify-content: stretch !important;
+    }
+    #official-rows .settings-link-btn {
+        width: 100% !important; height: 38px !important; justify-content: center !important; border-radius: 10px !important;
+    }
 }
 
 /* ---------- Very small phones (<= 380px) ---------- */
@@ -10883,8 +10934,6 @@ html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%
     .wx-three-metrics, .rpt-preview-kpis { grid-template-columns: minmax(0, 1fr) !important; }
     .wx-hourly-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .topbar-page-title { font-size: 15px; }
-    .resident-table tbody tr { grid-template-columns: minmax(0, 1fr) !important; }
-    #resident-rows td, #official-rows td { grid-column: 1 / -1; }
 }
 
 /* ---------- Resident portal ---------- */
