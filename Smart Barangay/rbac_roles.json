@@ -43,6 +43,7 @@
     "name": "Population Collector",
     "description": "Collects and Register Residents",
     "modules": [
+      "Dashboard",
       "Residents"
     ]
   }

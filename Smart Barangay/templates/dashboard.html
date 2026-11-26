@@ -10,12 +10,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body class="{% if official_mode %}official-mode{% endif %}" data-dashboard-role="{{ dashboard_role }}" data-dashboard-department="{{ dashboard_department or '' }}">
+<body data-dashboard-role="{{ dashboard_role }}" data-dashboard-department="{{ dashboard_department or '' }}">
     <div class="app-shell">
         <aside class="sidebar" id="sidebar">
             <div class="brand">
                 <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" type="button" aria-label="Toggle sidebar" aria-controls="sidebar" aria-expanded="true" title="Collapse sidebar">
-                    <i data-lucide="chevrons-left"></i>
+                    <svg class="sidebar-icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect width="18" height="18" x="3" y="3" rx="2.5"></rect>
+                        <path d="M9 3v18"></path>
+                        <path d="m16 15-3-3 3-3"></path>
+                    </svg>
+                    <svg class="sidebar-icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect width="18" height="18" x="3" y="3" rx="2.5"></rect>
+                        <path d="M9 3v18"></path>
+                        <path d="m14 9 3 3-3 3"></path>
+                    </svg>
                 </button>
                 <img src="{{ url_for('static', filename='municipality_logo.png') }}?v=2" alt="SmartBarangay Logo" class="brand-seal">
                 <div>
@@ -101,7 +110,7 @@
             </header>
 
             <div class="page-content">
-                <div id="dashboard-view"{% if official_mode %} hidden{% endif %}>
+                <div id="dashboard-view">
                 <section class="page-heading">
                     <div>
                         <h1 id="dashboard-title">Dashboard</h1>
@@ -179,7 +188,7 @@
                     </section>
                 </div>
 
-                <div id="official-dashboard-view"{% if not official_mode %} hidden{% endif %}><section class="page-heading official-heading"><div><h1 id="official-dashboard-title">Department Dashboard</h1><p id="official-dashboard-subtitle">Welcome, department official</p></div><div class="sync"><i data-lucide="activity"></i> Live sync: <time id="official-sync-time"></time></div></section><section class="department-banner"><i data-lucide="users-round"></i><div><strong id="official-department-label">Department</strong><p>Your dashboard is filtered to department-related records and concerns.</p></div></section><section class="resident-metrics official-metrics"><article class="metric-card"><div class="metric-label">OPEN CONCERNS <i data-lucide="message-square"></i></div><strong id="official-open-concerns">0</strong></article><article class="metric-card"><div class="metric-label">PENDING DOCS <i data-lucide="file-text"></i></div><strong id="official-pending-docs">0</strong></article><article class="metric-card"><div class="metric-label">RESOLVED (<span id="official-resolved-month"></span>) <i data-lucide="circle-check"></i></div><strong id="official-resolved">0</strong></article><article class="metric-card"><div class="metric-label">DEPT. RESIDENTS <i data-lucide="users-round"></i></div><strong id="official-residents">0</strong></article></section><section class="data-panel department-panel"><h2><i data-lucide="message-square"></i> Department Concerns</h2><div class="record-list" id="official-concerns-list"></div></section><section class="data-panel department-panel"><h2><i data-lucide="file-text"></i> Department Document Requests</h2><div class="record-list" id="official-documents-list"></div></section></div>
+                <div id="official-dashboard-view" hidden><section class="page-heading official-heading"><div><h1 id="official-dashboard-title">Department Dashboard</h1><p id="official-dashboard-subtitle">Welcome, department official</p></div><div class="sync"><i data-lucide="activity"></i> Live sync: <time id="official-sync-time"></time></div></section><section class="department-banner"><i data-lucide="users-round"></i><div><strong id="official-department-label">Department</strong><p>Your dashboard is filtered to department-related records and concerns.</p></div></section><section class="resident-metrics official-metrics"><article class="metric-card"><div class="metric-label">OPEN CONCERNS <i data-lucide="message-square"></i></div><strong id="official-open-concerns">0</strong></article><article class="metric-card"><div class="metric-label">PENDING DOCS <i data-lucide="file-text"></i></div><strong id="official-pending-docs">0</strong></article><article class="metric-card"><div class="metric-label">RESOLVED (<span id="official-resolved-month"></span>) <i data-lucide="circle-check"></i></div><strong id="official-resolved">0</strong></article><article class="metric-card"><div class="metric-label">DEPT. RESIDENTS <i data-lucide="users-round"></i></div><strong id="official-residents">0</strong></article></section><section class="data-panel department-panel"><h2><i data-lucide="message-square"></i> Department Concerns</h2><div class="record-list" id="official-concerns-list"></div></section><section class="data-panel department-panel"><h2><i data-lucide="file-text"></i> Department Document Requests</h2><div class="record-list" id="official-documents-list"></div></section></div>
 
                 <div id="residents-view" hidden>
                     <section class="page-heading residents-heading"><div><h1>Resident Management</h1><p>Manage, categorize, and verify resident profiles, households, and family sectors</p></div><button class="primary-button" type="button" id="add-resident"><i data-lucide="user-plus"></i> Add Resident</button></section>
@@ -231,7 +240,38 @@
 
                 <div class="app-view" id="documents-view" hidden><section class="page-heading"><div><h1>Document Processing</h1><p>Certificate issuance, payment verification, and remote digital document release</p></div></section><section class="metric-grid compact-metrics"><article class="metric-card"><div class="metric-label">ALL REQUESTS</div><strong id="documents-total">0</strong></article><article class="metric-card"><div class="metric-label">APPROVED</div><strong id="documents-approved">0</strong></article><article class="metric-card"><div class="metric-label">REJECTED</div><strong id="documents-rejected">0</strong></article></section><section class="data-panel"><div class="filter-tabs" data-filter-target="documents"><button class="current" data-filter="all">All</button><button data-filter="Approved">Approved</button><button data-filter="Rejected">Rejected</button><input placeholder="Search..." data-search="documents"></div><div class="doc-table-head"><span>RESIDENT</span><span>DOCUMENT TYPE</span><span>DATE REQUESTED</span><span>STATUS</span><span>PROCESSED BY</span><span class="doc-head-actions">ACTIONS</span></div><div class="record-list" id="documents-list"></div></section></div>
 
-                <div class="app-view" id="concerns-view" hidden><section class="page-heading"><div><h1>Community Concerns</h1><p>Click a concern title to view its full details</p></div></section><div class="filter-tabs" data-filter-target="concerns"><button class="current" data-filter="all">All</button></div><div class="record-list concern-list" id="concerns-list"></div></div>
+                <div class="app-view" id="concerns-view" hidden>
+                    <section class="page-heading">
+                        <div>
+                            <h1>Concerns</h1>
+                            <p>View submitted community concerns</p>
+                        </div>
+                    </section>
+                    <div class="filter-tabs concern-filter-bar" data-filter-target="concerns">
+                        <button class="current concern-all-pill" data-filter="all" type="button" id="concerns-all-btn">All (<span id="concerns-total-count">0</span>)</button>
+                        <div class="concern-date-filters">
+                            <select id="concerns-month-filter" class="concern-mini-select" aria-label="Filter concerns by month">
+                                <option value="all">All Months</option>
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                            <select id="concerns-year-filter" class="concern-mini-select" aria-label="Filter concerns by year">
+                                <option value="all">All Years</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="record-list concern-list concern-grid-2col" id="concerns-list"></div>
+                </div>
 
                 <div class="app-view" id="announcements-view" hidden>
                     <div class="ann-header-row">
@@ -360,7 +400,7 @@
                                 <span class="rpt-card-icon"><i data-lucide="file-text"></i></span>
                                 <div class="rpt-card-text">
                                     <h3>Document Issuance Summary</h3>
-                                    <p>Clearances, certificates and IDs issued</p>
+                                    <p>Clearances and certificates issued</p>
                                 </div>
                             </div>
                             <button class="rpt-gen-btn" type="button" data-open-report="documents">Generate</button>
@@ -370,7 +410,7 @@
                                 <span class="rpt-card-icon"><i data-lucide="clipboard-list"></i></span>
                                 <div class="rpt-card-text">
                                     <h3>Community Concerns Monitoring</h3>
-                                    <p>Monthly concerns by status</p>
+                                    <p>Submitted concerns by month and year</p>
                                 </div>
                             </div>
                             <button class="rpt-gen-btn" type="button" data-open-report="concerns">Generate</button>
@@ -1498,16 +1538,19 @@
                     </select>
                 </div>
                 <div class="rpt-field">
-                    <label>Group</label>
+                    <label>Sector</label>
                     <div class="rpt-chip-group" data-chip-group="res-groups">
-                        <button type="button" class="rpt-chip active" data-val="all">All</button>
-                        <button type="button" class="rpt-chip" data-val="minors">Minors 0-17</button>
-                        <button type="button" class="rpt-chip" data-val="adults">Adults 18-59</button>
-                        <button type="button" class="rpt-chip" data-val="seniors">Seniors 60+</button>
+                        <button type="button" class="rpt-chip active" data-val="all">All Sectors</button>
+                        <button type="button" class="rpt-chip" data-val="leader">Household Heads</button>
+                        <button type="button" class="rpt-chip" data-val="kids">Kids / Minors (0-17)</button>
+                        <button type="button" class="rpt-chip" data-val="adults">Adults (18-59)</button>
+                        <button type="button" class="rpt-chip" data-val="seniors">Senior Citizen (60+)</button>
                         <button type="button" class="rpt-chip" data-val="pwd">PWD</button>
-                        <button type="button" class="rpt-chip" data-val="4ps">4Ps</button>
+                        <button type="button" class="rpt-chip" data-val="lgbt">LGBT</button>
                         <button type="button" class="rpt-chip" data-val="solo_parent">Solo Parent</button>
-                        <button type="button" class="rpt-chip" data-val="indigenous">Indigenous</button>
+                        <button type="button" class="rpt-chip" data-val="pregnant">Pregnant</button>
+                        <button type="button" class="rpt-chip" data-val="young_parent">Young Parent (13-19 yrs. old)</button>
+                        <button type="button" class="rpt-chip" data-val="4ps">4Ps Beneficiary</button>
                     </div>
                 </div>
                 <div class="rpt-field">
@@ -1570,7 +1613,6 @@
                         <button type="button" class="rpt-chip" data-val="Certificate of Residency">Certificate of Residency</button>
                         <button type="button" class="rpt-chip" data-val="Certificate of Indigency">Certificate of Indigency</button>
                         <button type="button" class="rpt-chip" data-val="Business Clearance">Business Clearance</button>
-                        <button type="button" class="rpt-chip" data-val="Barangay ID">Barangay ID</button>
                     </div>
                 </div>
                 <div class="rpt-field">
@@ -1626,16 +1668,6 @@
                             <option value="2025">2025</option>
                             <option value="2024">2024</option>
                         </select>
-                    </div>
-                </div>
-                <div class="rpt-field">
-                    <label>Status</label>
-                    <div class="rpt-chip-group" data-chip-group="con-statuses">
-                        <button type="button" class="rpt-chip active" data-val="all">All</button>
-                        <button type="button" class="rpt-chip" data-val="Open">Open</button>
-                        <button type="button" class="rpt-chip" data-val="In Progress">In Progress</button>
-                        <button type="button" class="rpt-chip" data-val="Escalated">Escalated</button>
-                        <button type="button" class="rpt-chip" data-val="Resolved">Resolved</button>
                     </div>
                 </div>
                 <div class="rpt-field">
@@ -1832,12 +1864,11 @@
                         <input name="full_name" required placeholder="e.g. Dr. Maria Santos" autocomplete="off">
                     </label>
                     <label>Position
-                        <input name="position" list="official-position-suggestions" required placeholder="e.g. Barangay Secretary, Barangay Kagawad" autocomplete="off">
+                        <input name="position" list="official-position-suggestions" required placeholder="e.g. Barangay Secretary, Barangay Officials, Population Collector" autocomplete="off">
                         <datalist id="official-position-suggestions">
                             <option value="Barangay Secretary"></option>
-                            <option value="Barangay Kagawad"></option>
-                            <option value="Barangay Treasurer"></option>
-                            <option value="SK Chairperson"></option>
+                            <option value="Barangay Officials"></option>
+                            <option value="Population Collector"></option>
                         </datalist>
                     </label>
                     <label>Email Address
@@ -1976,7 +2007,7 @@
             const phone = u.phone || 'Not provided';
             const roleLabel = currentRole === 'super_admin'
                 ? 'Super Admin (Barangay Captain)'
-                : (currentRole === 'admin' ? 'Admin (Barangay Secretary)' : 'Authorized Official');
+                : (u.position || 'Barangay Official');
             const department = u.department || u.position || 'Barangay Office';
             const username = u.username || (email.includes('@') ? email.split('@')[0] : 'admin');
             const createdText = formatProfileDate(u.created_at, 'January 15, 2025');
@@ -2071,12 +2102,11 @@
             const matchedRoleName = result.matched_role && result.matched_role.name ? result.matched_role.name : '';
             const roleDisplayLabel = currentRole === 'super_admin'
                 ? (result.user.position || 'Super Admin · Barangay Captain')
-                : (result.user.position || matchedRoleName || (currentRole === 'admin' ? 'Barangay Secretary' : 'Barangay Official'));
+                : (result.user.position || matchedRoleName || 'Barangay Official');
             document.querySelector('.profile small').textContent = roleDisplayLabel;
             document.querySelector('#profile-form [name="full_name"]').value = result.user.full_name || '';
             document.querySelector('#profile-form [name="position"]').value = result.user.position || '';
             document.querySelector('#profile-form [name="phone"]').value = result.user.phone || '';
-            const isOfficial = currentRole === 'barangay_official';
             const dashTitleText = 'Dashboard';
             const dashTitleEl = document.querySelector('#dashboard-title');
             if (dashTitleEl) dashTitleEl.textContent = dashTitleText;
@@ -2085,7 +2115,7 @@
                 const topbarTitleEl = document.querySelector('#topbar-page-title');
                 if (topbarTitleEl) topbarTitleEl.textContent = dashTitleText;
             }
-            document.querySelector('#dashboard-subtitle').textContent = isOfficial ? `${result.user.department || 'Department'} · Barangay Don Felipe Larrazabal · Ormoc City, Leyte` : 'All barangay systems · Don Felipe Larrazabal · Ormoc City, Leyte';
+            document.querySelector('#dashboard-subtitle').textContent = 'Barangay Don Felipe Larrazabal · Ormoc City, Leyte';
             const reviewAlertsBtn = document.querySelector('[data-action="review-alerts"]');
             if (reviewAlertsBtn) reviewAlertsBtn.hidden = !allowedAccessSet.has('Concerns');
             const securitySettingsCard = document.querySelector('#settings-home .setting-card[data-setting="security"]');
@@ -2095,11 +2125,9 @@
                 document.querySelector('#official-dashboard-view').hidden = true;
                 const firstAllowedNav = document.querySelector('.nav-item[data-section]:not([hidden])');
                 if (firstAllowedNav) firstAllowedNav.click();
-            } else if (isOfficial) {
-                const resSpan = document.querySelector('.nav-item[data-section="Residents"] span');
-                if (resSpan) resSpan.textContent = 'Residents';
-                document.querySelector('#dashboard-view').hidden = true;
-                document.querySelector('#official-dashboard-view').hidden = false;
+            } else {
+                document.querySelector('#dashboard-view').hidden = false;
+                document.querySelector('#official-dashboard-view').hidden = true;
             }
             if (allowedAccessSet.has('Manage Officials') && typeof loadOfficials === 'function') {
                 loadOfficials();
@@ -2115,27 +2143,8 @@
         applyRoleAccess();
 
         const loadOfficialDashboard = async () => {
-            if (currentRole !== 'barangay_official') return;
-            const department = document.body.dataset.dashboardDepartment || 'Department';
-            const [concernsResponse, documentsResponse, residentsResponse] = await Promise.all([fetch('/api/concerns'), fetch('/api/documents'), fetch('/api/residents')]);
-            const concerns = concernsResponse.ok ? (await concernsResponse.json()).data || [] : [];
-            const documents = documentsResponse.ok ? (await documentsResponse.json()).data || [] : [];
-            const residents = residentsResponse.ok ? (await residentsResponse.json()).data || [] : [];
-            document.querySelector('#official-dashboard-title').textContent = department;
-            document.querySelector('#official-dashboard-subtitle').textContent = `Welcome, ${document.querySelector('.profile strong').textContent} · ${department}`;
-            document.querySelector('#official-department-label').textContent = `${department} Department`;
-            document.querySelector('#official-open-concerns').textContent = concerns.filter((item) => !['Resolved'].includes(item.status)).length;
-            document.querySelector('#official-pending-docs').textContent = documents.filter((item) => ['Pending', 'In Progress', 'Processing'].includes(item.status)).length;
-            document.querySelector('#official-resolved').textContent = concerns.filter((item) => item.status === 'Resolved').length;
-            const activeOfficialResidents = residents.filter((item) => String(item.status || '').trim().toLowerCase() !== 'inactive');
-            document.querySelector('#official-residents').textContent = activeOfficialResidents.length;
-            document.querySelector('#official-concerns-list').innerHTML = concerns.length ? concerns.slice(0, 6).map((item) => `<div class="department-row"><div><strong>${escapeHtml(item.title)}</strong><small>By ${escapeHtml(item.submitted_by)} · ${escapeHtml(smartBarangayTime.formatDate(item.submitted_at))}</small></div><span class="tag priority-${String(item.priority || '').toLowerCase()}">${escapeHtml(item.priority)}</span><em class="status ${String(item.status || 'Pending').toLowerCase().replaceAll(' ', '-')}">${escapeHtml(item.status)}</em><button class="status-edit" data-kind="concern" data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(item.status || 'Pending')}" type="button">Edit status</button></div>`).join('') : '<div class="empty-state">No concerns for this department.</div>';
-            document.querySelector('#official-documents-list').innerHTML = documents.length ? documents.slice(0, 6).map((item) => {
-                const status = String(item.status || 'Pending');
-                const readyForDownload = ['Approved', 'Resolved'].includes(status);
-                const statusBadgeLabel = readyForDownload ? 'Paid & Approved' : status;
-                return `<div class="department-row"><div><strong>${escapeHtml(item.document_type)}</strong><small>${escapeHtml(item.resident_name)} · ${escapeHtml(smartBarangayTime.formatDate(item.date_requested))}</small></div><em class="status ${readyForDownload ? 'approved' : status.toLowerCase().replaceAll(' ', '-')}">${escapeHtml(statusBadgeLabel)}</em><button class="status-edit" data-kind="document" data-id="${escapeHtml(item.id)}" data-status="${escapeHtml(status)}" type="button">${readyForDownload ? 'View Document' : 'View & Verify'}</button>${!readyForDownload && status !== 'Rejected' ? `<button class="primary-button quick-approve-doc" data-id="${escapeHtml(item.id)}" type="button" style="padding: 6px 10px; font-size: 12px; background: #059669;">✓ Paid & Approve</button>` : `<button class="outline-button certificate-download" data-id="${escapeHtml(item.id)}" type="button" ${readyForDownload ? '' : 'disabled'}>${readyForDownload ? 'Download PDF' : 'Rejected'}</button>`}</div>`;
-            }).join('') : '<div class="empty-state">No document requests for this department.</div>';
+            // Unified Dashboard: all users share the main Admin Dashboard (#dashboard-view)
+            return;
         };
 
         let officialsData = [];
@@ -2690,9 +2699,78 @@
             if (rec) openConcernDetailModal(rec);
         });
 
-        const renderConcernRecord = (record) => {
-            return `<article class="concern-row concern-title-card" role="button" tabindex="0" data-concern-id="${escapeHtml(record.id)}"><h3 class="concern-title-only">${escapeHtml(record.title || 'Untitled Concern')}</h3><i data-lucide="chevron-right" class="concern-title-chevron"></i></article>`;
+        const concernAccentForRecord = (record, idx = 0) => {
+            const cat = String(record.category || '').toLowerCase();
+            if (cat.includes('infra') || cat.includes('light') || cat.includes('road')) return 'accent-purple';
+            if (cat.includes('social') || cat.includes('food')) return 'accent-green';
+            if (cat.includes('health') || cat.includes('sanit')) return 'accent-blue';
+            if (cat.includes('peace') || cat.includes('noise') || cat.includes('order')) return 'accent-teal';
+            if (cat.includes('emerg') || cat.includes('hazard') || cat.includes('flood')) return 'accent-coral';
+            const cycle = ['accent-blue', 'accent-purple', 'accent-green', 'accent-coral', 'accent-amber', 'accent-teal'];
+            return cycle[idx % cycle.length];
         };
+
+        const renderConcernRecord = (record, idx = 0) => {
+            const accent = concernAccentForRecord(record, idx);
+            const author = String(record.submitted_by || 'Resident').trim();
+            const dateStr = record.submitted_at ? smartBarangayTime.formatDate(record.submitted_at) : '';
+            const metaHtml = `<span class="concern-meta-author">${escapeHtml(author)}</span>${dateStr ? `<span class="concern-meta-date">${escapeHtml(dateStr)}</span>` : ''}`;
+            return `<article class="concern-row concern-title-card ${accent}" role="button" tabindex="0" data-concern-id="${escapeHtml(record.id)}"><div class="concern-card-copy"><h3 class="concern-title-only">${escapeHtml(record.title || 'Untitled Concern')}</h3><div class="concern-card-meta">${metaHtml}</div></div><i data-lucide="chevron-right" class="concern-title-chevron"></i></article>`;
+        };
+        const getConcernDateParts = (record) => {
+            const raw = record?.submitted_at || record?.created_at || '';
+            if (!raw) return null;
+            const d = new Date(raw);
+            if (!Number.isNaN(d.getTime())) {
+                return { month: d.getMonth() + 1, year: d.getFullYear() };
+            }
+            const m = String(raw).match(/^(\d{4})-(\d{2})/);
+            if (m) return { year: Number(m[1]), month: Number(m[2]) };
+            return null;
+        };
+
+        const populateConcernYearOptions = (records) => {
+            const yearSel = document.querySelector('#concerns-year-filter');
+            if (!yearSel) return;
+            const prevVal = yearSel.value || 'all';
+            const years = new Set([new Date().getFullYear()]);
+            (records || []).forEach((rec) => {
+                const parts = getConcernDateParts(rec);
+                if (parts && parts.year) years.add(parts.year);
+            });
+            const sortedYears = Array.from(years).sort((a, b) => b - a);
+            yearSel.innerHTML = `<option value="all">All Years</option>${sortedYears.map((y) => `<option value="${y}">${y}</option>`).join('')}`;
+            if (Array.from(yearSel.options).some((opt) => opt.value === prevVal)) {
+                yearSel.value = prevVal;
+            }
+        };
+
+        const renderFilteredConcerns = () => {
+            const records = pageData.Concerns || [];
+            const monthVal = document.querySelector('#concerns-month-filter')?.value || 'all';
+            const yearVal = document.querySelector('#concerns-year-filter')?.value || 'all';
+            const visible = records.filter((rec) => {
+                if (monthVal === 'all' && yearVal === 'all') return true;
+                const parts = getConcernDateParts(rec);
+                if (!parts) return false;
+                if (monthVal !== 'all' && parts.month !== Number(monthVal)) return false;
+                if (yearVal !== 'all' && parts.year !== Number(yearVal)) return false;
+                return true;
+            });
+            const countEl = document.querySelector('#concerns-total-count');
+            if (countEl) countEl.textContent = String(visible.length);
+            const listEl = document.querySelector('#concerns-list');
+            if (listEl) {
+                listEl.innerHTML = visible.length
+                    ? visible.map((rec, i) => renderConcernRecord(rec, i)).join('')
+                    : '<div class="empty-state" style="grid-column: 1 / -1;">No concerns found for the selected month/year.</div>';
+            }
+            lucide.createIcons();
+        };
+
+        document.querySelector('#concerns-month-filter')?.addEventListener('change', renderFilteredConcerns);
+        document.querySelector('#concerns-year-filter')?.addEventListener('change', renderFilteredConcerns);
+
         const renderPageData = (section) => {
             const records = pageData[section] || [];
             if (section === 'Documents') {
@@ -2706,8 +2784,8 @@
                 document.querySelector('#documents-list').innerHTML = visibleDocs.length ? visibleDocs.map(renderDocumentRecord).join('') : '<div class="empty-state">No matching document requests.</div>';
             }
             if (section === 'Concerns') {
-                document.querySelector('#concerns-list').innerHTML = records.length ? records.map(renderConcernRecord).join('') : '<div class="empty-state">No concerns found.</div>';
-                lucide.createIcons();
+                populateConcernYearOptions(records);
+                renderFilteredConcerns();
             }
             if (section === 'Announcements') renderAnnouncementsList(records);
             if (section === 'Weather & Alerts' && typeof renderWeatherAlertsPanel === 'function') { renderWeatherAlertsPanel(records); }
@@ -2718,7 +2796,13 @@
             const section = tabs.dataset.filterTarget === 'documents' ? 'Documents' : 'Concerns';
             const records = pageData[section] || []; const filter = button.dataset.filter;
             if (section === 'Documents') document.querySelector('#documents-list').innerHTML = records.filter((record) => filter === 'all' || getEffectiveDocStatus(record) === filter).map(renderDocumentRecord).join('') || '<div class="empty-state">No matching document requests.</div>';
-            if (section === 'Concerns') document.querySelector('#concerns-list').innerHTML = records.filter((record) => filter === 'all' || record.status === filter).map(renderConcernRecord).join('') || '<div class="empty-state">No matching concerns.</div>';
+            if (section === 'Concerns') {
+                const mSel = document.querySelector('#concerns-month-filter');
+                const ySel = document.querySelector('#concerns-year-filter');
+                if (mSel) mSel.value = 'all';
+                if (ySel) ySel.value = 'all';
+                renderFilteredConcerns();
+            }
         })));
         document.querySelectorAll('input[data-search="documents"]').forEach((input) => input.addEventListener('input', () => {
             const query = input.value.toLowerCase();
@@ -4280,7 +4364,6 @@
             }
             params.set('month', document.querySelector('#rpt-con-month')?.value || 'all');
             params.set('year', document.querySelector('#rpt-con-year')?.value || 'all');
-            params.set('statuses', getSelectedChips('con-statuses').join(','));
             const fmt = document.querySelector('input[name="rpt-con-format"]:checked')?.value || 'pdf';
             return { params, format: fmt };
         };
@@ -4559,7 +4642,7 @@
             { key: 'Settings', label: 'Settings', desc: 'System config & backups', icon: 'settings' }
         ];
         const ALL_RBAC_MODULE_KEYS = RBAC_MODULES.map((m) => m.key);
-        const RBAC_STORAGE_KEY = 'smartbarangay_rbac_roles_v1';
+        const RBAC_STORAGE_KEY = 'smartbarangay_rbac_roles_v3';
         const defaultRbacRoles = [
             {
                 id: 'super-admin',
@@ -4571,7 +4654,7 @@
                 id: 'admin',
                 name: 'Barangay Secretary',
                 description: 'Manage residents, documents, concerns & reports',
-                modules: ['Dashboard', 'Residents', 'Documents', 'Concerns', 'Announcements', 'Weather & Alerts', 'Reports']
+                modules: ['Dashboard', 'Residents', 'Documents', 'Reports', 'Settings']
             },
             {
                 id: 'barangay-official',
@@ -4605,11 +4688,15 @@
         const syncOfficialPositionSuggestions = () => {
             const listEl = document.querySelector('#official-position-suggestions');
             if (!listEl) return;
-            const suggestions = new Set(['Barangay Secretary', 'Barangay Kagawad', 'Barangay Treasurer', 'SK Chairperson']);
+            const suggestions = new Set();
             rbacRoles.forEach((r) => {
                 if (r.id === 'super-admin') return;
                 if (r.name && r.name.trim()) suggestions.add(r.name.trim());
             });
+            if (!suggestions.size) {
+                suggestions.add('Barangay Secretary');
+                suggestions.add('Barangay Officials');
+            }
             listEl.innerHTML = Array.from(suggestions).map((s) => `<option value="${escapeHtml(s)}"></option>`).join('');
         };
         const saveRbacRoles = async () => {
@@ -6230,9 +6317,8 @@
             const breadcrumbLabel = topbarSectionTitles[section] || section;
             syncTopbarForSection(section, breadcrumbLabel);
             const selectedView = navigationViews[section];
-            const roleSelectedView = currentRole === 'barangay_official' && selectedView === 'dashboard-view' ? 'official-dashboard-view' : selectedView;
-            document.querySelectorAll('.app-view, #dashboard-view, #official-dashboard-view, #residents-view').forEach((view) => { view.hidden = view.id !== roleSelectedView; });
-            if (section === 'Dashboard') { loadDashboard(); loadOfficialDashboard(); }
+            document.querySelectorAll('.app-view, #dashboard-view, #official-dashboard-view, #residents-view').forEach((view) => { view.hidden = view.id !== selectedView; });
+            if (section === 'Dashboard') { loadDashboard(); }
             if (section === 'Residents') loadResidents();
             if (section === 'Manage Officials') loadOfficials();
             if (section === 'Profile') { renderAdminProfileView(); lucide.createIcons(); }
@@ -7334,6 +7420,11 @@
                     delete pageData.Concerns;
                     await loadPageData('Concerns');
                 }
+                const mSel = document.querySelector('#concerns-month-filter');
+                const ySel = document.querySelector('#concerns-year-filter');
+                if (mSel) mSel.value = 'all';
+                if (ySel) ySel.value = 'all';
+                renderFilteredConcerns();
                 const card = document.querySelector(`.concern-row[data-concern-id="${CSS.escape(String(item.recordId))}"]`);
                 highlightElementTemporarily(card);
                 const rec = (pageData.Concerns || []).find((c) => String(c.id) === String(item.recordId)) || item.raw;

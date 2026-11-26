@@ -79,7 +79,7 @@ DEFAULT_RBAC_ROLES = [
         "id": "admin",
         "name": "Barangay Secretary",
         "description": "Manage residents, documents, concerns & reports",
-        "modules": ["Dashboard", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports"],
+        "modules": ["Dashboard", "Residents", "Documents", "Reports", "Settings"],
     },
     {
         "id": "barangay-official",
@@ -91,7 +91,7 @@ DEFAULT_RBAC_ROLES = [
 
 ROLE_ACCESS = {
     "super_admin": set(ALL_RBAC_MODULES),
-    "admin": {"Dashboard", "Residents", "Documents", "Concerns", "Announcements", "Weather & Alerts", "Reports"},
+    "admin": {"Dashboard", "Residents", "Documents", "Reports", "Settings"},
     "barangay_official": {"Dashboard", "Residents", "Documents", "Concerns"},
     "official": {"Dashboard", "Residents", "Documents", "Concerns"},
 }
@@ -209,11 +209,9 @@ def server_data_unavailable():
 
 
 def current_department_categories(user: dict | None) -> set[str] | None:
-    if user and user.get("role") == "barangay_official":
-        return DEPARTMENT_CATEGORIES.get(user.get("department"))
     return None
 
-    
+
 def current_user() -> dict | None:
     user = session.get("user")
     if not user:
@@ -453,7 +451,7 @@ def home():
         "dashboard.html",
         dashboard_role=user.get("role"),
         dashboard_department=user.get("department"),
-        official_mode=user.get("role") == "barangay_official",
+        official_mode=False,
     )
 
 
@@ -928,50 +926,105 @@ def download_report(report_name: str):
 
             filtered = []
             for r in all_rows:
+                if str(r.get("status") or "").strip().lower() == "inactive":
+                    continue
                 if not _matches_report_period(r.get("resident_since") or r.get("created_at"), period):
                     continue
                 if purok and purok.lower() != "all":
                     addr = str(r.get("address") or "").lower()
                     if purok.lower() not in addr:
                         continue
+                try:
+                    age_num = int(r.get("age") or 0)
+                except (TypeError, ValueError):
+                    age_num = 0
+                sec = str(r.get("sector") or "").lower()
+                is_head = bool(r.get("is_head")) or str(r.get("household_role") or "").strip().lower() == "head"
+                is_senior = age_num >= 60 or bool(r.get("is_senior")) or "senior" in sec
+                is_pwd = bool(r.get("is_pwd")) or "pwd" in sec
+                is_lgbt = bool(r.get("is_lgbt")) or "lgbt" in sec
+                is_solo_parent = bool(r.get("is_solo_parent")) or "solo parent" in sec
+                is_pregnant = bool(r.get("is_pregnant")) or "pregnant" in sec
+                is_young_parent = bool(r.get("is_young_parent")) or "young parent" in sec
+                is_4ps = bool(r.get("is_4ps")) or "4ps" in sec
+
                 if not use_all_groups:
-                    try:
-                        age_num = int(r.get("age") or 0)
-                    except (TypeError, ValueError):
-                        age_num = 0
-                    sec = str(r.get("sector") or "").lower()
                     matched_group = False
-                    if "minors" in groups_raw and 0 <= age_num <= 17:
+                    if "leader" in groups_raw and is_head:
+                        matched_group = True
+                    if ("kids" in groups_raw or "minors" in groups_raw) and 0 <= age_num <= 17:
                         matched_group = True
                     if "adults" in groups_raw and 18 <= age_num <= 59:
                         matched_group = True
-                    if "seniors" in groups_raw and (age_num >= 60 or bool(r.get("is_senior")) or "senior" in sec):
+                    if "seniors" in groups_raw and is_senior:
                         matched_group = True
-                    if "pwd" in groups_raw and (bool(r.get("is_pwd")) or "pwd" in sec):
+                    if "pwd" in groups_raw and is_pwd:
                         matched_group = True
-                    if "4ps" in groups_raw and (bool(r.get("is_4ps")) or "4ps" in sec):
+                    if "lgbt" in groups_raw and is_lgbt:
                         matched_group = True
-                    if "solo_parent" in groups_raw and (bool(r.get("is_solo_parent")) or "solo parent" in sec):
+                    if "solo_parent" in groups_raw and is_solo_parent:
                         matched_group = True
-                    if "indigenous" in groups_raw and ("indigenous" in sec or "ip" in sec.split()):
+                    if "pregnant" in groups_raw and is_pregnant:
+                        matched_group = True
+                    if "young_parent" in groups_raw and is_young_parent:
+                        matched_group = True
+                    if "4ps" in groups_raw and is_4ps:
                         matched_group = True
                     if not matched_group:
                         continue
-                filtered.append(r)
 
+                sector_tags = []
+                if is_head:
+                    sector_tags.append("Household Head")
+                if age_num < 18:
+                    sector_tags.append("Kids / Minors (0-17)")
+                elif is_senior:
+                    sector_tags.append("Senior Citizen (60+)")
+                else:
+                    sector_tags.append("Adults (18-59)")
+                if is_pwd:
+                    sector_tags.append("PWD")
+                if is_lgbt:
+                    sector_tags.append("LGBT")
+                if is_solo_parent:
+                    sector_tags.append("Solo Parent")
+                if is_pregnant:
+                    sector_tags.append("Pregnant")
+                if is_young_parent:
+                    sector_tags.append("Young Parent (13-19 yrs. old)")
+                if is_4ps:
+                    sector_tags.append("4Ps Beneficiary")
+
+                row_copy = dict(r)
+                row_copy["sector"] = ", ".join(sector_tags)
+                filtered.append(row_copy)
+
+            group_labels_map = {
+                "leader": "Household Heads",
+                "kids": "Kids / Minors (0-17)",
+                "minors": "Kids / Minors (0-17)",
+                "adults": "Adults (18-59)",
+                "seniors": "Senior Citizen (60+)",
+                "pwd": "PWD",
+                "lgbt": "LGBT",
+                "solo_parent": "Solo Parent",
+                "pregnant": "Pregnant",
+                "young_parent": "Young Parent (13-19 yrs. old)",
+                "4ps": "4Ps Beneficiary",
+            }
             title = "Resident Registration Report"
             subtitle = "Residents by age group and sector"
             period_lbl = "All Time" if period.lower() == "all" else period
-            grp_lbl = "All Groups" if use_all_groups else ", ".join(g.replace("_", " ").title() for g in groups_raw)
+            grp_lbl = "All Sectors" if use_all_groups else ", ".join(group_labels_map.get(g, g.replace("_", " ").title()) for g in groups_raw)
             purok_lbl = "All Puroks" if purok.lower() == "all" else purok
-            filters_summary = f"Period: {period_lbl} · Group: {grp_lbl} · Purok: {purok_lbl}"
+            filters_summary = f"Period: {period_lbl} · Sector: {grp_lbl} · Purok: {purok_lbl}"
             columns = [
                 ("resident_id", "Resident ID"),
                 ("full_name", "Full Name"),
                 ("age", "Age"),
                 ("gender", "Sex"),
                 ("marital_status", "Civil Status"),
-                ("household", "Household"),
+                ("household", "Household Number"),
                 ("address", "Address"),
                 ("sector", "Sector"),
                 ("status", "Status"),
@@ -1000,15 +1053,13 @@ def download_report(report_name: str):
                     dtype = str(d.get("document_type") or "").strip().lower()
                     if dtype not in types_lower:
                         continue
-                eff_status = "Rejected" if str(d.get("verification_status") or "").lower() == "rejected" else str(d.get("status") or "Pending")
                 row_copy = dict(d)
-                row_copy["effective_status"] = eff_status
                 row_copy["approved_by"] = d.get("verified_by") or d.get("processor") or "—"
                 row_copy["fee_display"] = f"PHP {float(d.get('amount_paid') or 0):.2f}" if d.get("amount_paid") not in (None, "") else "—"
                 filtered.append(row_copy)
 
             title = "Document Issuance Summary"
-            subtitle = "Clearances, certificates and IDs issued"
+            subtitle = "Clearances and certificates issued"
             period_lbl = "All Time" if period.lower() == "all" else period
             types_lbl = "All Types" if use_all_types else ", ".join(types_raw)
             filters_summary = f"Period: {period_lbl} · Document Type: {types_lbl}"
@@ -1017,17 +1068,16 @@ def download_report(report_name: str):
                 ("resident_name", "Resident Name"),
                 ("document_type", "Document Type"),
                 ("date_requested", "Date Requested"),
-                ("effective_status", "Status"),
                 ("fee_display", "Fee Paid"),
                 ("approved_by", "Processed By"),
             ]
-            approved_cnt = sum(1 for r in filtered if r.get("effective_status") in ("Approved", "Resolved"))
-            rejected_cnt = sum(1 for r in filtered if r.get("effective_status") == "Rejected")
-            total_fees = sum(float(r.get("amount_paid") or 0) for r in filtered if r.get("effective_status") in ("Approved", "Resolved"))
+            total_fees = sum(
+                float(r.get("amount_paid") or 0)
+                for r in filtered
+                if str(r.get("verification_status") or "").lower() != "rejected"
+            )
             summary_cards = [
                 {"label": "Total Requests", "value": len(filtered)},
-                {"label": "Approved", "value": approved_cnt},
-                {"label": "Rejected", "value": rejected_cnt},
                 {"label": "Total Fees", "value": f"PHP {total_fees:,.2f}"},
             ]
             rows = filtered
@@ -1036,9 +1086,6 @@ def download_report(report_name: str):
             all_rows = supabase_repository.list_table("concerns", "submitted_at", categories=categories)
             month_param = str(request.args.get("month", "all")).strip()
             year_param = str(request.args.get("year", "all")).strip()
-            statuses_raw = [s.strip() for s in str(request.args.get("statuses", "all")).split(",") if s.strip()]
-            use_all_statuses = (not statuses_raw) or any(s.lower() == "all" for s in statuses_raw)
-            statuses_lower = {s.lower() for s in statuses_raw}
 
             filtered = []
             for c in all_rows:
@@ -1049,35 +1096,26 @@ def download_report(report_name: str):
                 if month_param and month_param.lower() != "all":
                     if not dt or str(dt.month) != str(int(month_param)):
                         continue
-                if not use_all_statuses:
-                    st = str(c.get("status") or "Open").strip().lower()
-                    # Treat Pending concerns as Open when filtering for Open
-                    if st not in statuses_lower and not (st == "pending" and "open" in statuses_lower):
-                        continue
-                filtered.append(c)
+                row_copy = dict(c)
+                desc = str(c.get("description") or "").strip()
+                row_copy["description"] = desc if desc else "No additional description provided."
+                filtered.append(row_copy)
 
             month_names = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
             m_lbl = month_names[int(month_param)] if month_param.isdigit() and 1 <= int(month_param) <= 12 else "All Months"
             y_lbl = "All Years" if year_param.lower() == "all" else year_param
-            s_lbl = "All Statuses" if use_all_statuses else ", ".join(statuses_raw)
             title = "Community Concerns Monitoring"
-            subtitle = "Monthly concerns by status"
-            filters_summary = f"Month: {m_lbl} · Year: {y_lbl} · Status: {s_lbl}"
+            subtitle = "Submitted community concerns by month and year"
+            filters_summary = f"Month: {m_lbl} · Year: {y_lbl}"
             columns = [
                 ("concern_id", "Concern ID"),
                 ("title", "Title"),
-                ("category", "Category"),
-                ("priority", "Priority"),
+                ("description", "Description"),
                 ("submitted_by", "Submitted By"),
                 ("submitted_at", "Date Submitted"),
-                ("status", "Status"),
             ]
-            open_cnt = sum(1 for r in filtered if str(r.get("status") or "").lower() in ("open", "pending"))
-            resolved_cnt = sum(1 for r in filtered if str(r.get("status") or "").lower() == "resolved")
             summary_cards = [
                 {"label": "Total Concerns", "value": len(filtered)},
-                {"label": "Open / Pending", "value": open_cnt},
-                {"label": "Resolved", "value": resolved_cnt},
             ]
             rows = filtered
 
@@ -2113,19 +2151,9 @@ def create_document():
 
 
 def _resolve_resident_email(doc: dict) -> str:
-    fake_demo_emails = {
-        "juan.dela.cruz@gmail.com",
-        "ana.reyes@gmail.com",
-        "rosa.bautista@gmail.com",
-        "maria.santos@gmail.com",
-        "carlos.mendoza@gmail.com",
-        "liza.torres@gmail.com",
-        "pedro.villanueva@gmail.com",
-        "resident@gmail.com",
-    }
     for email_key in ("resident_email", "email", "applicant_email", "requester_email", "contact_email"):
         cur = str(doc.get(email_key) or "").strip()
-        if cur and cur.lower() not in fake_demo_emails:
+        if cur:
             return cur
     return supabase_repository._resolve_account_email(
         doc.get("requester_id") or doc.get("resident_id"),
@@ -3470,7 +3498,7 @@ def register_account():
     requested_role = str(payload.get("role", "barangay_official")).strip().lower()
     if requested_role not in ("admin", "barangay_official"):
         return jsonify({"error": "Super Admin can register Barangay Officials and Barangay Secretary only."}), 400
-    # Barangay Secretary receives Admin role; all other registered officials are Authorized Users (barangay_official)
+    # Barangay Secretary receives Admin role; all other registered officials use barangay_official
     assigned_role = "admin" if (position and "secretary" in position.lower()) else requested_role
     raw_password = str(payload.get("password") or "")
     if (

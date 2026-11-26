@@ -418,21 +418,11 @@ class SupabaseRepository:
             enriched[k] = v
         if enriched.get("verification_status") == "Rejected" and enriched.get("status") not in ("Approved", "Resolved"):
             enriched["status"] = "Rejected"
-        fake_demo_emails = {
-            "juan.dela.cruz@gmail.com",
-            "ana.reyes@gmail.com",
-            "rosa.bautista@gmail.com",
-            "maria.santos@gmail.com",
-            "carlos.mendoza@gmail.com",
-            "liza.torres@gmail.com",
-            "pedro.villanueva@gmail.com",
-            "resident@gmail.com",
-        }
         # Prioritize any email column sent by the Resident Mobile App on the document request row itself
         row_email = ""
         for email_key in ("resident_email", "email", "applicant_email", "requester_email", "contact_email"):
             candidate = str(enriched.get(email_key) or "").strip()
-            if candidate and candidate.lower() not in fake_demo_emails:
+            if candidate:
                 row_email = candidate
                 break
         if row_email:
@@ -896,19 +886,63 @@ class SupabaseRepository:
         clean_email = email.strip().lower()
         try:
             client = self._require_server()
-            created = client.auth.admin.create_user(
-                {
-                    "email": clean_email,
-                    "password": password,
-                    "email_confirm": True
-                }
-            )
-            if not created.user:
-                raise RuntimeError(
-                    "Supabase did not create the account"
+            created_new_user = False
+            user_id = None
+            try:
+                created = client.auth.admin.create_user(
+                    {
+                        "email": clean_email,
+                        "password": password,
+                        "email_confirm": True,
+                    }
                 )
+                if not created.user:
+                    raise RuntimeError("Supabase did not create the account")
+                user_id = str(created.user.id)
+                created_new_user = True
+            except Exception as create_err:
+                err_msg = str(create_err).lower()
+                if "already been registered" in err_msg or "already exists" in err_msg:
+                    # Check if this is an orphaned Auth user with no profiles row
+                    existing_auth_user = None
+                    try:
+                        auth_users = client.auth.admin.list_users()
+                        for au in auth_users or []:
+                            if str(getattr(au, "email", "") or "").strip().lower() == clean_email:
+                                existing_auth_user = au
+                                break
+                    except Exception:
+                        existing_auth_user = None
 
-            user_id = str(created.user.id)
+                    if existing_auth_user:
+                        candidate_id = str(existing_auth_user.id)
+                        existing_prof = (
+                            client.table("profiles")
+                            .select("id,role,position,full_name")
+                            .eq("id", candidate_id)
+                            .execute()
+                        )
+                        if not existing_prof.data:
+                            # Orphaned Auth user (deleted from profiles previously) — reclaim and update password
+                            client.auth.admin.update_user_by_id(
+                                candidate_id,
+                                {"password": password, "email_confirm": True},
+                            )
+                            user_id = candidate_id
+                        else:
+                            if self.is_official_archived(candidate_id, clean_email):
+                                raise ValueError(
+                                    "This official is currently archived. Restore them in Settings → Archives."
+                                )
+                            raise ValueError(
+                                "A user with this email address has already been registered"
+                            )
+                    else:
+                        raise ValueError(
+                            "A user with this email address has already been registered"
+                        )
+                else:
+                    raise
 
             try:
                 update_fields = {
@@ -960,11 +994,13 @@ class SupabaseRepository:
                         else:
                             profile = client.table("profiles").insert(fallback_insert).execute()
             except Exception:
-                client.auth.admin.delete_user(user_id)
+                if created_new_user and user_id:
+                    client.auth.admin.delete_user(user_id)
                 raise
 
             if not profile.data:
-                client.auth.admin.delete_user(user_id)
+                if created_new_user and user_id:
+                    client.auth.admin.delete_user(user_id)
                 raise RuntimeError(
                     "Could not create the account role profile"
                 )
