@@ -10736,7 +10736,7 @@ img, video, canvas { max-width: 100%; }
 html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
 .app-shell, .main-content, .page-content, .app-view { min-width: 0; max-width: 100%; }
 .page-content img, .page-content svg:not(.lucide), .page-content canvas { max-width: 100%; height: auto; }
-.record-row > *, .metric-card, .card, .panel { min-width: 0; overflow-wrap: anywhere; }
+.record-row > *, .metric-card, .card, .panel { min-width: 0; overflow-wrap: break-word; }
 
 /* ---------- Tablet / small laptop (<= 1024px) ---------- */
 @media (max-width: 1024px) {
@@ -10824,7 +10824,25 @@ html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%
     .nav-item { padding-top: 12px; padding-bottom: 12px; }
 
     /* Long text never pushes the layout wider */
-    h1, h2, h3, p, td, th, strong, small, span, a, label { overflow-wrap: anywhere; }
+    h1, h2, h3, p { overflow-wrap: break-word; }
+
+    /* Generic tables: keep columns readable and scroll sideways */
+    .page-content table th, .page-content table td { min-width: 96px; overflow-wrap: normal; word-break: normal; }
+
+    /* Resident / Officials tables -> one card per person */
+    .resident-table, .resident-table tbody { display: block !important; width: 100% !important; overflow: visible !important; }
+    .resident-table thead { display: none !important; }
+    .resident-table tr {
+        display: grid !important; grid-template-columns: minmax(0, 1fr) !important;
+        gap: 8px; padding: 14px; margin-bottom: 12px;
+        border: 1px solid #E2E8F0; border-radius: 14px; background: #fff;
+    }
+    .resident-table td {
+        display: block !important; width: auto !important; min-width: 0 !important;
+        padding: 0 !important; border: 0 !important; text-align: left !important;
+        white-space: normal !important; word-break: normal !important; overflow-wrap: break-word !important;
+    }
+    .resident-table td:last-child { display: flex !important; flex-wrap: wrap; gap: 8px; padding-top: 8px !important; border-top: 1px solid #F1F5F9 !important; }
 }
 
 /* ---------- Very small phones (<= 380px) ---------- */
