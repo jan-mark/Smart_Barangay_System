@@ -12,6 +12,7 @@
 </head>
 <body data-dashboard-role="{{ dashboard_role }}" data-dashboard-department="{{ dashboard_department or '' }}">
     <div class="app-shell">
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
         <aside class="sidebar" id="sidebar">
             <div class="brand">
                 <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" type="button" aria-label="Toggle sidebar" aria-controls="sidebar" aria-expanded="true" title="Collapse sidebar">
@@ -51,6 +52,9 @@
 
         <main class="main-content">
             <header class="topbar" id="main-topbar">
+                <button class="menu-toggle mobile-menu-btn" id="mobile-menu-btn" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
                 <div class="topbar-page-title" id="topbar-page-title">Dashboard</div>
                 <div class="top-actions">
                     <div class="sync-status-wrap">
@@ -5358,7 +5362,8 @@
             sidebarOpen = isOpen;
             sidebar.classList.toggle('open', isMobile() && isOpen);
             sidebar.classList.toggle('collapsed', !isMobile() && !isOpen);
-            menuToggle?.setAttribute('aria-expanded', String(isOpen));
+            menuToggle?.setAttribute('aria-expanded', String(isMobile() && isOpen));
+            document.body.classList.toggle('sidebar-open', isMobile() && isOpen);
             if (sidebarCollapseBtn) {
                 sidebarCollapseBtn.setAttribute('aria-expanded', String(isOpen));
                 sidebarCollapseBtn.title = isOpen ? 'Collapse sidebar' : 'Expand sidebar';
@@ -5367,6 +5372,11 @@
         setSidebarState(sidebarOpen);
         menuToggle?.addEventListener('click', () => setSidebarState(!sidebarOpen));
         sidebarCollapseBtn?.addEventListener('click', () => setSidebarState(!sidebarOpen));
+        document.querySelector('#sidebar-backdrop')?.addEventListener('click', () => setSidebarState(false));
+        window.addEventListener('resize', () => {
+            // Keep state consistent when rotating phone/tablet or resizing the window.
+            setSidebarState(isMobile() ? false : true);
+        });
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && isMobile()) setSidebarState(false);
         });
